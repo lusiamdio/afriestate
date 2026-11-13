@@ -1,7 +1,7 @@
 
 
 import React, { useState, useEffect } from 'react';
-import { GoogleGenAI, Type } from '@google/genai';
+import { GoogleGenAI, Type } from '../lib/ai';
 import type { Property, User } from '../types';
 import PropertyList from './PropertyList';
 import { SparklesIcon } from './icons/ActionIcons';
@@ -60,7 +60,7 @@ const PersonalizedMatches: React.FC<PersonalizedMatchesProps> = (props) => {
             setMatches([]);
 
             try {
-                const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+                const ai = new GoogleGenAI();
                 
                 const savedPropertyIds = new Set(savedProperties.map(p => p.id));
                 const otherProperties = allProperties.filter(p => !savedPropertyIds.has(p.id));
@@ -116,8 +116,8 @@ const PersonalizedMatches: React.FC<PersonalizedMatchesProps> = (props) => {
     if (!currentUser) return null;
 
     return (
-        <section id="personalized-matches" className="py-12 lg:py-16 bg-brand-light">
-            <div className="container mx-auto px-6">
+        <section id="personalized-matches" className="py-12 lg:py-16 bg-brand-light dark:bg-slate-950">
+            <div className="w-full px-4 sm:px-6 lg:px-10">
                 <div className="text-center mb-12">
                     <div className="flex justify-center items-center gap-2">
                          <SparklesIcon className="w-8 h-8 text-brand-primary" />

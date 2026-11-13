@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI } from '../lib/ai';
 import type { TourRequest } from '../types';
 import { CloseIcon } from './icons/NavIcons';
 import { CpuChipIcon, ClipboardDocumentIcon } from './icons/ActionIcons';
@@ -29,7 +29,7 @@ const AIResponseModal: React.FC<AIResponseModalProps> = ({ isOpen, onClose, tour
             setError(null);
 
             try {
-                const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+                const ai = new GoogleGenAI();
                 const prompt = `
                     You are an AI assistant for a real estate agent. Your task is to draft a professional, friendly, and helpful email reply to a potential client who has requested a property tour.
 

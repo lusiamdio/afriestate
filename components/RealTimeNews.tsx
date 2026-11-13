@@ -1,7 +1,7 @@
 
 
 import React, { useState } from 'react';
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI } from "../lib/ai";
 import { CpuChipIcon } from './icons/ActionIcons';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
@@ -26,7 +26,7 @@ const RealTimeNews: React.FC = () => {
       setResult(null);
 
       try {
-          const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+          const ai = new GoogleGenAI();
           
           const response = await ai.models.generateContent({
               model: "gemini-2.5-flash",

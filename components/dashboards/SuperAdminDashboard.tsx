@@ -9,7 +9,7 @@ import {
   Activity, Users, Globe, DollarSign, Shield, ShieldAlert, Server, 
   Sparkles, TrendingUp, Lock, HelpCircle, Terminal, Cpu, Clock, RefreshCw, 
   Send, AlertTriangle, FileText, Download, Check, X, ShieldCheck, 
-  Network, Settings, Trash2, Key, Info, CheckCircle2, MessageSquare
+  Network, Settings, Trash2, Key, Info, CheckCircle2, MessageSquare, ArrowRight
 } from "lucide-react";
 
 import { 
@@ -20,7 +20,7 @@ import {
 
 import { getUsers, getProperties } from "../../lib/data";
 import { supabase } from "../../lib/supabase";
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI } from "../../lib/ai";
 import { useAdminState } from "../../contexts/AdminStateContext";
 
 import UsersTab from "./superadmin/components/UsersTab";
@@ -255,7 +255,7 @@ export default function AfriEstateAdmin({ onClose }: { onClose?: () => void }) {
   // --- CHRONOLOGICAL TIMELINE CHANNELS ---
   const [liveEvents, setLiveEvents] = useState<{ id: number; time: string; category: string; desc: string; type: string }[]>([]);
 
-  const [currencyCode, setCurrencyCode] = useState<"ZAR" | "USD" | "NGN" | "KES">("ZAR");
+  const [currencyCode, setCurrencyCode] = useState<"ZAR" | "USD" | "NGN" | "KES" | "GHS">("ZAR");
   const [selectedMapRegion, setSelectedMapRegion] = useState("Southern Africa");
   const [mapLayer, setMapLayer] = useState<"Appreciation" | "Investor Density" | "Fraud Hotspots">("Appreciation");
   const [chartRegionFilter, setChartRegionFilter] = useState("All Africa");
@@ -551,12 +551,7 @@ export default function AfriEstateAdmin({ onClose }: { onClose?: () => void }) {
     setIsAiComputing(true);
 
     try {
-      const apiKey = (process.env.API_KEY || import.meta.env.VITE_GEMINI_API_KEY) as string;
-      if (!apiKey) {
-        throw new Error("API Key is missing from the environment configuration");
-      }
-
-      const ai = new GoogleGenAI({ apiKey });
+      const ai = new GoogleGenAI();
       const statsContext = `
 You are the AfriEstate Super Admin Sovereign AI Advisor (GopherML v3).
 Here is the real-time database state:
@@ -1509,7 +1504,11 @@ Use this live context to answer the operator's query accurately. Speak professio
                                 <span className="bg-rose-500/10 text-rose-455 text-[8.5px] font-black px-1.5 rounded uppercase">{trig.gravity}</span>
                               </div>
                               <p className="text-slate-300 font-sans leading-relaxed text-[11px]">{trig.trigger}</p>
-                              <p className="text-slate-500 text-[10px]">{trig.origin} ➔ {trig.target} • {renderCurrency(trig.amount)}</p>
+                              <p className="text-slate-500 text-[10px] flex items-center gap-1 flex-wrap">
+                                <span>{trig.origin}</span>
+                                <ArrowRight className="w-3 h-3 inline text-slate-500" />
+                                <span>{trig.target} • {renderCurrency(trig.amount)}</span>
+                              </p>
                             </div>
                             <div className="flex md:flex-col justify-end gap-1.5 select-none self-end md:self-center">
                               <button onClick={() => { pushLog(`FRAUD: Suspicious transaction ${trig.id} frozen.`); toast(`Alert ${trig.id} isolated & frozen.`, "warn"); }} className="bg-rose-500 hover:bg-rose-400 text-black text-[10px] font-bold px-3 py-1.5 rounded uppercase">Freeze Wallet</button>
@@ -1753,7 +1752,10 @@ Use this live context to answer the operator's query accurately. Speak professio
                                     <button onClick={() => handleResolveDispute(disp.id, `Release to Developer (${disp.developer})`)} className="bg-cyan-500 hover:bg-cyan-400 text-black font-black px-2 py-1 rounded text-[10px] uppercase">Payout Dev</button>
                                   </div>
                                 ) : (
-                                  <span className="text-emerald-400 font-bold text-xs select-none">✓ Settled</span>
+                                  <span className="inline-flex items-center gap-1 text-emerald-400 font-bold text-xs select-none">
+                                    <Check className="w-3.5 h-3.5" />
+                                    <span>Settled</span>
+                                  </span>
                                 )}
                               </td>
                             </tr>
@@ -1843,7 +1845,11 @@ Use this live context to answer the operator's query accurately. Speak professio
                       ].map((comm, idx) => (
                         <div key={idx} className="p-3.5 bg-slate-950 border border-rose-950/50 rounded-lg space-y-2">
                           <div className="flex justify-between items-center bg-slate-900 p-1 px-2.5 rounded text-[10px]">
-                            <span className="text-rose-400 font-bold">{comm.sender} ➔ {comm.receiver}</span>
+                            <span className="inline-flex items-center gap-1 text-rose-400 font-bold">
+                              <span>{comm.sender}</span>
+                              <ArrowRight className="w-3 h-3 inline" />
+                              <span>{comm.receiver}</span>
+                            </span>
                             <span className="text-slate-500 font-mono text-[9px]">{comm.hash}</span>
                           </div>
                           <p className="text-slate-350 font-sans leading-relaxed text-[11px] border-l-2 border-rose-500 pl-3">
@@ -2112,7 +2118,10 @@ Use this live context to answer the operator's query accurately. Speak professio
                             <td className="py-3 text-slate-400">{th.status}</td>
                             <td className="py-3 text-right">
                               {th.status.includes("Mitigated") ? (
-                                <span className="text-emerald-400 font-bold">Mitigated ✓</span>
+                                <span className="inline-flex items-center gap-1 text-emerald-400 font-bold">
+                                  <span>Mitigated</span>
+                                  <Check className="w-3.5 h-3.5" />
+                                </span>
                               ) : (
                                 <button 
                                   onClick={() => handleOpenActionModal("isolate_threat", th)}
@@ -2655,7 +2664,7 @@ Use this live context to answer the operator's query accurately. Speak professio
                         <button
                           key={curr.code}
                           onClick={() => {
-                            setCurrencyCode(curr.code);
+                            setCurrencyCode(curr.code as "ZAR" | "USD" | "NGN" | "KES" | "GHS");
                             pushLog(`LOCALIZATION: Currency base swapped to: ${curr.code}`);
                             toast(`Platform base currency swapped to ${curr.code}`, "success");
                           }}
@@ -2726,7 +2735,7 @@ Use this live context to answer the operator's query accurately. Speak professio
                         <input type="text" defaultValue="sars_token_hash_49210e9" className="w-full bg-[#0c1224] border border-slate-800 rounded px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500" />
                       </div>
                     </div>
-                    <button onClick={() => onAction("adjust_pricing_config", {} as any)} className="bg-cyan-500 hover:bg-cyan-400 text-black font-extrabold px-4 py-2 rounded text-[10.5px] uppercase">Save API Config</button>
+                    <button onClick={() => setActiveModal({ type: "adjust_pricing_config", data: {} as any })} className="bg-cyan-500 hover:bg-cyan-400 text-black font-extrabold px-4 py-2 rounded text-[10.5px] uppercase">Save API Config</button>
                   </div>
 
                   {/* Platform default variables configuring */}
@@ -2829,7 +2838,10 @@ Use this live context to answer the operator's query accurately. Speak professio
                             <td className="p-4 text-slate-400 font-bold uppercase">{esc.origin}</td>
                             <td className="p-4 text-right">
                               {esc.status === "MITIGATED" ? (
-                                <span className="text-[#22c55e] font-extrabold">Mitigated ✓</span>
+                                <span className="inline-flex items-center gap-1 text-[#22c55e] font-extrabold">
+                                  <span>Mitigated</span>
+                                  <Check className="w-3.5 h-3.5" />
+                                </span>
                               ) : (
                                 <button
                                   onClick={() => {

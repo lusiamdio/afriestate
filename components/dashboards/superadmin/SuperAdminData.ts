@@ -37,76 +37,94 @@ export interface PropertyListing {
   reitEligible: boolean;
   investmentPotential: number; // 0 to 100
   size: string;
-  type: "Luxury Portfolio" | "Commercial Retail" | "Fractional Hub" | "Affordable Housing";
+  type: "Luxury Portfolio" | "Commercial Retail" | "Fractional Hub" | "Affordable Housing" | "REIT Commercial";
   ownerId: string;
   valuationTrend: string; // "+14.2% YoY"
 }
 
 export interface EscrowTransaction {
   id: string;
-  senderName: string;
-  receiverName: string;
+  senderName?: string;
+  senderRole?: string;
+  receiverName?: string;
+  receiverRole?: string;
+  assetName?: string;
   amount: number; // ZAR
-  fee: number; // ZAR
-  region: "Southern Africa" | "West Africa" | "East Africa" | "North Africa";
-  type: "Investor Payout" | "Escrow Deposit" | "Broker Commission" | "REIT Dividend";
-  status: "Completed" | "Pending Escrow" | "Frozen Locked" | "Reversed";
-  date: string;
-  amlFlagged: boolean;
-  currencyCodeUsed: string;
+  fee?: number; // ZAR
+  region?: "Southern Africa" | "West Africa" | "East Africa" | "North Africa";
+  type: string;
+  status: "Completed" | "Pending Escrow" | "Frozen Locked" | "Reversed" | "Completed Clear";
+  date?: string;
+  timestamp?: string;
+  amlFlagged?: boolean;
+  currencyCodeUsed?: string;
 }
 
 export interface ComplianceCase {
   id: string;
-  subjectName: string;
-  subjectRole: string;
-  riskScore: number;
-  details: string;
-  dateCreated: string;
-  status: "Approved Secure" | "Under EDD Review" | "Escalated to Counsel" | "Action Required";
-  documentName: string;
-  caselog: string[];
+  userName?: string;
+  subjectName?: string;
+  userRole?: string;
+  subjectRole?: string;
+  riskMetric?: number;
+  riskScore?: number;
+  flagReason?: string;
+  details?: string;
+  dateCreated?: string;
+  status: "Approved Secure" | "Under EDD Review" | "Escalated to Counsel" | "Action Required" | "Under Review" | "Flagged High Risk";
+  documentName?: string;
+  timeline?: string[];
+  caselog?: string[];
 }
 
 export interface ModerationReport {
   id: string;
-  reportingUser: string;
-  contentType: "Review" | "Forum Post" | "Property Listing" | "Chat Private Log";
-  issue: string;
-  severity: "Critical" | "High" | "Medium" | "Low";
-  status: "Pending Investigation" | "Content Removed" | "Warning Issued" | "Dismissed";
-  reportedValue: string;
-  dateCreated: string;
+  reporterName?: string;
+  reportingUser?: string;
+  targetAsset?: string;
+  contentType?: "Review" | "Forum Post" | "Property Listing" | "Chat Private Log";
+  reason?: string;
+  issue?: string;
+  severity?: "Critical" | "High" | "Medium" | "Low";
+  status: "Pending Investigation" | "Content Removed" | "Warning Issued" | "Dismissed" | "Unresolved Alert" | "Resolved Archive";
+  reportedValue?: string;
+  timestamp?: string;
+  dateCreated?: string;
 }
 
 export interface HealthService {
   id: string;
   name: string;
+  endpoint?: string;
+  type?: string;
   status: "ONLINE" | "DEGRADED" | "OUTAGE" | "SYNCING";
   latency: string;
-  cpuLoad: string;
-  uptime: string;
+  cpuLoad?: string;
+  uptime?: string;
 }
 
 export interface CyberThreat {
   id: string;
   sourceIp: string;
-  location: string;
-  attackType: "Brute Force Auth" | "DDoS Velocity Spike" | "API Unauthorized Probing" | "Cross-Site Script Attempt";
-  severity: "CRITICAL" | "ELEVATED" | "INFO";
+  location?: string;
+  type?: string;
+  attackType?: "Brute Force Auth" | "DDoS Velocity Spike" | "API Unauthorized Probing" | "Cross-Site Script Attempt";
+  severity: "CRITICAL" | "ELEVATED" | "INFO" | "HIGH";
   status: "Active Attack" | "Mitigated Isolate" | "Under Scrutiny";
   timestamp: string;
 }
 
 export interface SupportTicket {
   id: string;
-  userEmail: string;
+  senderEmail?: string;
+  userEmail?: string;
   subject: string;
-  message: string;
-  priority: "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
-  status: "Open Tickets" | "In Progress" | "SLA Escalation" | "Resolved";
-  assignedTeam: string;
-  dateCreated: string;
+  message?: string;
+  category?: string;
+  priority?: "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
+  status: "Open Tickets" | "In Progress" | "SLA Escalation" | "Resolved" | "OPEN" | "RESOLVED";
+  assignedTeam?: string;
+  dateCreated?: string;
 }
 
 // Seeded Datasets

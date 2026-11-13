@@ -2,7 +2,8 @@ import React, { useState } from "react";
 import { PropertyListing } from "../SuperAdminData";
 import { 
   Globe, Search, CheckCircle2, AlertTriangle, ShieldAlert, MapPin, 
-  Settings, RefreshCw, Send, Check, X, Shield, Activity, Star, Layers, DollarSign
+  Settings, RefreshCw, Send, Check, X, Shield, Activity, Star, Layers, DollarSign,
+  TrendingUp, Users, ArrowRight
 } from "lucide-react";
 
 interface ListingsTabProps {
@@ -286,8 +287,8 @@ export default function ListingsTab({
                   )}
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-wider flex items-center gap-1">
-                        📈 Appreciation Index
+                      <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <TrendingUp className="w-3.5 h-3.5" /> Appreciation Index
                       </span>
                       <span className="text-[9.5px] text-cyan-400 font-bold bg-cyan-950/50 px-1.5 py-0.5 rounded">
                         {selectedMapRegion === "Southern Africa" ? "+12.8%" :
@@ -321,7 +322,7 @@ export default function ListingsTab({
                   </div>
                   <div className="border-t border-slate-900/50 pt-2.5 mt-3 text-[9px] text-slate-500 font-bold flex justify-between items-center">
                     <span>DBL-CLICK FOR RISK HUD</span>
-                    <span className="text-cyan-500">➔</span>
+                    <ArrowRight className="w-3.5 h-3.5 text-cyan-500" />
                   </div>
                 </div>
 
@@ -341,8 +342,8 @@ export default function ListingsTab({
                   )}
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1">
-                        👥 Investor Density
+                      <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <Users className="w-3.5 h-3.5" /> Investor Density
                       </span>
                       <span className="text-[10px] text-amber-400 font-bold bg-amber-950/50 px-1.5 py-0.5 rounded">
                         {selectedMapRegion === "Southern Africa" ? "2,840 Wallets" :
@@ -376,7 +377,7 @@ export default function ListingsTab({
                   </div>
                   <div className="border-t border-slate-900/50 pt-2.5 mt-3 text-[9px] text-slate-500 font-bold flex justify-between items-center">
                     <span>DBL-CLICK FOR RISK HUD</span>
-                    <span className="text-amber-500">➔</span>
+                    <ArrowRight className="w-3.5 h-3.5 text-amber-500" />
                   </div>
                 </div>
 
@@ -396,8 +397,8 @@ export default function ListingsTab({
                   )}
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-[10px] font-bold text-rose-400 uppercase tracking-wider flex items-center gap-1">
-                        🛡️ Fraud Hotspots
+                      <span className="text-[10px] font-bold text-rose-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <ShieldAlert className="w-3.5 h-3.5" /> Fraud Hotspots
                       </span>
                       <span className="text-[10px] text-rose-400 font-bold bg-rose-950/50 px-1.5 py-0.5 rounded">
                         {selectedMapRegion === "Southern Africa" ? "0.8% Class A" :
@@ -427,7 +428,7 @@ export default function ListingsTab({
                   </div>
                   <div className="border-t border-slate-900/50 pt-2.5 mt-3 text-[9px] text-slate-500 font-bold flex justify-between items-center">
                     <span>DBL-CLICK FOR RISK HUD</span>
-                    <span className="text-rose-500">➔</span>
+                    <ArrowRight className="w-3.5 h-3.5 text-rose-500" />
                   </div>
                 </div>
 

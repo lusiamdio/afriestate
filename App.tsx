@@ -5,7 +5,7 @@ import Header from './components/Header';
 import Footer from './components/Footer';
 import Hero from './components/Hero';
 import PropertyList from './components/PropertyList';
-import { CATEGORIES, AGENT_ACHIEVEMENTS, INVESTOR_ACHIEVEMENTS } from './constants';
+import { CATEGORIES, AGENT_ACHIEVEMENTS, INVESTOR_ACHIEVEMENTS, DEFAULT_BLOG_POSTS } from './constants';
 import type { Property, SearchFilters, TourRequest, User, Message, Review, CalendarEvent, AgentProfile, Lead, Achievement, InvestorSettings, InvestmentRequest, BlogPost, Notification } from './types';
 import { ListingType, PropertyType, PropertyStatus, NotificationType } from './types';
 import CategoryCard from './components/CategoryCard';
@@ -14,10 +14,10 @@ import MortgageCalculator from './components/MortgageCalculator';
 import ScheduleTourModal from './components/ScheduleTourModal';
 import MarketInsights from './components/MarketInsights';
 import RecommendedProperties from './components/RecommendedProperties';
-import PropertyDetailModal from './components/PropertyDetailModal';
+import PropertyDetailPage from './components/pages/PropertyDetailPage';
 import CompareBar from './components/CompareBar';
 import CompareModal from './components/CompareModal';
-import { AuthModal } from './components/AuthModal';
+import AuthPage, { type AuthView } from './components/pages/AuthPage';
 import UserDashboardModal from './components/UserDashboardModal';
 import PropertyFormModal from './components/PropertyFormModal';
 import ServiceListingFormModal from './components/ServiceListingFormModal';
@@ -37,21 +37,20 @@ import { useTranslations } from './contexts/LanguageContext';
 import InvestmentRequestModal from './components/InvestmentRequestModal';
 import { useCurrency } from './contexts/CurrencyContext';
 import UpgradeToInvestorModal from './components/UpgradeToInvestorModal';
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type } from "./lib/ai";
 import PrivacyPolicyModal from './components/PrivacyPolicyModal';
 import TermsOfServiceModal from './components/TermsOfServiceModal';
 import CareersModal from './components/CareersModal';
 import ApplicationModal from './components/ApplicationModal';
-import NeighborhoodExplorerModal from './components/NeighborhoodExplorerModal';
 import ServiceRegistrationModal from './components/ServiceRegistrationModal';
 import BlogDetailModal from './components/BlogDetailModal';
-import ProviderServicesModal from './components/ProviderServicesModal';
 import SessionTimeoutModal from './components/SessionTimeoutModal';
-import RealTimeNews from './components/RealTimeNews';
-import NewOfferings from './components/NewOfferings';
 import { useToast } from './contexts/ToastContext';
 import { useAdminState } from './contexts/AdminStateContext';
 import MapInterface from './components/MapInterface';
+import ExploreAfricaMap from './components/ExploreAfricaMap';
+import BookingStyleFilterSidebar from './components/BookingStyleFilterSidebar';
+import PropertyVerificationModal from './components/PropertyVerificationModal';
 
 import SuperAdminDashboard from './components/dashboards/SuperAdminDashboard';
 
@@ -63,10 +62,10 @@ import PricingPage from './components/pages/PricingPage';
 import RentACarPage from './components/pages/RentACarPage';
 import FindWellnessPage from './components/pages/FindWellnessPage';
 import BookAStayPage from './components/pages/BookAStayPage';
+import NeighborhoodExplorerPage from './components/pages/NeighborhoodExplorerPage';
+import FindProfessionalPage from './components/pages/FindProfessionalPage';
 
-// FIX: Added 'userSignup' to the AuthView type to allow setting this view state, resolving a TypeScript error.
-type AuthView = 'login' | 'signup' | 'userSignup' | 'agentSignup' | 'investorSignup' | 'pendingVerificationAgent' | 'pendingVerificationInvestor' | 'forgotPassword' | 'resetConfirmation';
-type Page = 'home' | 'about' | 'services' | 'contact' | 'pricing' | 'rent-a-car' | 'find-wellness' | 'book-a-stay';
+type Page = 'home' | 'about' | 'services' | 'contact' | 'pricing' | 'rent-a-car' | 'find-wellness' | 'book-a-stay' | 'auth' | 'property-detail' | 'neighborhood-explorer' | 'find-professional';
 
 const initialFilters: SearchFilters = {
     location: '',
@@ -77,6 +76,16 @@ const initialFilters: SearchFilters = {
     bedrooms: 0,
     bathrooms: 0,
     amenities: [],
+    mode: 'buy',
+    region: '',
+    country: '',
+    leaseDuration: '',
+    investmentType: '',
+    targetReturnMin: 0,
+    infrastructure: [],
+    security: [],
+    proximity: [],
+    verifiedOnly: false,
     checkIn: '',
     checkOut: '',
     guests: 0,
@@ -155,6 +164,27 @@ const App: React.FC = () => {
   // Tour Requests State
   const [tourRequests, setTourRequests] = useState<TourRequest[]>([]);
 
+  // Enquiries & Live Engagement Tracking for Automatic Trending Ranking
+  const [enquiryCounts, setEnquiryCounts] = useState<Record<string, number>>(() => {
+    try {
+      const saved = localStorage.getItem('afriestate_enquiry_counts');
+      if (saved) return JSON.parse(saved);
+    } catch {
+      // ignore storage errors
+    }
+    return {
+      '8': 34,
+      '6': 29,
+      '4': 26,
+      '17': 24,
+      '12': 21,
+      '1': 19,
+      '2': 17,
+      '11': 15,
+      '5': 14,
+    };
+  });
+
   // Saved Searches State
   const [savedSearches, setSavedSearches] = useState<SearchFilters[]>([]);
   
@@ -196,10 +226,13 @@ const App: React.FC = () => {
   // Modal States
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
   const [isTourModalOpen, setIsTourModalOpen] = useState(false);
-  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isCompareModalOpen, setIsCompareModalOpen] = useState(false);
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [authModalView, setAuthModalView] = useState<AuthView>('login');
+  const [authPageView, setAuthPageView] = useState<AuthView>('login');
+  const openAuthPage = (view: AuthView = 'login') => {
+    setAuthPageView(view);
+    setPage('auth');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
   const [isDashboardOpen, setIsDashboardOpen] = useState(false);
   const [isPropertyFormOpen, setIsPropertyFormOpen] = useState(false);
   const [isServiceListingFormOpen, setIsServiceListingFormOpen] = useState(false);
@@ -215,20 +248,30 @@ const App: React.FC = () => {
   const [isTermsOfServiceModalOpen, setIsTermsOfServiceModalOpen] = useState(false);
   const [isCareersModalOpen, setIsCareersModalOpen] = useState(false);
   const [isApplicationModalOpen, setIsApplicationModalOpen] = useState(false);
-  const [isNeighborhoodExplorerOpen, setIsNeighborhoodExplorerOpen] = useState(false);
   const [initialNeighborhoodId, setInitialNeighborhoodId] = useState<string | undefined>(undefined);
   const [isServiceRegistrationModalOpen, setIsServiceRegistrationModalOpen] = useState(false);
   const [isBlogDetailModalOpen, setIsBlogDetailModalOpen] = useState(false);
   const [selectedBlogPost, setSelectedBlogPost] = useState<BlogPost | null>(null);
-  const [isProviderServicesModalOpen, setIsProviderServicesModalOpen] = useState(false);
   const [providerServiceFilter, setProviderServiceFilter] = useState<string | undefined>(undefined);
+  const [initialNeighborhoodFilter, setInitialNeighborhoodFilter] = useState<string | undefined>(undefined);
   
   const [isSessionWarningOpen, setIsSessionWarningOpen] = useState(false);
   const [sessionCountdown, setSessionCountdown] = useState(60);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [readNotificationIds, setReadNotificationIds] = useState<Set<string>>(new Set());
-  const [blogPosts, setBlogPosts] = useState<BlogPost[]>([]);
-  const [isLoadingBlog, setIsLoadingBlog] = useState(true);
+  const [blogPosts, setBlogPosts] = useState<BlogPost[]>(() => {
+    try {
+      const cached = localStorage.getItem('blogPosts');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {
+      // ignore JSON errors
+    }
+    return DEFAULT_BLOG_POSTS;
+  });
+  const [isLoadingBlog, setIsLoadingBlog] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [propertyToEdit, setPropertyToEdit] = useState<Property | null>(null);
   const [compareList, setCompareList] = useState<Property[]>([]);
@@ -242,6 +285,10 @@ const App: React.FC = () => {
   const [applyingForJob, setApplyingForJob] = useState('');
   const [savedNeighborhoodIds, setSavedNeighborhoodIds] = useState<Set<string>>(new Set());
   const [isMapView, setIsMapView] = useState(false);
+  const [verificationProperty, setVerificationProperty] = useState<Property | null>(null);
+  const [isVerificationModalOpen, setIsVerificationModalOpen] = useState(false);
+  const [sortOrder, setSortOrder] = useState<'recommended' | 'price_low' | 'price_high' | 'yield_high' | 'rating'>('recommended');
+  const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
   const [isSuperAdminLoggedIn, setIsSuperAdminLoggedIn] = useState(false);
   const { t } = useTranslations();
   const { addToast } = useToast();
@@ -407,9 +454,20 @@ const App: React.FC = () => {
     const fetchData = async () => {
         setIsLoadingProperties(true);
         const allProps = await getProperties(false);
-        const investmentProps = allProps.filter(p => p.listingType === ListingType.FOR_INVESTMENT);
+        let savedViews: Record<string, number> = {};
+        try {
+          const raw = localStorage.getItem('afriestate_view_counts');
+          if (raw) savedViews = JSON.parse(raw);
+        } catch {
+          // ignore
+        }
+        const hydratedProps = allProps.map(p => ({
+          ...p,
+          views: (p.views || 0) + (savedViews[p.id] || 0),
+        }));
+        const investmentProps = hydratedProps.filter(p => p.listingType === ListingType.FOR_INVESTMENT);
 
-        setAllProperties(allProps);
+        setAllProperties(hydratedProps);
         setInvestmentProperties(investmentProps);
         setIsLoadingProperties(false);
 
@@ -442,64 +500,29 @@ const App: React.FC = () => {
     fetchData();
   }, [currentUser]);
 
-  // AI Blog Generation
-    useEffect(() => {
-        const generateAndCacheBlogPosts = async () => {
-            setIsLoadingBlog(true);
-            const cachedPosts = localStorage.getItem('blogPosts');
-            if (cachedPosts) {
-                setBlogPosts(JSON.parse(cachedPosts));
-                setIsLoadingBlog(false);
-                return;
-            }
-
-            try {
-                const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-                const prompt = `Generate 3 educational, industry-relevant blog posts for a real estate marketplace called AfriEstate. Provide a JSON array.
-
-Each object must have the following fields: 'title', 'author', 'date', 'image', 'summary', and 'content'.
-
-The 'content' field MUST be a single Markdown string adhering to these professional formatting guidelines:
-
-1.  **Headings**: All section headings must be bold. Use H2 markdown ('## Major Section Heading') for main sections.
-2.  **Paragraphs**: Write in short, readable paragraphs (2-4 sentences each). **Crucially, you MUST use a double line break (a completely empty line) between paragraphs in the Markdown to ensure proper spacing.**
-3.  **Structure**: The article must follow this structure:
-    *   An **Introduction** that grabs the reader's attention.
-    *   A **Main Body** organized with clear, bold headings (H2s).
-    *   A **Key Takeaways** section summarizing the main points, under its own bold heading.
-    *   A **Call-to-Action (CTA)** at the end, under its own bold heading.
-4.  **Formatting**: Use lists and bold text for emphasis where appropriate.
-
-The other fields should follow these rules:
-- 'title': A clear, concise, and keyword-optimized title.
-- 'author': A realistic-sounding author name.
-- 'date': A recent date, e.g., "October 28, 2023".
-- 'image': A relevant, high-quality image URL from picsum.photos, e.g., https://picsum.photos/seed/blog1/400/250. Use a different seed for each post.
-- 'summary': A concise one-sentence summary of the article.
-`;
-                
-                const response = await ai.models.generateContent({
-                    model: 'gemini-3-flash-preview',
-                    contents: prompt,
-                    config: { responseMimeType: 'application/json', responseSchema: blogSchema }
-                });
-                
-                const posts = JSON.parse(response.text.trim());
-                if (Array.isArray(posts)) {
-                    localStorage.setItem('blogPosts', JSON.stringify(posts));
-                    setBlogPosts(posts);
-                }
-            } catch (error) {
-                console.error("Failed to generate blog posts:", error);
-            } finally {
-                setIsLoadingBlog(false);
-            }
-        };
-        
-        generateAndCacheBlogPosts();
-    }, []);
+  // Blog Post Initialization & Safe Cache (defaults to verified African real estate articles)
+  useEffect(() => {
+    try {
+      const cached = localStorage.getItem('blogPosts');
+      if (!cached) {
+        localStorage.setItem('blogPosts', JSON.stringify(DEFAULT_BLOG_POSTS));
+        setBlogPosts(DEFAULT_BLOG_POSTS);
+      } else {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setBlogPosts(parsed);
+        } else {
+          setBlogPosts(DEFAULT_BLOG_POSTS);
+        }
+      }
+    } catch {
+      setBlogPosts(DEFAULT_BLOG_POSTS);
+    } finally {
+      setIsLoadingBlog(false);
+    }
+  }, []);
   
-  // Centralized Filtering Logic
+  // Centralized Filtering & Sorting Logic
   useEffect(() => {
     const isTraditionalSearch = [PropertyType.ALL, PropertyType.APARTMENT, PropertyType.HOUSE, PropertyType.COMMERCIAL, PropertyType.STUDENT_HOUSING, PropertyType.TOWNSHIP, PropertyType.RURAL, PropertyType.LAND, PropertyType.LUXURY_ESTATE, PropertyType.IN_CONSTRUCTION].includes(filters.propertyType);
     const isStaySearch = [PropertyType.SHORT_TERM_RENTAL, PropertyType.HOTEL].includes(filters.propertyType);
@@ -507,36 +530,123 @@ The other fields should follow these rules:
     const isWellnessSearch = filters.propertyType === PropertyType.WELLNESS;
 
     const filtered = allProperties.filter(p => {
-        const matchesLocation = filters.location === '' || p.address.city.toLowerCase().includes(filters.location.toLowerCase()) || p.address.street.toLowerCase().includes(filters.location.toLowerCase());
+        // 1. Pan-African Location & Cross-Border Geographic matching
+        const locQuery = (filters.location || '').toLowerCase().trim();
+        const matchesLocation = !locQuery || 
+          p.address.city.toLowerCase().includes(locQuery) || 
+          p.address.street.toLowerCase().includes(locQuery) ||
+          (p.country && p.country.toLowerCase().includes(locQuery)) ||
+          (p.region && p.region.toLowerCase().includes(locQuery));
+
+        // 2. Transaction Mode / Intent (Buy / Rent / Invest)
+        let matchesListingType = true;
+        if (filters.listingType === ListingType.SALE || filters.mode === 'buy') {
+          matchesListingType = p.listingType === ListingType.SALE;
+        } else if (filters.listingType === ListingType.RENT || filters.mode === 'rent') {
+          matchesListingType = p.listingType === ListingType.RENT;
+        } else if (filters.listingType === ListingType.FOR_INVESTMENT || filters.mode === 'invest') {
+          matchesListingType = p.listingType === ListingType.FOR_INVESTMENT || p.investmentType !== undefined || (p.targetReturn || 0) > 0;
+        }
+
+        // 3. Region and Country filter
+        const matchesRegion = !filters.region || p.region === filters.region;
+        const matchesCountry = !filters.country || p.country === filters.country;
+
+        // 4. Price filter
         const matchesPrice = p.price >= filters.priceMin && p.price <= filters.priceMax;
 
+        // 5. Property type
+        const matchesPropertyType = filters.propertyType === PropertyType.ALL || p.propertyType === filters.propertyType;
+
+        // 6. Bedrooms & Bathrooms
+        const matchesBedrooms = filters.bedrooms === 0 || p.details.beds >= filters.bedrooms;
+        const matchesBathrooms = filters.bathrooms === 0 || p.details.baths >= filters.bathrooms;
+
+        // 7. African Infrastructure Filters
+        let matchesInfra = true;
+        if (filters.infrastructure && filters.infrastructure.length > 0) {
+          for (const inf of filters.infrastructure) {
+            if (inf === 'solar' && !p.hasSolar) matchesInfra = false;
+            if (inf === 'generator' && !p.hasGenerator) matchesInfra = false;
+            if (inf === 'borehole' && !p.hasBorehole) matchesInfra = false;
+            if (inf === 'waterTank' && !p.hasWaterTank) matchesInfra = false;
+            if (inf === 'fibre' && !p.hasFibre) matchesInfra = false;
+          }
+        }
+
+        // 8. African Security Filters
+        let matchesSec = true;
+        if (filters.security && filters.security.length > 0) {
+          const pSec = (p.securityFeatures || []).join(' ').toLowerCase();
+          for (const sec of filters.security) {
+            if (sec === 'gated' && !pSec.includes('gated')) matchesSec = false;
+            if (sec === 'guards' && !pSec.includes('guard')) matchesSec = false;
+            if (sec === 'cctv' && !pSec.includes('cctv')) matchesSec = false;
+            if (sec === 'perimeter' && !pSec.includes('perimeter') && !pSec.includes('fence')) matchesSec = false;
+          }
+        }
+
+        // 9. Accessibility / Proximity
+        let matchesProx = true;
+        if (filters.proximity && filters.proximity.length > 0) {
+          const pProx = (p.proximity || []).join(' ').toLowerCase();
+          for (const prox of filters.proximity) {
+            if (prox === 'university' && !pProx.includes('university') && !pProx.includes('school')) matchesProx = false;
+            if (prox === 'cbd' && !pProx.includes('cbd') && !pProx.includes('business')) matchesProx = false;
+            if (prox === 'airport' && !pProx.includes('airport')) matchesProx = false;
+            if (prox === 'hospital' && !pProx.includes('hospital')) matchesProx = false;
+          }
+        }
+
+        // 10. Target Return Minimum
+        let matchesYield = true;
+        if (filters.targetReturnMin && filters.targetReturnMin > 0) {
+          const y = p.targetReturn || p.rentalYield || p.marketROI || 0;
+          if (y < filters.targetReturnMin) matchesYield = false;
+        }
+
+        // 11. Verified Properties Only
+        const matchesVerified = !filters.verifiedOnly || p.verified === true;
+
         if (isTraditionalSearch) {
-             const matchesListingType = filters.listingType === ListingType.ALL || p.listingType === filters.listingType;
-             const matchesPropertyType = filters.propertyType === PropertyType.ALL || p.propertyType === filters.propertyType;
-             const matchesBedrooms = filters.bedrooms === 0 || p.details.beds >= filters.bedrooms;
-             const matchesBathrooms = filters.bathrooms === 0 || p.details.baths >= filters.bathrooms;
-             const matchesAmenities = filters.amenities.length === 0 || filters.amenities.every(a => p.amenities.includes(a));
-             return matchesLocation && matchesListingType && matchesPropertyType && matchesPrice && matchesBedrooms && matchesBathrooms && matchesAmenities;
+          const matchesAmenities = filters.amenities.length === 0 || filters.amenities.every(a => p.amenities.includes(a));
+          return matchesLocation && matchesListingType && matchesRegion && matchesCountry && matchesPropertyType && matchesPrice && matchesBedrooms && matchesBathrooms && matchesAmenities && matchesInfra && matchesSec && matchesProx && matchesYield && matchesVerified;
         }
 
         if (isStaySearch) {
-            const matchesGuests = !filters.guests || (p.guests || 0) >= filters.guests;
-            return matchesLocation && [PropertyType.SHORT_TERM_RENTAL, PropertyType.HOTEL].includes(p.propertyType) && matchesGuests && matchesPrice;
+          const matchesGuests = !filters.guests || (p.guests || 0) >= filters.guests;
+          return matchesLocation && [PropertyType.SHORT_TERM_RENTAL, PropertyType.HOTEL].includes(p.propertyType) && matchesGuests && matchesPrice && matchesVerified;
         }
 
         if (isTransportSearch) {
-            const matchesVehicleType = !filters.vehicleType || p.vehicleType === filters.vehicleType;
-            return matchesLocation && p.propertyType === filters.propertyType && matchesVehicleType && matchesPrice;
+          const matchesVehicleType = !filters.vehicleType || p.vehicleType === filters.vehicleType;
+          return matchesLocation && p.propertyType === filters.propertyType && matchesVehicleType && matchesPrice;
         }
 
         if (isWellnessSearch) {
-            return matchesLocation && p.propertyType === filters.propertyType && matchesPrice;
+          return matchesLocation && p.propertyType === filters.propertyType && matchesPrice;
         }
 
-        return matchesLocation && matchesPrice;
+        return matchesLocation && matchesListingType && matchesPrice && matchesVerified;
     });
+
+    // Apply Sorting
+    filtered.sort((a, b) => {
+      if (sortOrder === 'price_low') return a.price - b.price;
+      if (sortOrder === 'price_high') return b.price - a.price;
+      if (sortOrder === 'yield_high') {
+        const yA = a.targetReturn || a.rentalYield || a.marketROI || 0;
+        const yB = b.targetReturn || b.rentalYield || b.marketROI || 0;
+        return yB - yA;
+      }
+      if (sortOrder === 'rating') return b.agent.rating - a.agent.rating;
+      // Default: 'recommended'
+      if (a.featured !== b.featured) return a.featured ? -1 : 1;
+      return b.agent.rating - a.agent.rating;
+    });
+
     setFilteredProperties(filtered);
-  }, [filters, allProperties]);
+  }, [filters, allProperties, sortOrder]);
 
 
   // Derived State
@@ -564,22 +674,122 @@ The other fields should follow these rules:
         .map(n => ({ ...n, isRead: readNotificationIds.has(n.id) }))
         .sort((a, b) => b.timestamp - a.timestamp);
   }, [notifications, readNotificationIds]);
+
+  const computedEnquiryCounts = useMemo(() => {
+      const merged: Record<string, number> = { ...enquiryCounts };
+      tourRequests.forEach(tr => {
+        if (tr.propertyId) {
+          merged[tr.propertyId] = (merged[tr.propertyId] || 0) + 1;
+        }
+      });
+      messages.forEach(msg => {
+        if (msg.propertyId) {
+          merged[msg.propertyId] = (merged[msg.propertyId] || 0) + 1;
+        }
+      });
+      return merged;
+  }, [enquiryCounts, tourRequests, messages]);
+
+  const recordPropertyEnquiry = (propertyId: string) => {
+      setEnquiryCounts(prev => {
+        const next = { ...prev, [propertyId]: (prev[propertyId] || 0) + 1 };
+        try {
+          localStorage.setItem('afriestate_enquiry_counts', JSON.stringify(next));
+        } catch {
+          // ignore
+        }
+        return next;
+      });
+  };
   
   // Handlers
+  const handleOpenVerificationModal = (property: Property) => {
+    setVerificationProperty(property);
+    setIsVerificationModalOpen(true);
+  };
+
+  const handleResetFilters = () => {
+    setFilters(initialFilters);
+  };
+
+  const handleSelectHub = (city: string, country: string, region: string, listingType?: ListingType) => {
+    setFilters(prev => ({
+      ...prev,
+      location: city,
+      country,
+      region,
+      listingType: listingType || prev.listingType,
+      mode: listingType === ListingType.FOR_INVESTMENT ? 'invest' : prev.mode,
+    }));
+    scrollToSection('home', 'all-listings');
+  };
+
   const handleFilterChange = (key: keyof SearchFilters, value: any) => {
     setFilters(prev => ({ ...prev, [key]: value }));
+  };
+
+  const fallbackParseQuery = (q: string): Partial<SearchFilters> => {
+    const lower = q.toLowerCase();
+    const result: Partial<SearchFilters> = {};
+
+    const knownLocations = [
+      'cape town', 'johannesburg', 'sandton', 'camps bay', 'durban', 'lagos', 
+      'abuja', 'victoria island', 'nairobi', 'westlands', 'kigali', 'accra', 
+      'cantonments', 'cairo', 'casablanca', 'luanda', 'south africa', 'nigeria', 
+      'kenya', 'ghana', 'rwanda', 'egypt', 'morocco', 'angola'
+    ];
+    for (const loc of knownLocations) {
+      if (lower.includes(loc)) {
+        result.location = loc.charAt(0).toUpperCase() + loc.slice(1);
+        break;
+      }
+    }
+
+    if (lower.includes('invest') || lower.includes('yield') || lower.includes('roi')) {
+      result.mode = 'invest';
+      result.listingType = ListingType.FOR_INVESTMENT;
+    } else if (lower.includes('rent') || lower.includes('to let') || lower.includes('lease')) {
+      result.mode = 'rent';
+      result.listingType = ListingType.RENT;
+    } else if (lower.includes('buy') || lower.includes('sale') || lower.includes('for sale')) {
+      result.mode = 'buy';
+      result.listingType = ListingType.SALE;
+    }
+
+    if (lower.includes('apartment') || lower.includes('flat')) {
+      result.propertyType = PropertyType.APARTMENT;
+    } else if (lower.includes('house') || lower.includes('villa') || lower.includes('mansion')) {
+      result.propertyType = PropertyType.HOUSE;
+    } else if (lower.includes('commercial') || lower.includes('office')) {
+      result.propertyType = PropertyType.COMMERCIAL;
+    }
+
+    const bedMatch = lower.match(/(\d+)\s*(?:bed|bedroom)/);
+    if (bedMatch) {
+      result.bedrooms = parseInt(bedMatch[1], 10);
+    }
+
+    const infra: string[] = [];
+    if (lower.includes('solar') || lower.includes('inverter')) infra.push('solar');
+    if (lower.includes('generator') || lower.includes('genset')) infra.push('generator');
+    if (lower.includes('borehole')) infra.push('borehole');
+    if (lower.includes('water tank')) infra.push('water_tank');
+    if (lower.includes('fibre') || lower.includes('fiber')) infra.push('fibre');
+    if (infra.length > 0) result.infrastructure = infra;
+
+    return result;
   };
 
   const handleAISearch = async (query: string) => {
     if (!query.trim()) return;
     setIsSearchingAI(true);
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+        const ai = new GoogleGenAI();
         const prompt = `Parse the following user query into a JSON object of search filters. Use the provided schema. If a value isn't specified, omit the key.
         Query: "${query}"`;
         
         const response = await ai.models.generateContent({
-            model: 'gemini-3-flash-preview',
+            model: 'gemini-2.5-flash',
             contents: prompt,
             config: {
                 responseMimeType: 'application/json',
@@ -592,10 +802,18 @@ The other fields should follow these rules:
 
         setFilters(newFilters);
         setActiveTab('all');
+        scrollToSection('home', 'all-listings');
 
     } catch (error) {
-        console.error("AI Search Error:", error);
-        alert("Sorry, I couldn't understand that search. Please try rephrasing.");
+        const fallback = fallbackParseQuery(query);
+        setFilters(prev => ({ 
+          ...prev, 
+          ...fallback, 
+          location: fallback.location || query 
+        }));
+        setActiveTab('all');
+        scrollToSection('home', 'all-listings');
+        addToast(`Filtered listings matching "${query}"`, 'info');
     } finally {
         setIsSearchingAI(false);
     }
@@ -620,18 +838,27 @@ The other fields should follow these rules:
 
   const handleOpenDetailModal = async (property: Property) => {
     withRoleGate(property, async (p) => {
+        setIsDashboardOpen(false);
         setSelectedProperty(p);
-        setIsDetailModalOpen(true);
+        setPage('property-detail');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
         await incrementPropertyView(p.id);
         setAllProperties(prev => prev.map(item => item.id === p.id ? { ...item, views: (item.views || 0) + 1 } : item));
+        try {
+          const raw = localStorage.getItem('afriestate_view_counts');
+          const counts = raw ? JSON.parse(raw) : {};
+          counts[p.id] = (counts[p.id] || 0) + 1;
+          localStorage.setItem('afriestate_view_counts', JSON.stringify(counts));
+        } catch {
+          // ignore
+        }
     });
   };
 
   const handleSaveToggle = async (propertyId: string) => {
     withIdRoleGate(propertyId, async (id) => {
         if (!currentUser) {
-            setAuthModalView('login');
-            setIsAuthModalOpen(true);
+            openAuthPage('login');
             return;
         }
         const newSaved = new Set(savedPropertyIds);
@@ -675,8 +902,7 @@ The other fields should follow these rules:
   const handleOpenTourModal = (property: Property) => {
     withRoleGate(property, (p) => {
       if (!currentUser) {
-        setAuthModalView('login');
-        setIsAuthModalOpen(true);
+        openAuthPage('login');
         return;
       }
       setSelectedProperty(p);
@@ -700,7 +926,8 @@ The other fields should follow these rules:
   };
   
   const handleLogin = () => {
-      setIsAuthModalOpen(false);
+      setPage('home');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
   };
   
   const handleLogout = async () => {
@@ -762,6 +989,7 @@ The other fields should follow these rules:
       if(currentUser) {
           const newRequest = await addTourRequest(currentUser.username, request.propertyId, request.propertyTitle, request.date, request.time);
           setTourRequests(prev => [...prev, newRequest]);
+          if (request.propertyId) recordPropertyEnquiry(request.propertyId);
           setIsTourModalOpen(false);
           addToast("Tour requested successfully! The agent will be in touch.", "success");
       }
@@ -769,8 +997,7 @@ The other fields should follow these rules:
   
   const handleSaveSearch = async () => {
     if (!currentUser) {
-      setAuthModalView('login');
-      setIsAuthModalOpen(true);
+      openAuthPage('login');
       return;
     }
     const newSavedSearches = [...savedSearches, filters];
@@ -794,8 +1021,7 @@ The other fields should follow these rules:
   const handleMessageAgent = (property: Property) => {
       withRoleGate(property, (p) => {
           if (!currentUser) {
-            setAuthModalView('login');
-            setIsAuthModalOpen(true);
+            openAuthPage('login');
             return;
           }
           setSelectedProperty(p);
@@ -813,6 +1039,7 @@ The other fields should follow these rules:
               text: text,
           });
           setMessages(prev => [...prev, newMessage]);
+          recordPropertyEnquiry(selectedProperty.id);
           setIsMessageModalOpen(false);
       }
   };
@@ -913,13 +1140,13 @@ The other fields should follow these rules:
 
   const handleOpenNeighborhoodExplorer = (neighborhoodId?: string) => {
     setInitialNeighborhoodId(neighborhoodId);
-    setIsNeighborhoodExplorerOpen(true);
+    setPage('neighborhood-explorer');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
   
   const handleSaveNeighborhoodToggle = (neighborhoodId: string) => {
     if (!currentUser) {
-        setAuthModalView('login');
-        setIsAuthModalOpen(true);
+        openAuthPage('login');
         return;
     }
     setSavedNeighborhoodIds(prev => {
@@ -939,22 +1166,21 @@ The other fields should follow these rules:
     setIsAgentContactModalOpen(true);
   };
 
-  const handleOpenProviderServices = (service: string) => {
-    setPage('home');
+  const handleOpenProviderServices = (service: string, neighborhoodFilter?: string) => {
     setProviderServiceFilter(service);
-    setIsProviderServicesModalOpen(true);
+    setInitialNeighborhoodFilter(neighborhoodFilter);
+    setPage('find-professional');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handlePlanSelect = (role: 'user' | 'agent' | 'investor') => {
-      setPage('home');
       if (role === 'user') {
-          setAuthModalView('userSignup');
+          openAuthPage('userSignup');
       } else if (role === 'agent') {
-          setAuthModalView('agentSignup');
+          openAuthPage('agentSignup');
       } else {
-          setAuthModalView('investorSignup');
+          openAuthPage('investorSignup');
       }
-      setIsAuthModalOpen(true);
   };
   
   const handleMarkAsRead = async (id: string) => {
@@ -1028,10 +1254,51 @@ The other fields should follow these rules:
 
   const renderPage = () => {
     switch(page) {
+      case 'auth':
+          return (
+            <AuthPage
+              initialView={authPageView}
+              onBack={() => scrollToSection('home')}
+              onLogin={handleLogin}
+              onSwitchToPricing={() => scrollToSection('pricing')}
+              onSuperAdminLogin={() => {
+                setIsSuperAdminLoggedIn(true);
+                setPage('home');
+              }}
+            />
+          );
+      case 'property-detail':
+          if (selectedProperty) {
+            const liveProperty = allProperties.find(p => p.id === selectedProperty.id) || selectedProperty;
+            return (
+              <PropertyDetailPage
+                property={liveProperty}
+                allProperties={allProperties}
+                currentUser={currentUser}
+                isSaved={savedPropertyIds.has(selectedProperty.id)}
+                isCompared={compareList.some(item => item.id === selectedProperty.id)}
+                onBack={() => scrollToSection('home', 'all-listings')}
+                onSelectProperty={handleOpenDetailModal}
+                onSaveToggle={handleSaveToggle}
+                onToggleCompare={handleToggleCompare}
+                onOpenCalculator={handleOpenCalculator}
+                onOpenTourModal={handleOpenTourModal}
+                onOpenAgentContact={(mode, name) => {
+                  setAgentContactMode(mode);
+                  setAgentContactName(name);
+                  setIsAgentContactModalOpen(true);
+                }}
+                onOpenVRTour={handleOpenVRTour}
+                onMessageAgent={handleMessageAgent}
+                onLeaveReview={handleLeaveReview}
+              />
+            );
+          }
+          return null;
       case 'about':
-          return <AboutPage onExploreProperties={() => setIsAuthModalOpen(true)} />;
+          return <AboutPage onExploreProperties={() => openAuthPage('login')} />;
       case 'services':
-          return <ServicesPage onServiceClick={() => setIsAuthModalOpen(true)} />;
+          return <ServicesPage onServiceClick={() => openAuthPage('login')} />;
       case 'contact':
           return <ContactPage />;
       case 'pricing':
@@ -1042,6 +1309,32 @@ The other fields should follow these rules:
           return <FindWellnessPage properties={allProperties.filter(p => p.propertyType === PropertyType.WELLNESS)} />;
       case 'book-a-stay':
           return <BookAStayPage properties={allProperties.filter(p => [PropertyType.HOTEL, PropertyType.SHORT_TERM_RENTAL].includes(p.propertyType))} />;
+      case 'neighborhood-explorer':
+          return (
+            <NeighborhoodExplorerPage
+              initialNeighborhoodId={initialNeighborhoodId}
+              allProperties={allProperties}
+              savedNeighborhoodIds={savedNeighborhoodIds}
+              onSaveToggle={handleSaveNeighborhoodToggle}
+              onBack={() => scrollToSection('home', 'neighborhoods')}
+              onSelectProperty={handleOpenDetailModal}
+              onFindProfessionalsInNeighborhood={(neighborhoodName) =>
+                handleOpenProviderServices('All', neighborhoodName)
+              }
+            />
+          );
+      case 'find-professional':
+          return (
+            <FindProfessionalPage
+              initialServiceFilter={providerServiceFilter}
+              initialNeighborhoodFilter={initialNeighborhoodFilter}
+              onBack={() => scrollToSection('home')}
+              onContactProvider={handleContactProvider}
+              onExploreNeighborhood={(neighborhoodId) =>
+                handleOpenNeighborhoodExplorer(neighborhoodId)
+              }
+            />
+          );
       case 'home':
       default:
           return (
@@ -1051,20 +1344,26 @@ The other fields should follow these rules:
                       isSearchingAI={isSearchingAI}
                       filters={filters}
                       onFilterChange={handleFilterChange}
+                      onMarketSelect={() => scrollToSection('home', 'all-listings')}
+                      properties={allProperties}
+                      enquiryCounts={computedEnquiryCounts}
+                      onOpenDetailModal={handleOpenDetailModal}
                   />
 
-                  <NewOfferings 
-                      onRentCarClick={() => setPage('rent-a-car')} 
-                      onFindWellnessClick={() => setPage('find-wellness')}
-                      onBookStayClick={() => setPage('book-a-stay')}
-                  />
+                  {/* Explore Africa Continental Geographic Hub Discovery */}
+                  <div id="explore-africa">
+                    <ExploreAfricaMap 
+                      onSelectHub={handleSelectHub} 
+                      activeFilters={filters} 
+                    />
+                  </div>
                   
-                  <section id="just-listed" className="py-24 bg-brand-light relative z-10 -mt-8 rounded-t-[3xl]">
-                  <div className="container mx-auto px-4 sm:px-6">
-                      <div className="flex flex-col items-center mb-16">
+                  <section id="just-listed" className="py-16 lg:py-24 bg-brand-light dark:bg-slate-950 relative z-10">
+                  <div className="w-full px-4 sm:px-6 lg:px-10">
+                      <div className="flex flex-col items-center mb-14">
                           <div className="w-12 h-1 bg-brand-secondary mb-6"></div>
-                          <h2 className="text-4xl md:text-5xl font-black text-center text-brand-dark font-heading">Just Listed</h2>
-                          <p className="mt-4 text-slate-500 font-light text-center max-w-2xl text-lg">Discover the newest properties added to our exclusive collection. Your next investment starts here.</p>
+                          <h2 className="text-4xl md:text-5xl font-black text-center text-brand-dark dark:text-white font-heading">Just Listed</h2>
+                          <p className="mt-4 text-slate-500 dark:text-slate-400 font-light text-center max-w-2xl text-lg">Discover the newest properties added to our exclusive collection. Your next investment starts here.</p>
                       </div>
                       <PropertyList 
                           properties={recentProperties}
@@ -1085,12 +1384,12 @@ The other fields should follow these rules:
                   </div>
                   </section>
 
-                  <section id="featured-listings" className="py-24 bg-white">
-                  <div className="container mx-auto px-4 sm:px-6">
-                      <div className="flex flex-col items-center mb-16">
+                  <section id="featured-listings" className="py-16 lg:py-24 bg-white dark:bg-slate-900">
+                  <div className="w-full px-4 sm:px-6 lg:px-10">
+                      <div className="flex flex-col items-center mb-14">
                           <div className="w-12 h-1 bg-brand-secondary mb-6"></div>
-                          <h2 className="text-4xl md:text-5xl font-black text-center text-brand-dark font-heading">{t.app.featuredListings}</h2>
-                          <p className="mt-4 text-slate-500 font-light text-center max-w-2xl text-lg">Curated selections that represent the pinnacle of luxury, comfort, and value across the continent.</p>
+                          <h2 className="text-4xl md:text-5xl font-black text-center text-brand-dark dark:text-white font-heading">{t.app.featuredListings}</h2>
+                          <p className="mt-4 text-slate-500 dark:text-slate-400 font-light text-center max-w-2xl text-lg">Curated selections that represent the pinnacle of luxury, comfort, and value across the continent.</p>
                       </div>
                       <PropertyList 
                       properties={featuredProperties}
@@ -1111,106 +1410,243 @@ The other fields should follow these rules:
                   </div>
                   </section>
 
-                  <section className="py-24 bg-brand-dark text-white relative overflow-hidden">
-                      <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-brand-secondary rounded-full filter blur-[120px] opacity-10 -mr-[400px] -mt-[400px]"></div>
-                      <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-brand-primary rounded-full filter blur-[100px] opacity-10 -ml-[300px] -mb-[300px]"></div>
-                      
-                      <div className="container mx-auto px-4 sm:px-6 relative z-10">
-                          <div className="text-center mb-16">
-                              <h2 className="text-4xl md:text-5xl font-black font-heading tracking-tight mb-6">{t.app.exploreByLifestyle}</h2>
-                              <p className="text-center text-slate-300 font-light mt-4 max-w-2xl mx-auto text-lg">{t.app.exploreByLifestyleSubtitle}</p>
-                          </div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
-                          {CATEGORIES.map(category => (
-                              <div key={category.titleKey} className="transform hover:-translate-y-2 transition-all duration-300">
-                                <CategoryCard title={t.categories[category.titleKey as keyof typeof t.categories]} description={t.categories[category.descriptionKey as keyof typeof t.categories]} Icon={category.Icon} />
+                  <section className="py-20 lg:py-24 bg-[#0B1F1A] text-white">
+                      <div className="w-full px-4 sm:px-6 lg:px-10">
+                          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
+                              <div className="max-w-2xl">
+                                  <p className="text-xs font-semibold tracking-widest uppercase text-amber-300 mb-2">
+                                      Tailored Discovery
+                                  </p>
+                                  <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold font-heading tracking-tight text-white" style={{ textWrap: 'balance' }}>
+                                      {t.app.exploreByLifestyle}
+                                  </h2>
                               </div>
-                          ))}
+                              <p className="text-sm sm:text-base text-slate-300 max-w-md leading-relaxed">
+                                  {t.app.exploreByLifestyleSubtitle}
+                              </p>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 items-stretch">
+                          {CATEGORIES.map((category, idx) => {
+                              const lifestyleMedia = [
+                                { image: '/images/841376502.webp', actionLabel: 'Browse Short Stays', onClick: () => setPage('book-a-stay') },
+                                { image: '/images/2a47542b078d54560485a1e72a5373aa9c3a4a48-800x535.avif', actionLabel: 'Explore Vehicles', onClick: () => setPage('rent-a-car') },
+                                { image: '/images/getlstd-property-photo.jpg', actionLabel: 'Discover Retreats', onClick: () => setPage('find-wellness') },
+                                { image: '/images/2ec34ce4ca57aef13fc8b3239a99345e.jpg', actionLabel: 'Search Long-Term', onClick: () => { handleFilterChange('mode', 'rent'); handleFilterChange('listingType', ListingType.RENT); scrollToSection('home', 'all-listings'); } },
+                              ][idx] || { image: '/images/house_suburbs_1779978598551.png', actionLabel: 'Explore', onClick: () => scrollToSection('home', 'all-listings') };
+
+                              return (
+                                <CategoryCard
+                                  key={category.titleKey}
+                                  title={t.categories[category.titleKey as keyof typeof t.categories]}
+                                  description={t.categories[category.descriptionKey as keyof typeof t.categories]}
+                                  Icon={category.Icon}
+                                  image={lifestyleMedia.image}
+                                  indexLabel={`0${idx + 1}`}
+                                  actionLabel={lifestyleMedia.actionLabel}
+                                  onClick={lifestyleMedia.onClick}
+                                />
+                              );
+                          })}
                           </div>
                       </div>
                   </section>
 
-                  <section id="all-listings" className="py-24 bg-brand-light">
-                  <div className="container mx-auto px-4 sm:px-6">
-                      <div className="flex flex-col items-center mb-12">
-                          <h2 className="text-4xl md:text-5xl font-black text-center text-brand-dark font-heading mb-6">{t.app.findYourProperty}</h2>
-                      </div>
-                      <div className="flex justify-between items-center w-full mb-10">
-                          <div className="flex items-center gap-4">
-                              <button onClick={() => setActiveTab('all')} className={`px-4 py-2 text-sm font-semibold rounded-full transition-colors ${activeTab === 'all' ? 'bg-brand-primary text-white' : 'bg-white/50 text-brand-dark'}`}>{t.app.allListings}</button>
-                              <button onClick={() => setActiveTab('saved')} className={`px-4 py-2 text-sm font-semibold rounded-full transition-colors relative ${activeTab === 'saved' ? 'bg-brand-primary text-white' : 'bg-white/50 text-brand-dark'}`}>
-                              {t.app.savedProperties}
-                              {savedPropertyIds.size > 0 && <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-brand-accent text-white text-xs font-bold">{savedPropertyIds.size}</span>}
+                  <section id="all-listings" className="py-16 md:py-24 bg-slate-50 dark:bg-slate-950">
+                  <div className="w-full px-4 sm:px-6 lg:px-10">
+                      {/* Section Title & Intent Summary */}
+                      <div className="mb-8 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+                          <div>
+                            <div className="text-xs uppercase tracking-widest text-emerald-600 font-semibold mb-1">
+                              {filters.mode === 'invest' ? 'High-Yield Assets & Syndications' : filters.mode === 'rent' ? 'Verified African Rentals' : 'Prime Real Estate For Sale'}
+                            </div>
+                            <h2 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white tracking-tight">
+                              {filters.location ? `Properties in ${filters.location}` : t.app.findYourProperty}
+                            </h2>
+                            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                              Showing {filteredProperties.length} verified listings across Africa with cadastre and surveyor checks.
+                            </p>
+                          </div>
+
+                          {/* Quick Tabs: All vs Saved */}
+                          <div className="flex items-center gap-2">
+                              <button 
+                                onClick={() => setActiveTab('all')} 
+                                className={`px-4 py-2 text-xs font-semibold rounded-lg transition-all ${activeTab === 'all' ? 'bg-slate-900 text-white shadow-sm' : 'bg-white text-slate-700 hover:bg-slate-100 shadow-xs'}`}
+                              >
+                                {t.app.allListings} ({filteredProperties.length})
+                              </button>
+                              <button 
+                                onClick={() => setActiveTab('saved')} 
+                                className={`px-4 py-2 text-xs font-semibold rounded-lg transition-all relative ${activeTab === 'saved' ? 'bg-slate-900 text-white shadow-sm' : 'bg-white text-slate-700 hover:bg-slate-100 shadow-xs'}`}
+                              >
+                                {t.app.savedProperties}
+                                {savedPropertyIds.size > 0 && (
+                                  <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-amber-500 text-slate-900 text-[10px] font-bold">
+                                    {savedPropertyIds.size}
+                                  </span>
+                                )}
                               </button>
                           </div>
-                          
-                          <div className="flex items-center gap-4">
-                              <div className="flex bg-white/50 rounded-lg p-1 border border-brand-primary/20">
-                                  <button onClick={() => setIsMapView(false)} className={`px-4 py-1.5 text-sm font-semibold rounded-md transition-all ${!isMapView ? 'bg-white text-brand-primary shadow-sm' : 'text-slate-500 hover:text-brand-dark'}`}>
-                                      List View
+                      </div>
+
+                      {/* Top Bar for Results: Mobile filter trigger, Sort & View toggles */}
+                      <div className="bg-white dark:bg-slate-900 rounded-xl p-3 sm:p-4 mb-6 flex flex-wrap items-center justify-between gap-3 shadow-sm">
+                          {/* Mobile filter button */}
+                          <button 
+                            type="button"
+                            onClick={() => setIsMobileFiltersOpen(true)}
+                            className="lg:hidden inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                            </svg>
+                            Filters & Infrastructure
+                          </button>
+
+                          {/* Active filters summary */}
+                          <div className="hidden sm:flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                            <span className="font-semibold text-slate-900 dark:text-white">{activeTab === 'all' ? filteredProperties.length : savedProperties.length}</span> results found
+                            {filters.verifiedOnly && <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] bg-emerald-50 text-emerald-700 font-medium">Verified only</span>}
+                            {filters.infrastructure.length > 0 && <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] bg-amber-50 text-amber-800 font-medium">{filters.infrastructure.length} infra specs</span>}
+                          </div>
+
+                          {/* Right Controls: Sort Order & List/Map Toggle */}
+                          <div className="flex items-center gap-3 ml-auto">
+                              <div className="flex items-center gap-2">
+                                <label htmlFor="sort-select" className="text-xs font-medium text-slate-500 hidden md:inline">Sort by:</label>
+                                <select
+                                  id="sort-select"
+                                  value={sortOrder}
+                                  onChange={(e) => setSortOrder(e.target.value as any)}
+                                  className="text-xs font-medium bg-slate-100 dark:bg-slate-800 border-0 rounded-lg px-2.5 py-1.5 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                                >
+                                  <option value="recommended">Recommended & Featured</option>
+                                  <option value="price_low">Price: Low to High</option>
+                                  <option value="price_high">Price: High to Low</option>
+                                  <option value="yield_high">Highest Yield / ROI %</option>
+                                  <option value="rating">Top Agent Rating</option>
+                                </select>
+                              </div>
+
+                              <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-0.5">
+                                  <button 
+                                      onClick={() => setIsMapView(false)} 
+                                      className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${!isMapView ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs' : 'text-slate-500 hover:text-slate-900'}`}
+                                  >
+                                      List
                                   </button>
-                                  <button onClick={() => setIsMapView(true)} className={`px-4 py-1.5 text-sm font-semibold rounded-md transition-all flex items-center gap-1.5 ${isMapView ? 'bg-white text-brand-primary shadow-sm' : 'text-slate-500 hover:text-brand-dark'}`}>
-                                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" /></svg>
-                                      Map View
+                                  <button 
+                                      onClick={() => setIsMapView(true)} 
+                                      className={`px-3 py-1 text-xs font-semibold rounded-md transition-all flex items-center gap-1 ${isMapView ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs' : 'text-slate-500 hover:text-slate-900'}`}
+                                  >
+                                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" /></svg>
+                                      Map
                                   </button>
                               </div>
-                              <button onClick={handleSaveSearch} className="flex items-center gap-2 bg-white/50 text-brand-dark dark:text-white px-4 py-2 rounded-lg font-semibold hover:bg-white transition-colors border border-brand-primary/20">
-                                  <BookmarkIcon className="w-5 h-5 text-brand-primary" />
-                                  {t.app.saveSearch}
+
+                              <button 
+                                  onClick={handleSaveSearch} 
+                                  title="Save current search criteria"
+                                  className="hidden sm:flex items-center gap-1.5 text-xs text-slate-700 dark:text-slate-200 hover:text-slate-900 px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 transition-colors"
+                              >
+                                  <BookmarkIcon className="w-4 h-4 text-emerald-600" />
+                                  <span>Save</span>
                               </button>
                           </div>
                       </div>
-                      
-                      {activeTab === 'all' && !isMapView && <p className="text-center text-slate-500 dark:text-slate-400 mb-8">{t.app.showingResults.replace('{{count}}', String(filteredProperties.length))}</p>}
-                      {activeTab === 'saved' && !isMapView && <p className="text-center text-slate-500 dark:text-slate-400 mb-8">{t.app.savedCount.replace('{{count}}', String(savedProperties.length))}</p>}
-                      
-                      {isMapView ? (
-                        <div className="mb-12">
-                           <MapInterface 
-                              properties={activeTab === 'all' ? filteredProperties : savedProperties} 
-                              onOpenDetailModal={handleOpenDetailModal}
-                           />
-                        </div>
-                      ) : activeTab === 'all' ? (
-                          filteredProperties.length > 0 ? (
-                              <PropertyList 
-                                  properties={filteredProperties}
-                                  currentUser={currentUser}
-                                  onSaveToggle={handleSaveToggle}
-                                  savedPropertyIds={savedPropertyIds}
-                                  onOpenCalculator={handleOpenCalculator}
-                                  onOpenTourModal={handleOpenTourModal}
-                                  onFindSimilar={handleFindSimilar}
-                                  onOpenDetailModal={handleOpenDetailModal}
-                                  onToggleCompare={handleToggleCompare}
-                                  onOpenVRTour={handleOpenVRTour}
-                                  compareList={compareList}
-                                  onEdit={handleEditProperty}
-                                  onDelete={handleDeleteProperty}
-                                  isLoading={isLoadingProperties}
-                              />
-                          ) : <p className="text-center text-slate-500 dark:text-slate-400">{t.app.noPropertiesFound}<br/>{t.app.adjustFilters}</p>
-                      ) : (
-                          savedProperties.length > 0 ? (
-                              <PropertyList 
-                                  properties={savedProperties}
-                                  currentUser={currentUser}
-                                  onSaveToggle={handleSaveToggle}
-                                  savedPropertyIds={savedPropertyIds}
-                                  onOpenCalculator={handleOpenCalculator}
-                                  onOpenTourModal={handleOpenTourModal}
-                                  onFindSimilar={handleFindSimilar}
-                                  onOpenDetailModal={handleOpenDetailModal}
-                                  onToggleCompare={handleToggleCompare}
-                                  onOpenVRTour={handleOpenVRTour}
-                                  compareList={compareList}
-                                  onEdit={handleEditProperty}
-                                  onDelete={handleDeleteProperty}
-                                  isLoading={isLoadingProperties}
-                              />
-                          ) : <p className="text-center text-slate-500 dark:text-slate-400">{t.app.noSavedProperties}</p>
-                      )}
 
+                      {/* Main 2-Column Content: Sidebar + Cards */}
+                      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                          {/* Desktop Sidebar (col-span-3) */}
+                          <div className="hidden lg:block lg:col-span-3">
+                              <BookingStyleFilterSidebar 
+                                filters={filters} 
+                                onFilterChange={handleFilterChange} 
+                                onResetFilters={handleResetFilters} 
+                                totalResultsCount={filteredProperties.length} 
+                              />
+                          </div>
+
+                          {/* Results Column (col-span-9) */}
+                          <div className="lg:col-span-9">
+                              {isMapView ? (
+                                <div className="rounded-xl overflow-hidden bg-white dark:bg-slate-900 p-2 shadow-sm">
+                                   <MapInterface 
+                                      properties={activeTab === 'all' ? filteredProperties : savedProperties} 
+                                      onOpenDetailModal={handleOpenDetailModal}
+                                   />
+                                </div>
+                              ) : activeTab === 'all' ? (
+                                  filteredProperties.length > 0 ? (
+                                      <PropertyList 
+                                          properties={filteredProperties}
+                                          currentUser={currentUser}
+                                          onSaveToggle={handleSaveToggle}
+                                          savedPropertyIds={savedPropertyIds}
+                                          onOpenCalculator={handleOpenCalculator}
+                                          onOpenTourModal={handleOpenTourModal}
+                                          onFindSimilar={handleFindSimilar}
+                                          onOpenDetailModal={handleOpenDetailModal}
+                                          onToggleCompare={handleToggleCompare}
+                                          onOpenVRTour={handleOpenVRTour}
+                                          compareList={compareList}
+                                          onEdit={handleEditProperty}
+                                          onDelete={handleDeleteProperty}
+                                          isLoading={isLoadingProperties}
+                                          onOpenVerificationModal={handleOpenVerificationModal}
+                                      />
+                                  ) : (
+                                      <div className="bg-white dark:bg-slate-900 rounded-xl p-12 text-center shadow-sm">
+                                          <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400">
+                                            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                            </svg>
+                                          </div>
+                                          <h3 className="text-base font-semibold text-slate-900 dark:text-white mb-1">{t.app.noPropertiesFound}</h3>
+                                          <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-sm mx-auto">{t.app.adjustFilters}</p>
+                                          <button 
+                                            onClick={handleResetFilters}
+                                            className="px-4 py-2 text-xs font-semibold rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
+                                          >
+                                            Reset all filters
+                                          </button>
+                                      </div>
+                                  )
+                              ) : (
+                                  savedProperties.length > 0 ? (
+                                      <PropertyList 
+                                          properties={savedProperties}
+                                          currentUser={currentUser}
+                                          onSaveToggle={handleSaveToggle}
+                                          savedPropertyIds={savedPropertyIds}
+                                          onOpenCalculator={handleOpenCalculator}
+                                          onOpenTourModal={handleOpenTourModal}
+                                          onFindSimilar={handleFindSimilar}
+                                          onOpenDetailModal={handleOpenDetailModal}
+                                          onToggleCompare={handleToggleCompare}
+                                          onOpenVRTour={handleOpenVRTour}
+                                          compareList={compareList}
+                                          onEdit={handleEditProperty}
+                                          onDelete={handleDeleteProperty}
+                                          isLoading={isLoadingProperties}
+                                          onOpenVerificationModal={handleOpenVerificationModal}
+                                      />
+                                  ) : (
+                                      <div className="bg-white dark:bg-slate-900 rounded-xl p-12 text-center shadow-sm">
+                                          <h3 className="text-base font-semibold text-slate-900 dark:text-white mb-1">{t.app.noSavedProperties}</h3>
+                                          <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">Click the bookmark icon on any property card to save it for easy comparison.</p>
+                                          <button 
+                                            onClick={() => setActiveTab('all')}
+                                            className="px-4 py-2 text-xs font-semibold rounded-lg bg-slate-900 text-white hover:bg-slate-800 transition-colors"
+                                          >
+                                            Browse all properties
+                                          </button>
+                                      </div>
+                                  )
+                              )}
+                          </div>
+                      </div>
                   </div>
                   </section>
                   
@@ -1234,7 +1670,6 @@ The other fields should follow these rules:
                   }
                   
                   <MarketInsights />
-                  <RealTimeNews />
 
                   {targetPropertyForSimilar && 
                       <RecommendedProperties
@@ -1255,27 +1690,67 @@ The other fields should follow these rules:
                       />
                   }
 
-                  <FinancialServices />
+                  <FinancialServices 
+                    onOpenMortgageCalculator={() => {
+                      const target = allProperties.find(p => p.listingType === ListingType.SALE) || allProperties[0];
+                      if (target) handleOpenCalculator(target);
+                    }}
+                    onExploreRentals={() => {
+                      handleFilterChange('mode', 'rent');
+                      handleFilterChange('listingType', ListingType.RENT);
+                      scrollToSection('home', 'all-listings');
+                    }}
+                    onOpenProviderServices={(serviceFilter) => handleOpenProviderServices(serviceFilter || 'All')}
+                  />
                   <NeighborhoodSection onOpenExplorer={handleOpenNeighborhoodExplorer} />
                   <BlogSection posts={blogPosts} onPostClick={handleBlogClick} isLoading={isLoadingBlog}/>
                   
-                  {/* Home Page Call to Action */}
-                  <section className="py-24 bg-brand-light relative overflow-hidden text-center sm:text-left">
-                      <div className="absolute top-0 right-0 w-96 h-96 bg-brand-secondary rounded-full filter blur-[100px] opacity-20 -mr-48 -mt-48"></div>
-                      <div className="absolute bottom-0 left-0 w-96 h-96 bg-brand-primary rounded-full filter blur-[100px] opacity-20 -ml-48 -mb-48"></div>
-                      <div className="container mx-auto px-6 relative z-10 max-w-5xl">
-                          <div className="bg-brand-dark rounded-[3rem] p-12 md:p-20 shadow-2xl flex flex-col md:flex-row items-center justify-between gap-12 text-white">
-                              <div className="text-left flex-1">
-                                  <h2 className="text-4xl md:text-5xl font-black font-heading mb-6">Experience Premium Real Estate Today</h2>
-                                  <p className="text-lg md:text-xl font-light text-slate-300 max-w-xl">
-                                      Join thousands of property seekers, investors, and homeowners experiencing the simplest and most powerful estate platform in Africa. Create your account in minutes.
-                                  </p>
+                  {/* Home Page Closing Call to Action */}
+                  <section className="w-full py-20 lg:py-24 bg-[#0B1F1A] text-white">
+                      <div className="w-full px-4 sm:px-6 lg:px-10 grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
+                          <div className="lg:col-span-7">
+                              <p className="text-xs font-semibold tracking-widest uppercase text-amber-300 mb-3">
+                                  Ready to Transact with Certainty
+                              </p>
+                              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold font-heading tracking-tight text-white" style={{ textWrap: 'balance' }}>
+                                  Experience Premium Real Estate Today
+                              </h2>
+                              <p className="mt-4 text-sm sm:text-base text-slate-300 max-w-xl leading-relaxed">
+                                  Join property seekers, diaspora buyers, institutional investors, and accredited agents operating across Africa with verified title checks and transparent market intelligence.
+                              </p>
+
+                              <div className="mt-8 pt-8 grid grid-cols-3 gap-6 max-w-lg">
+                                  <div>
+                                      <p className="text-xl sm:text-2xl font-bold font-mono tabular-nums text-amber-300">54</p>
+                                      <p className="text-xs text-slate-400 mt-1">Continental Markets</p>
+                                  </div>
+                                  <div>
+                                      <p className="text-xl sm:text-2xl font-bold font-mono tabular-nums text-white">100%</p>
+                                      <p className="text-xs text-slate-400 mt-1">Registry Verified</p>
+                                  </div>
+                                  <div>
+                                      <p className="text-xl sm:text-2xl font-bold font-mono tabular-nums text-emerald-300">24/7</p>
+                                      <p className="text-xs text-slate-400 mt-1">Investor Desk</p>
+                                  </div>
                               </div>
-                              <div className="flex-shrink-0 w-full md:w-auto">
-                                  <button onClick={() => setPage('pricing')} className="bg-brand-primary text-white font-bold text-lg px-10 py-5 rounded-full hover:bg-white hover:text-brand-dark transition-all transform hover:-translate-y-1 shadow-2xl flex items-center justify-center gap-3 w-full sm:w-auto">
-                                      Sign Up Now <ArrowRightIcon className="w-6 h-6"/>
-                                  </button>
-                              </div>
+                          </div>
+
+                          <div className="lg:col-span-5 flex flex-col sm:flex-row lg:flex-col gap-3 lg:items-end justify-center">
+                              <button
+                                  type="button"
+                                  onClick={() => openAuthPage('signup')}
+                                  className="inline-flex items-center justify-center gap-2.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-semibold text-sm px-7 py-4 rounded-xl transition-colors w-full sm:w-auto lg:w-72"
+                              >
+                                  <span className="whitespace-nowrap">Create Free Account</span>
+                                  <ArrowRightIcon className="w-4 h-4 shrink-0" />
+                              </button>
+                              <button
+                                  type="button"
+                                  onClick={() => scrollToSection('home', 'all-listings')}
+                                  className="inline-flex items-center justify-center gap-2.5 bg-white/10 hover:bg-white/15 text-white font-semibold text-sm px-7 py-4 rounded-xl transition-colors w-full sm:w-auto lg:w-72"
+                              >
+                                  <span className="whitespace-nowrap">Browse Verified Listings</span>
+                              </button>
                           </div>
                       </div>
                   </section>
@@ -1294,7 +1769,7 @@ The other fields should follow these rules:
         currentUser={currentUser}
         notifications={notificationsWithReadStatus}
         readNotificationIds={readNotificationIds}
-        onLoginClick={() => { setAuthModalView('login'); setIsAuthModalOpen(true); }}
+        onLoginClick={() => openAuthPage('login')}
         onSignUpClick={() => setPage('pricing')}
         onDashboardClick={() => setIsDashboardOpen(true)}
         onListPropertyClick={handleListPropertyClick}
@@ -1304,40 +1779,64 @@ The other fields should follow these rules:
         onAboutClick={() => scrollToSection('about', 'about')}
         onServicesClick={() => scrollToSection('services', 'services')}
         onContactClick={() => scrollToSection('contact', 'contact')}
+        onBuyClick={() => {
+          handleFilterChange('mode', 'buy');
+          handleFilterChange('listingType', ListingType.SALE);
+          scrollToSection('home', 'all-listings');
+        }}
+        onRentClick={() => {
+          handleFilterChange('mode', 'rent');
+          handleFilterChange('listingType', ListingType.RENT);
+          scrollToSection('home', 'all-listings');
+        }}
+        onInvestClick={() => {
+          handleFilterChange('mode', 'invest');
+          handleFilterChange('listingType', ListingType.FOR_INVESTMENT);
+          scrollToSection('home', 'all-listings');
+        }}
+        onSellClick={handleListPropertyClick}
+        onDevelopClick={() => {
+          handleFilterChange('propertyType', PropertyType.IN_CONSTRUCTION);
+          scrollToSection('home', 'all-listings');
+        }}
+        onExploreClick={() => scrollToSection('home', 'explore-africa')}
+        savedCount={savedPropertyIds.size}
+        onSavedClick={() => {
+          setActiveTab('saved');
+          scrollToSection('home', 'all-listings');
+        }}
       />
       <main className="flex-grow">
         {renderPage()}
       </main>
-      <Footer 
-        onAboutClick={() => scrollToSection('about', 'about')}
-        onContactClick={() => scrollToSection('contact', 'contact')}
-        onBlogClick={() => scrollToSection('home', 'blog')}
-        onPrivacyPolicyClick={() => setIsPrivacyPolicyModalOpen(true)}
-        onTermsOfServiceClick={() => setIsTermsOfServiceModalOpen(true)}
-        onCareersClick={() => setIsCareersModalOpen(true)}
-        onFindAProClick={() => setIsProviderServicesModalOpen(true)}
-      />
+      {page !== 'auth' && (
+        <Footer 
+          onAboutClick={() => scrollToSection('about', 'about')}
+          onContactClick={() => scrollToSection('contact', 'contact')}
+          onBlogClick={() => scrollToSection('home', 'blog')}
+          onPrivacyPolicyClick={() => setIsPrivacyPolicyModalOpen(true)}
+          onTermsOfServiceClick={() => setIsTermsOfServiceModalOpen(true)}
+          onCareersClick={() => setIsCareersModalOpen(true)}
+          onFindAProClick={() => handleOpenProviderServices('All')}
+          onMarketJump={(loc) => {
+            handleFilterChange('location', loc);
+            setActiveTab('all');
+            scrollToSection('home', 'all-listings');
+          }}
+          onModeJump={(mode) => {
+            handleFilterChange('mode', mode);
+            handleFilterChange('listingType', mode === 'buy' ? ListingType.SALE : mode === 'rent' ? ListingType.RENT : ListingType.FOR_INVESTMENT);
+            setActiveTab('all');
+            scrollToSection('home', 'all-listings');
+          }}
+        />
+      )}
       <Chatbot />
       
       {selectedProperty && <MortgageCalculator isOpen={isCalculatorOpen} onClose={() => setIsCalculatorOpen(false)} propertyPrice={selectedProperty.price} propertyTitle={selectedProperty.title} />}
       {selectedProperty && <ScheduleTourModal isOpen={isTourModalOpen} onClose={() => setIsTourModalOpen(false)} propertyTitle={selectedProperty.title} propertyId={selectedProperty.id} agentName={selectedProperty.agent.name} onSubmit={handleScheduleTour} />}
-      {selectedProperty && <PropertyDetailModal isOpen={isDetailModalOpen} onClose={() => setIsDetailModalOpen(false)} property={selectedProperty} currentUser={currentUser} onOpenAgentContact={(mode, name) => { setAgentContactMode(mode); setAgentContactName(name); setIsAgentContactModalOpen(true); }} onOpenVRTour={handleOpenVRTour} onMessageAgent={handleMessageAgent} onLeaveReview={handleLeaveReview} />}
       {compareList.length > 0 && <CompareBar properties={compareList} onCompare={() => setIsCompareModalOpen(true)} onClear={() => setCompareList([])} onRemove={(p) => setCompareList(prev => prev.filter(item => item.id !== p.id))} />}
       <CompareModal isOpen={isCompareModalOpen} onClose={() => setIsCompareModalOpen(false)} properties={compareList} />
-      <AuthModal 
-        isOpen={isAuthModalOpen} 
-        onClose={() => setIsAuthModalOpen(false)} 
-        onLogin={handleLogin} 
-        initialView={authModalView}
-        onSwitchToPricing={() => {
-            setIsAuthModalOpen(false);
-            setPage('pricing');
-        }}
-        onSuperAdminLogin={() => {
-          setIsAuthModalOpen(false);
-          setIsSuperAdminLoggedIn(true);
-        }}
-      />
       {currentUser && 
           <UserDashboardModal
             isOpen={isDashboardOpen}
@@ -1417,13 +1916,6 @@ The other fields should follow these rules:
         jobTitle={applyingForJob}
         onSubmit={handleApplicationSubmit}
       />
-      <NeighborhoodExplorerModal 
-        isOpen={isNeighborhoodExplorerOpen}
-        onClose={() => setIsNeighborhoodExplorerOpen(false)}
-        initialNeighborhoodId={initialNeighborhoodId}
-        savedNeighborhoodIds={savedNeighborhoodIds}
-        onSaveToggle={handleSaveNeighborhoodToggle}
-      />
       <ServiceRegistrationModal 
         isOpen={isServiceRegistrationModalOpen}
         onClose={() => setIsServiceRegistrationModalOpen(false)}
@@ -1439,21 +1931,58 @@ The other fields should follow these rules:
               }}
           />
        )}
-       <ProviderServicesModal 
-          isOpen={isProviderServicesModalOpen}
-          onClose={() => {
-              setIsProviderServicesModalOpen(false);
-              setProviderServiceFilter(undefined);
-          }}
-          onContactProvider={handleContactProvider}
-          initialServiceFilter={providerServiceFilter}
-       />
        <SessionTimeoutModal
             isOpen={isSessionWarningOpen}
             onClose={handleStayLoggedIn}
             onLogout={handleLogout}
             countdown={sessionCountdown}
         />
+
+       {/* Title Deed Verification Modal */}
+       <PropertyVerificationModal
+         isOpen={isVerificationModalOpen}
+         onClose={() => setIsVerificationModalOpen(false)}
+         property={verificationProperty}
+       />
+
+       {/* Mobile Booking.com Filters Drawer */}
+       {isMobileFiltersOpen && (
+         <div className="fixed inset-0 z-50 overflow-y-auto lg:hidden">
+           <div 
+             className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity" 
+             onClick={() => setIsMobileFiltersOpen(false)} 
+           />
+           <div className="relative min-h-full flex items-end justify-center sm:items-center p-0 sm:p-4">
+             <div className="relative bg-white rounded-t-2xl sm:rounded-2xl max-w-lg w-full max-h-[85vh] overflow-y-auto p-4 shadow-2xl">
+               <div className="flex items-center justify-between pb-3 border-b border-slate-200 mb-3">
+                 <h3 className="text-base font-bold text-slate-900">Filters & Infrastructure</h3>
+                 <button 
+                   onClick={() => setIsMobileFiltersOpen(false)}
+                   className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100"
+                 >
+                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                   </svg>
+                 </button>
+               </div>
+               <BookingStyleFilterSidebar 
+                 filters={filters} 
+                 onFilterChange={handleFilterChange} 
+                 onResetFilters={handleResetFilters} 
+                 totalResultsCount={filteredProperties.length} 
+               />
+               <div className="mt-4 pt-3 border-t border-slate-200">
+                 <button 
+                   onClick={() => setIsMobileFiltersOpen(false)}
+                   className="w-full py-2.5 text-xs font-bold rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shadow-xs"
+                 >
+                   Show {filteredProperties.length} Results
+                 </button>
+               </div>
+             </div>
+           </div>
+         </div>
+       )}
     </div>
   );
 };

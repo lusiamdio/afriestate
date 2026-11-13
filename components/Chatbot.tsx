@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { GoogleGenAI, Chat } from "@google/genai";
+import { GoogleGenAI, Chat } from "../lib/ai";
 import { ChatIcon, CloseIcon, SendIcon } from './icons/NavIcons';
 import { useTranslations } from '../contexts/LanguageContext';
 
@@ -47,7 +47,7 @@ const Chatbot: React.FC = () => {
     useEffect(() => {
         const initChat = async () => {
             try {
-                const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+                const ai = new GoogleGenAI();
                 const newChat = ai.chats.create({
                     model: 'gemini-2.5-flash',
                     config: {

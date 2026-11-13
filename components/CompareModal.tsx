@@ -4,7 +4,7 @@ import React from 'react';
 import type { Property } from '../types';
 import { CloseIcon } from './icons/NavIcons';
 import { BedIcon, BathIcon, AreaIcon } from './icons/PropertyIcons';
-import { CheckBadgeIcon } from './icons/ActionIcons';
+import { CheckBadgeIcon, StarIcon } from './icons/ActionIcons';
 import { useCurrency } from '../contexts/CurrencyContext';
 
 interface CompareModalProps {
@@ -91,11 +91,25 @@ const CompareModal: React.FC<CompareModalProps> = ({ isOpen, onClose, properties
                         </tr>
                         <tr className="bg-slate-50 dark:bg-slate-800/50">
                             <td className="p-4 font-semibold">Agent Name</td>
-                            {properties.map(p => <td key={p.id} className="p-4 border-l dark:border-slate-700">{p.agent.name} {p.agent.verified && <span title="Verified Agent">✅</span>}</td>)}
+                            {properties.map(p => (
+                              <td key={p.id} className="p-4 border-l dark:border-slate-700">
+                                <span className="inline-flex items-center gap-1.5">
+                                  <span>{p.agent.name}</span>
+                                  {p.agent.verified && <CheckBadgeIcon className="w-4 h-4 text-emerald-500 shrink-0" title="Verified Agent" />}
+                                </span>
+                              </td>
+                            ))}
                         </tr>
                         <tr>
                             <td className="p-4 font-semibold">Agent Rating</td>
-                            {properties.map(p => <td key={p.id} className="p-4 border-l dark:border-slate-700">⭐ {p.agent.rating} ({p.agent.reviewCount} reviews)</td>)}
+                            {properties.map(p => (
+                              <td key={p.id} className="p-4 border-l dark:border-slate-700">
+                                <span className="inline-flex items-center gap-1.5">
+                                  <StarIcon className="w-4 h-4 text-amber-500 shrink-0" />
+                                  <span>{p.agent.rating} ({p.agent.reviewCount} reviews)</span>
+                                </span>
+                              </td>
+                            ))}
                         </tr>
                     </tbody>
                 </table>

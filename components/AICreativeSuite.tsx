@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI } from "../lib/ai";
 import { blobToBase64 } from '../lib/utils';
 import { VideoCameraIcon, CameraIcon, SparklesIcon, CpuChipIcon } from './icons/ActionIcons';
 
@@ -105,7 +105,7 @@ const VideoAnalysis: React.FC = () => {
             
             const base64Frames = await Promise.all(framePromises);
             
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+            const ai = new GoogleGenAI();
 
             const contents = [
                 { text: prompt },

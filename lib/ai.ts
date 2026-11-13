@@ -1,114 +1,280 @@
-import { GoogleGenAI as GeminiAI, Type, Modality } from '@google/genai';
-import type { Blob } from '@google/genai';
+// Client-side AI boundary.
+// All Gemini API calls run securely through the application server (/api/gemini/* and /api/live).
+// The client never imports @google/genai or handles API keys directly.
 
-export { Type, Modality };
-export type { Blob };
-export type Chat = any;
+export enum Type {
+  TYPE_UNSPECIFIED = "TYPE_UNSPECIFIED",
+  STRING = "STRING",
+  NUMBER = "NUMBER",
+  INTEGER = "INTEGER",
+  BOOLEAN = "BOOLEAN",
+  ARRAY = "ARRAY",
+  OBJECT = "OBJECT",
+  NULL = "NULL",
+}
 
-type ContentRequest = { model: string; contents: unknown; config?: Record<string, any> };
+export enum Modality {
+  MODALITY_UNSPECIFIED = "MODALITY_UNSPECIFIED",
+  TEXT = "TEXT",
+  IMAGE = "IMAGE",
+  AUDIO = "AUDIO",
+  VIDEO = "VIDEO",
+}
 
-const env = import.meta.env;
-const gatewayUrl = env.VITE_AI_GATEWAY_URL?.replace(/\/$/, '');
-const openRouterKey = env.VITE_OPENROUTER_API_KEY;
-const geminiKey = env.VITE_GEMINI_API_KEY || env.GEMINI_API_KEY;
+export interface Blob {
+  data: string;
+  mimeType: string;
+}
 
-const routerModel = (model: string) => {
-  if (model.includes('pro')) return 'google/gemini-2.5-pro';
-  return 'google/gemini-2.5-flash';
-};
+export interface LiveSession {
+  sendRealtimeInput: (input: { audio?: any; video?: any; text?: any; media?: any }) => void;
+  close: () => void;
+}
 
-const textFromContents = (contents: any): string => {
-  if (typeof contents === 'string') return contents;
-  const values = Array.isArray(contents) ? contents : [contents];
-  return values.flatMap((value) => {
-    if (typeof value === 'string') return [value];
-    if (value?.parts) return value.parts.map((part: any) => part.text).filter(Boolean);
-    return [value?.text].filter(Boolean);
-  }).join('\n');
-};
+export interface LiveConnectOptions {
+  model?: string;
+  config?: Record<string, any>;
+  callbacks?: {
+    onopen?: () => void;
+    onmessage?: (message: any) => void;
+    onerror?: (error: any) => void;
+    onclose?: (event?: any) => void;
+  };
+}
 
-const openRouterGenerate = async (request: ContentRequest) => {
-  const response = await fetch(`${gatewayUrl || 'https://openrouter.ai/api/v1'}/chat/completions`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(openRouterKey ? { Authorization: `Bearer ${openRouterKey}` } : {}),
-      'HTTP-Referer': window.location.origin,
-      'X-Title': 'AfriEstate',
-    },
-    body: JSON.stringify({
-      model: routerModel(request.model),
-      messages: [
-        ...(request.config?.systemInstruction ? [{ role: 'system', content: request.config.systemInstruction }] : []),
-        { role: 'user', content: textFromContents(request.contents) },
-      ],
-    }),
-  });
-  if (!response.ok) throw new Error(`OpenRouter request failed (${response.status}).`);
-  const payload = await response.json();
-  const text = payload.choices?.[0]?.message?.content;
-  if (typeof text !== 'string' || !text.trim()) throw new Error('OpenRouter returned an empty response.');
-  return { text };
-};
+export class GenerateContentResponse {
+  readonly text: string;
+  readonly candidates: any[];
 
-/**
- * The only AI entry point used by the UI. Text generation goes through the
- * configured OpenRouter gateway first and falls back to Gemini for continuity.
- * Set VITE_AI_GATEWAY_URL in production; it keeps provider credentials off the
- * browser. Direct VITE_* keys are supported only for local development.
- */
+  constructor(data: { text?: string; candidates?: any[] }) {
+    this.text = data.text || '';
+    this.candidates = data.candidates || [];
+  }
+}
+
 export class GoogleGenAI {
-  private readonly gemini?: GeminiAI;
-  readonly models: any;
-  readonly chats: any;
-  readonly live: any;
-  readonly operations: any;
+  readonly models: {
+    generateContent: (request: { model?: string; contents: any; config?: any }) => Promise<GenerateContentResponse>;
+    generateImages: (request: { model?: string; prompt: string; config?: any }) => Promise<any>;
+    generateVideos: (request: { model?: string; prompt: string; config?: any }) => Promise<any>;
+  };
 
-  constructor({ apiKey }: { apiKey?: string } = {}) {
-    const resolvedGeminiKey = geminiKey || apiKey;
-    this.gemini = resolvedGeminiKey ? new GeminiAI({ apiKey: resolvedGeminiKey }) : undefined;
-    this.models = {
-      generateContent: (request: ContentRequest) => this.generateContent(request),
-      // Gemini-only modalities remain available through the same provider
-      // boundary while OpenRouter handles all portable text workloads.
-      generateImages: (request: any) => this.requireGemini().models.generateImages(request),
-      generateVideos: (request: any) => this.requireGemini().models.generateVideos(request),
+  readonly chats: {
+    create: (options?: { model?: string; config?: { systemInstruction?: string; [key: string]: any } }) => {
+      sendMessageStream: ({ message }: { message: string }) => Promise<AsyncGenerator<{ text: string }, void, unknown>>;
     };
+  };
+
+  readonly operations: {
+    getVideosOperation: ({ operation }: { operation: any }) => Promise<any>;
+  };
+
+  readonly live: {
+    connect: (options: LiveConnectOptions) => Promise<LiveSession>;
+  };
+
+  constructor(_options: { apiKey?: string } = {}) {
+    this.models = {
+      generateContent: async ({ model, contents, config }) => {
+        const response = await fetch('/api/gemini/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model, contents, config }),
+        });
+
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.error || `Server generateContent failed with status ${response.status}`);
+        }
+
+        const data = await response.json();
+        return new GenerateContentResponse(data);
+      },
+
+      generateImages: async ({ model, prompt, config }) => {
+        const response = await fetch('/api/gemini/generate-images', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model, prompt, config }),
+        });
+
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.error || `Server image generation failed with status ${response.status}`);
+        }
+
+        return response.json();
+      },
+
+      generateVideos: async ({ model, prompt, config }) => {
+        const response = await fetch('/api/gemini/generate-videos', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model, prompt, config }),
+        });
+
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.error || `Server video generation failed with status ${response.status}`);
+        }
+
+        return response.json();
+      },
+    };
+
+    this.operations = {
+      getVideosOperation: async ({ operation }) => {
+        const response = await fetch('/api/gemini/get-videos-operation', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ operation }),
+        });
+
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.error || `Failed to fetch video operation with status ${response.status}`);
+        }
+
+        return response.json();
+      },
+    };
+
     this.chats = {
-      create: ({ model, config }: { model: string; config?: { systemInstruction?: string } }) => {
-        const history: Array<{ role: string; text: string }> = [];
+      create: (chatOptions = {}) => {
+        const history: Array<{ role: string; content: string }> = [];
+
         return {
           sendMessageStream: async ({ message }: { message: string }) => {
-            const context = history.map(({ role, text }) => `${role}: ${text}`).join('\n');
-            const response = await this.generateContent({
-              model,
-              contents: `${config?.systemInstruction ? `System instructions:\n${config.systemInstruction}\n\n` : ''}${context}\nUser: ${message}`,
+            const response = await fetch('/api/gemini/chat-stream', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                model: chatOptions.model,
+                message,
+                history,
+                systemInstruction: chatOptions.config?.systemInstruction,
+                config: chatOptions.config,
+              }),
             });
-            history.push({ role: 'user', text: message }, { role: 'assistant', text: response.text });
-            return (async function* () { yield response; })();
+
+            if (!response.ok) {
+              throw new Error(`Chat stream failed with status ${response.status}`);
+            }
+
+            const reader = response.body?.getReader();
+            if (!reader) {
+              throw new Error('Streaming response body is unavailable');
+            }
+
+            let accumulatedText = '';
+            const decoder = new TextDecoder();
+
+            return (async function* () {
+              let buffer = '';
+
+              while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || '';
+
+                for (const line of lines) {
+                  const trimmed = line.trim();
+                  if (!trimmed.startsWith('data:')) continue;
+                  const dataStr = trimmed.slice(5).trim();
+
+                  if (dataStr === '[DONE]') {
+                    history.push({ role: 'user', content: message });
+                    history.push({ role: 'assistant', content: accumulatedText });
+                    return;
+                  }
+
+                  try {
+                    const parsed = JSON.parse(dataStr);
+                    if (parsed.error) {
+                      throw new Error(parsed.error);
+                    }
+                    if (parsed.text) {
+                      accumulatedText += parsed.text;
+                      yield { text: parsed.text };
+                    }
+                  } catch (e: any) {
+                    if (e.message && e.message !== 'Unexpected end of JSON input') {
+                      throw e;
+                    }
+                  }
+                }
+              }
+
+              if (accumulatedText) {
+                history.push({ role: 'user', content: message });
+                history.push({ role: 'assistant', content: accumulatedText });
+              }
+            })();
           },
         };
       },
     };
-    this.live = this.gemini?.live;
-    this.operations = this.gemini?.operations;
-  }
 
-  private requireGemini() {
-    if (!this.gemini) throw new Error('Gemini is not configured. Set VITE_GEMINI_API_KEY or configure the AI gateway.');
-    return this.gemini;
-  }
+    this.live = {
+      connect: async (options: LiveConnectOptions): Promise<LiveSession> => {
+        return new Promise((resolve, reject) => {
+          const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+          const wsUrl = `${protocol}//${window.location.host}/api/live`;
 
-  private async generateContent(request: ContentRequest) {
-    // A gateway is intentionally considered configured without a browser key.
-    if (gatewayUrl || openRouterKey) {
-      try {
-        return await openRouterGenerate(request);
-      } catch (error) {
-        if (!this.gemini) throw error;
-        console.warn('OpenRouter unavailable; falling back to Gemini.', error);
-      }
-    }
-    return this.requireGemini().models.generateContent(request as any);
+          const ws = new WebSocket(wsUrl);
+
+          const session: LiveSession = {
+            sendRealtimeInput: (input) => {
+              if (ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify(input));
+              }
+            },
+            close: () => {
+              try {
+                ws.close();
+              } catch (e) {
+                // ignore
+              }
+            },
+          };
+
+          ws.onopen = () => {
+            options.callbacks?.onopen?.();
+            resolve(session);
+          };
+
+          ws.onmessage = (event) => {
+            try {
+              const data = JSON.parse(event.data);
+              if (data.type === 'open') {
+                options.callbacks?.onopen?.();
+              } else if (data.type === 'error') {
+                options.callbacks?.onerror?.(new Error(data.error || 'Live API error'));
+              } else if (data.type === 'close') {
+                options.callbacks?.onclose?.();
+              } else {
+                options.callbacks?.onmessage?.(data);
+              }
+            } catch (err) {
+              console.error('Failed to parse Live message:', err);
+            }
+          };
+
+          ws.onerror = (event) => {
+            options.callbacks?.onerror?.(event);
+            reject(event);
+          };
+
+          ws.onclose = (event) => {
+            options.callbacks?.onclose?.(event);
+          };
+        });
+      },
+    };
   }
 }
+
+export type Chat = ReturnType<GoogleGenAI['chats']['create']>;

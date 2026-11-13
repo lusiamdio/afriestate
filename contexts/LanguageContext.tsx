@@ -1,7 +1,7 @@
 
 
 import React, { createContext, useState, useContext, useEffect, useMemo } from 'react';
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI } from "../lib/ai";
 import { Language } from '../types';
 import { translations as englishTranslations } from '../translations';
 
@@ -68,7 +68,7 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       
       setIsTranslating(true);
       try {
-          const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string || 'dummy' });
+          const ai = new GoogleGenAI();
           
           const languageMap: Record<string, string> = {
               [Language.FR]: 'French',

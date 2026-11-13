@@ -20,6 +20,7 @@ interface PropertyListProps {
   onEdit: (property: Property) => void;
   onDelete: (propertyId: string) => void;
   isLoading?: boolean;
+  onOpenVerificationModal?: (property: Property) => void;
 }
 
 const PropertyList: React.FC<PropertyListProps> = (props) => {
@@ -42,14 +43,14 @@ const PropertyList: React.FC<PropertyListProps> = (props) => {
 
   if (isLoading) {
     return (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {[...Array(3)].map((_, i) => <PropertyCardSkeleton key={i} />)}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6">
+            {[...Array(4)].map((_, i) => <PropertyCardSkeleton key={i} />)}
         </div>
     );
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6">
       {properties.map(property => (
         <PropertyCard 
           key={property.id} 
@@ -66,6 +67,7 @@ const PropertyList: React.FC<PropertyListProps> = (props) => {
           onToggleCompare={onToggleCompare}
           onEdit={onEdit}
           onDelete={onDelete}
+          onOpenVerificationModal={props.onOpenVerificationModal}
         />
       ))}
     </div>

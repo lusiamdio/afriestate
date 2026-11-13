@@ -1,10 +1,14 @@
-import React, { useState } from 'react';
-import { SparklesIcon } from './icons/SearchIcons';
-import { useTranslations } from '../contexts/LanguageContext';
+import React, { useState, useEffect } from 'react';
 import { PropertyType, ListingType } from '../types';
 import type { SearchFilters } from '../types';
-import { BuildingStorefrontIcon, MapPinIcon, TruckIcon } from '@heroicons/react/24/outline';
-import { WellnessIcon } from './icons/CategoryIcons';
+import { 
+  BuildingOffice2Icon, 
+  HomeModernIcon, 
+  BanknotesIcon, 
+  MagnifyingGlassIcon,
+  MapPinIcon
+} from '@heroicons/react/24/outline';
+import { YieldTrendingIcon } from './icons/AfricanInfrastructureIcons';
 
 interface SearchBarProps {
   onSearch: (query: string) => void;
@@ -13,153 +17,352 @@ interface SearchBarProps {
   onFilterChange: (key: keyof SearchFilters, value: any) => void;
 }
 
-type SearchTab = 'buy_rent' | 'stays' | 'transport' | 'wellness';
-
-const TabButton: React.FC<{
-    label: string;
-    icon: React.ElementType;
-    isActive: boolean;
-    onClick: () => void;
-    color: string;
-}> = ({ label, icon: Icon, isActive, onClick, color }) => (
-    <button
-        type="button"
-        onClick={onClick}
-        className={`flex items-center gap-2 px-6 py-4 text-sm font-black rounded-t-2xl transition-all flex-shrink-0 ${
-            isActive
-                ? `glass-panel ${color} shadow-[0_-4px_10px_rgba(0,0,0,0.1)]`
-                : 'text-black/70 hover:text-black hover:bg-slate-50'
-        }`}
-    >
-        <Icon className="w-5 h-5" />
-        <span className="uppercase tracking-widest">{label}</span>
-    </button>
-);
-
-
-const SearchButton: React.FC<{ isSearchingAI: boolean }> = ({ isSearchingAI }) => (
-    <button
-        type="submit"
-        disabled={isSearchingAI}
-        className="bg-brand-primary text-white font-black uppercase tracking-widest px-4 py-3.5 rounded-xl hover:bg-brand-dark transition-all disabled:bg-slate-400 shadow-lg shadow-brand-primary/20 transform hover:scale-105 active:scale-95 w-full h-full text-sm"
-    >
-        {isSearchingAI ? (
-            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto"></div>
-        ) : "Search"}
-    </button>
-);
+export type IntentMode = 'buy' | 'rent' | 'invest';
 
 const SearchBar: React.FC<SearchBarProps> = ({ onSearch, isSearchingAI, filters, onFilterChange }) => {
-    const [activeTab, setActiveTab] = useState<SearchTab>('buy_rent');
-    const { t } = useTranslations();
+  const [activeMode, setActiveMode] = useState<IntentMode>(() => {
+    if (filters.listingType === ListingType.FOR_INVESTMENT || filters.mode === 'invest') return 'invest';
+    if (filters.listingType === ListingType.RENT || filters.mode === 'rent') return 'rent';
+    return 'buy';
+  });
 
-    const handleSearch = (e: React.FormEvent) => {
-        e.preventDefault();
-        onSearch('');
-    };
-    
-    const setTabAndPropertyType = (tab: SearchTab, propType: PropertyType) => {
-        setActiveTab(tab);
-        onFilterChange('propertyType', propType);
-    };
+  const handleModeSwitch = (mode: IntentMode) => {
+    setActiveMode(mode);
+    onFilterChange('mode', mode);
+    if (mode === 'buy') {
+      onFilterChange('listingType', ListingType.SALE);
+    } else if (mode === 'rent') {
+      onFilterChange('listingType', ListingType.RENT);
+    } else if (mode === 'invest') {
+      onFilterChange('listingType', ListingType.FOR_INVESTMENT);
+    }
+  };
 
-    const renderFilters = () => {
-        switch (activeTab) {
-            case 'stays':
-                return (
-                    <div className="grid grid-cols-2 lg:grid-cols-7 gap-3">
-                        <input type="text" placeholder="Location: e.g. Cape Town" name="location" value={filters.location} onChange={(e) => onFilterChange('location', e.target.value)} className="input-field col-span-2 lg:col-span-2" />
-                        <input type="date" name="checkIn" value={filters.checkIn || ''} onChange={(e) => onFilterChange('checkIn', e.target.value)} className="input-field" title="Check-in Date" />
-                        <input type="date" name="checkOut" value={filters.checkOut || ''} onChange={(e) => onFilterChange('checkOut', e.target.value)} className="input-field" title="Check-out Date" />
-                        <input type="number" placeholder="Guests" name="guests" min="1" value={filters.guests || ''} onChange={(e) => onFilterChange('guests', Number(e.target.value))} className="input-field" />
-                        <input type="number" placeholder="Max Price" name="priceMax" value={filters.priceMax === 10000000 ? '' : filters.priceMax} onChange={(e) => onFilterChange('priceMax', e.target.value === '' ? 10000000 : Number(e.target.value))} className="input-field" />
-                        <SearchButton isSearchingAI={isSearchingAI} />
-                    </div>
-                );
-            case 'transport':
-                 return (
-                     <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
-                        <input type="text" placeholder="Pick-up location" name="location" value={filters.location} onChange={(e) => onFilterChange('location', e.target.value)} className="input-field col-span-2 lg:col-span-2" />
-                        <input type="date" name="checkIn" value={filters.checkIn || ''} onChange={(e) => onFilterChange('checkIn', e.target.value)} className="input-field" title="Pick-up Date" />
-                        <select name="vehicleType" value={filters.vehicleType || ''} onChange={(e) => onFilterChange('vehicleType', e.target.value)} className="input-field">
-                            <option value="">Any Vehicle</option>
-                            <option>Sedan</option>
-                            <option>SUV</option>
-                            <option>Van</option>
-                            <option>Luxury</option>
-                        </select>
-                        <input type="number" placeholder="Max Price" name="priceMax" value={filters.priceMax === 10000000 ? '' : filters.priceMax} onChange={(e) => onFilterChange('priceMax', e.target.value === '' ? 10000000 : Number(e.target.value))} className="input-field" />
-                        <SearchButton isSearchingAI={isSearchingAI} />
-                    </div>
-                );
-             case 'wellness':
-                return (
-                     <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-                        <input type="text" placeholder="Destination" name="location" value={filters.location} onChange={(e) => onFilterChange('location', e.target.value)} className="input-field col-span-2 lg:col-span-2" />
-                        <input type="date" name="checkIn" value={filters.checkIn || ''} onChange={(e) => onFilterChange('checkIn', e.target.value)} className="input-field" title="Start Date" />
-                        <input type="number" placeholder="Max Price" name="priceMax" value={filters.priceMax === 10000000 ? '' : filters.priceMax} onChange={(e) => onFilterChange('priceMax', e.target.value === '' ? 10000000 : Number(e.target.value))} className="input-field" />
-                        <SearchButton isSearchingAI={isSearchingAI} />
-                    </div>
-                );
-            case 'buy_rent':
-            default:
-                return (
-                     <div className="grid grid-cols-2 lg:grid-cols-7 gap-3">
-                        <input type="text" placeholder="Location, City..." name="location" value={filters.location} onChange={(e) => onFilterChange('location', e.target.value)} className="input-field col-span-2 lg:col-span-2" />
-                        <select name="listingType" value={filters.listingType} onChange={(e) => onFilterChange('listingType', e.target.value)} className="input-field">
-                            <option value={ListingType.ALL}>For Sale or Rent</option>
-                            <option value={ListingType.SALE}>For Sale</option>
-                            <option value={ListingType.RENT}>For Rent</option>
-                        </select>
-                        <div className="col-span-2 lg:col-span-2 flex flex-col justify-center px-4 input-field gap-1" style={{paddingTop: '0.4rem', paddingBottom: '0.4rem'}}>
-                            <div className="flex justify-between items-center w-full">
-                                <span className="text-xs font-bold text-slate-500 uppercase">Max Price</span>
-                                <span className="text-sm font-bold text-brand-dark dark:text-white">R {filters.priceMax === 10000000 || !filters.priceMax ? 'Any' : (filters.priceMax).toLocaleString()}</span>
-                            </div>
-                            <input 
-                                type="range" 
-                                min="100000" 
-                                max="10000000" 
-                                step="100000"
-                                value={filters.priceMax === 10000000 || !filters.priceMax ? 10000000 : filters.priceMax} 
-                                onChange={(e) => onFilterChange('priceMax', Number(e.target.value))} 
-                                className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-brand-primary" 
-                            />
-                        </div>
-                        <div className="flex items-center gap-2 input-field">
-                            <input type="number" name="bedrooms" min="0" value={filters.bedrooms || ''} onChange={(e) => onFilterChange('bedrooms', Number(e.target.value))} className="w-full bg-transparent focus:outline-none" placeholder="Beds"/>
-                            <span className="text-slate-400 font-bold text-xs uppercase">Beds</span>
-                        </div>
-                        <SearchButton isSearchingAI={isSearchingAI} />
-                    </div>
-                );
-        }
-    };
+  const handleFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSearch(filters.location);
+  };
 
-    return (
-        <div className="bg-white/10 dark:bg-slate-800/10 backdrop-blur-2xl p-3 rounded-[2rem] shadow-2xl w-full border border-white/20">
-            <div className="bg-transparent">
-                <div className="overflow-x-auto no-scrollbar">
-                    <div className="flex items-center px-2 whitespace-nowrap">
-                        <TabButton label="Homes" icon={BuildingStorefrontIcon} isActive={activeTab === 'buy_rent'} onClick={() => setTabAndPropertyType('buy_rent', PropertyType.ALL)} color="text-black" />
-                        <TabButton label="Stays" icon={MapPinIcon} isActive={activeTab === 'stays'} onClick={() => setTabAndPropertyType('stays', PropertyType.SHORT_TERM_RENTAL)} color="text-black" />
-                        <TabButton label="Transport" icon={TruckIcon} isActive={activeTab === 'transport'} onClick={() => setTabAndPropertyType('transport', PropertyType.TRANSPORT)} color="text-black" />
-                        <TabButton label="Wellness" icon={WellnessIcon} isActive={activeTab === 'wellness'} onClick={() => setTabAndPropertyType('wellness', PropertyType.WELLNESS)} color="text-black" />
-                    </div>
-                </div>
-                <div className="p-6 glass-panel rounded-2xl shadow-xl">
-                    <form onSubmit={handleSearch}>
-                        {renderFilters()}
-                    </form>
-                </div>
+  return (
+    <div className="w-full">
+      {/* 1. Intent Mode Tabs */}
+      <div className="flex items-center gap-1 pb-2">
+        <button
+          type="button"
+          onClick={() => handleModeSwitch('buy')}
+          className={`flex items-center gap-1.5 px-3 sm:px-4 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-all ${
+            activeMode === 'buy'
+              ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-sm'
+              : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800'
+          }`}
+        >
+          <HomeModernIcon className="w-3.5 h-3.5" />
+          <span>Buy Property</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleModeSwitch('rent')}
+          className={`flex items-center gap-1.5 px-3 sm:px-4 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-all ${
+            activeMode === 'rent'
+              ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-sm'
+              : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800'
+          }`}
+        >
+          <BuildingOffice2Icon className="w-3.5 h-3.5" />
+          <span>Rent a Home</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleModeSwitch('invest')}
+          className={`flex items-center gap-1.5 px-3 sm:px-4 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-all ${
+            activeMode === 'invest'
+              ? 'bg-amber-600 text-white dark:bg-amber-500 dark:text-slate-950 shadow-sm'
+              : 'text-amber-800 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/40'
+          }`}
+        >
+          <YieldTrendingIcon className="w-3.5 h-3.5 text-current" />
+          <span>Invest in Africa</span>
+        </button>
+      </div>
+
+      {/* 2. Dynamic Input Fields Based on Intent Mode */}
+      <form onSubmit={handleFormSubmit} className="pt-2">
+        {activeMode === 'buy' && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-2 items-end">
+            {/* Where / Location */}
+            <div className="lg:col-span-4 relative">
+              <label className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-0.5">
+                Where to Buy?
+              </label>
+              <div className="relative">
+                <MapPinIcon className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="City, area or country (e.g. Cape Town)"
+                  value={filters.location}
+                  onChange={(e) => onFilterChange('location', e.target.value)}
+                  className="w-full pl-8 pr-2.5 py-1.5 text-xs bg-slate-100 dark:bg-slate-800 border-0 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-white transition"
+                />
+              </div>
             </div>
-             <style>{`
-                .no-scrollbar::-webkit-scrollbar { display: none; }
-                .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-                .input-field { @apply w-full px-4 py-3.5 text-base border border-slate-100 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-brand-primary dark:bg-slate-700 dark:text-white placeholder:text-slate-400 font-medium transition-all hover:border-brand-primary/30 bg-slate-50 dark:bg-slate-900/30; }
-             `}</style>
-        </div>
-    );
+
+            {/* Property Type */}
+            <div className="lg:col-span-3">
+              <label className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-0.5">
+                Property Type
+              </label>
+              <select
+                value={filters.propertyType}
+                onChange={(e) => onFilterChange('propertyType', e.target.value as PropertyType)}
+                className="w-full px-2.5 py-1.5 text-xs bg-slate-100 dark:bg-slate-800 border-0 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-white transition"
+              >
+                <option value={PropertyType.ALL}>All Residential & Commercial</option>
+                <option value={PropertyType.APARTMENT}>Apartment / Flat</option>
+                <option value={PropertyType.HOUSE}>House / Freehold Villa</option>
+                <option value={PropertyType.LUXURY_ESTATE}>Luxury Estate</option>
+                <option value={PropertyType.TOWNSHIP}>Township Property</option>
+                <option value={PropertyType.LAND}>Land / Plot</option>
+                <option value={PropertyType.COMMERCIAL}>Commercial Property</option>
+                <option value={PropertyType.IN_CONSTRUCTION}>New Development / Off-Plan</option>
+              </select>
+            </div>
+
+            {/* Bedrooms */}
+            <div className="lg:col-span-2">
+              <label className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-0.5">
+                Bedrooms
+              </label>
+              <select
+                value={filters.bedrooms}
+                onChange={(e) => onFilterChange('bedrooms', Number(e.target.value))}
+                className="w-full px-2.5 py-1.5 text-xs bg-slate-100 dark:bg-slate-800 border-0 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-white transition"
+              >
+                <option value={0}>Any Beds</option>
+                <option value={1}>1+ Bed</option>
+                <option value={2}>2+ Beds</option>
+                <option value={3}>3+ Beds</option>
+                <option value={4}>4+ Beds</option>
+              </select>
+            </div>
+
+            {/* Price Max */}
+            <div className="lg:col-span-2">
+              <label className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-0.5">
+                Max Price
+              </label>
+              <input
+                type="number"
+                placeholder="Max Price"
+                value={filters.priceMax === 10000000 ? '' : filters.priceMax}
+                onChange={(e) => onFilterChange('priceMax', e.target.value === '' ? 10000000 : Number(e.target.value))}
+                className="w-full px-2.5 py-1.5 text-xs bg-slate-100 dark:bg-slate-800 border-0 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-white transition tabular-nums"
+              />
+            </div>
+
+            {/* Search Submit Button */}
+            <div className="lg:col-span-1">
+              <button
+                type="submit"
+                disabled={isSearchingAI}
+                className="w-full py-1.5 px-3 bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 font-semibold rounded-lg flex items-center justify-center transition shadow-sm"
+                title="Search Properties"
+              >
+                {isSearchingAI ? (
+                  <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                  <MagnifyingGlassIcon className="w-4 h-4" />
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {activeMode === 'rent' && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-2 items-end">
+            {/* Where / Location */}
+            <div className="lg:col-span-4 relative">
+              <label className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-0.5">
+                Where to Rent?
+              </label>
+              <div className="relative">
+                <MapPinIcon className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="City or area (e.g. Sea Point, Kilimani)"
+                  value={filters.location}
+                  onChange={(e) => onFilterChange('location', e.target.value)}
+                  className="w-full pl-8 pr-2.5 py-1.5 text-xs bg-slate-100 dark:bg-slate-800 border-0 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-white transition"
+                />
+              </div>
+            </div>
+
+            {/* Monthly Budget */}
+            <div className="lg:col-span-3">
+              <label className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-0.5">
+                Monthly Budget
+              </label>
+              <input
+                type="number"
+                placeholder="Max Monthly Rent"
+                value={filters.priceMax === 10000000 ? '' : filters.priceMax}
+                onChange={(e) => onFilterChange('priceMax', e.target.value === '' ? 10000000 : Number(e.target.value))}
+                className="w-full px-2.5 py-1.5 text-xs bg-slate-100 dark:bg-slate-800 border-0 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-white transition tabular-nums"
+              />
+            </div>
+
+            {/* Property Type */}
+            <div className="lg:col-span-2">
+              <label className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-0.5">
+                Type
+              </label>
+              <select
+                value={filters.propertyType}
+                onChange={(e) => onFilterChange('propertyType', e.target.value as PropertyType)}
+                className="w-full px-2.5 py-1.5 text-xs bg-slate-100 dark:bg-slate-800 border-0 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-white transition"
+              >
+                <option value={PropertyType.ALL}>All Types</option>
+                <option value={PropertyType.APARTMENT}>Apartment</option>
+                <option value={PropertyType.HOUSE}>House</option>
+                <option value={PropertyType.STUDENT_HOUSING}>Student Housing</option>
+                <option value={PropertyType.SHORT_TERM_RENTAL}>Short-Term Stay</option>
+              </select>
+            </div>
+
+            {/* Lease Duration */}
+            <div className="lg:col-span-2">
+              <label className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-0.5">
+                Lease Type
+              </label>
+              <select
+                value={filters.leaseDuration || ''}
+                onChange={(e) => onFilterChange('leaseDuration', e.target.value)}
+                className="w-full px-2.5 py-1.5 text-xs bg-slate-100 dark:bg-slate-800 border-0 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-white transition"
+              >
+                <option value="">Any Lease</option>
+                <option value="Long term">Long term (12m+)</option>
+                <option value="Medium term">Medium term (3-6m)</option>
+                <option value="Short term / Stay">Short term / Flex</option>
+              </select>
+            </div>
+
+            {/* Search Submit Button */}
+            <div className="lg:col-span-1">
+              <button
+                type="submit"
+                disabled={isSearchingAI}
+                className="w-full py-1.5 px-3 bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 font-semibold rounded-lg flex items-center justify-center transition shadow-sm"
+                title="Search Rentals"
+              >
+                {isSearchingAI ? (
+                  <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                  <MagnifyingGlassIcon className="w-4 h-4" />
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {activeMode === 'invest' && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-2 items-end">
+            {/* Target Region */}
+            <div className="lg:col-span-3">
+              <label className="block text-[10px] font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-400 mb-0.5">
+                Where in Africa?
+              </label>
+              <select
+                value={filters.region || ''}
+                onChange={(e) => onFilterChange('region', e.target.value)}
+                className="w-full px-2.5 py-1.5 text-xs bg-amber-50/80 dark:bg-amber-950/30 border-0 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-600 transition"
+              >
+                <option value="">All Pan-African Markets</option>
+                <option value="Southern Africa">Southern Africa (SA, Namibia, Botswana)</option>
+                <option value="West Africa">West Africa (Nigeria, Ghana, Senegal)</option>
+                <option value="East Africa">East Africa (Kenya, Rwanda, Tanzania)</option>
+                <option value="North Africa">North Africa (Egypt, Morocco, Tunisia)</option>
+                <option value="Central Africa">Central Africa (Angola, Cameroon)</option>
+              </select>
+            </div>
+
+            {/* Investment Type */}
+            <div className="lg:col-span-3">
+              <label className="block text-[10px] font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-400 mb-0.5">
+                Opportunity Structure
+              </label>
+              <select
+                value={filters.investmentType || ''}
+                onChange={(e) => onFilterChange('investmentType', e.target.value)}
+                className="w-full px-2.5 py-1.5 text-xs bg-amber-50/80 dark:bg-amber-950/30 border-0 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-600 transition"
+              >
+                <option value="">All Investment Types</option>
+                <option value="Student Residence">Student Residence (PBSA)</option>
+                <option value="Development">Off-Plan & New Development</option>
+                <option value="REIT">Commercial REIT</option>
+                <option value="Fractional">Fractional Co-Ownership</option>
+                <option value="Commercial">Commercial Yield Assets</option>
+              </select>
+            </div>
+
+            {/* Min Investment Amount */}
+            <div className="lg:col-span-3">
+              <label className="block text-[10px] font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-400 mb-0.5">
+                Capital Ticket
+              </label>
+              <select
+                onChange={(e) => {
+                  const val = Number(e.target.value);
+                  onFilterChange('priceMax', val || 10000000);
+                }}
+                className="w-full px-2.5 py-1.5 text-xs bg-amber-50/80 dark:bg-amber-950/30 border-0 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-600 transition"
+              >
+                <option value="">Any Capital Size</option>
+                <option value="50000">Under $50,000 / R500k</option>
+                <option value="250000">$50,000 – $250,000</option>
+                <option value="1000000">$250,000 – $1M</option>
+                <option value="10000000">Institutional ($1M+)</option>
+              </select>
+            </div>
+
+            {/* Target Return */}
+            <div className="lg:col-span-2">
+              <label className="block text-[10px] font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-400 mb-0.5">
+                Target Yield
+              </label>
+              <select
+                value={filters.targetReturnMin || 0}
+                onChange={(e) => onFilterChange('targetReturnMin', Number(e.target.value))}
+                className="w-full px-2.5 py-1.5 text-xs bg-amber-50/80 dark:bg-amber-950/30 border-0 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-600 transition"
+              >
+                <option value={0}>Any Return</option>
+                <option value={8}>8%+ Net Return</option>
+                <option value={10}>10%+ Net Return</option>
+                <option value={12}>12%+ Net Return</option>
+                <option value={15}>15%+ High Growth</option>
+              </select>
+            </div>
+
+            {/* Search Submit Button */}
+            <div className="lg:col-span-1">
+              <button
+                type="submit"
+                disabled={isSearchingAI}
+                className="w-full py-1.5 px-3 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg flex items-center justify-center transition shadow-sm"
+                title="Find Investments"
+              >
+                {isSearchingAI ? (
+                  <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                  <YieldTrendingIcon className="w-4 h-4 text-white" />
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+      </form>
+    </div>
+  );
 };
 
 export default SearchBar;

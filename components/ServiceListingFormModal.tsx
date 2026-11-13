@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { TruckIcon, SparklesIcon } from '@heroicons/react/24/outline';
 import { CloseIcon } from './icons/NavIcons';
 import RentACarListingForm from './RentACarListingForm';
 import WellnessListingForm from './WellnessListingForm';
@@ -41,15 +42,17 @@ const ServiceListingFormModal: React.FC<ServiceListingFormModalProps> = ({ isOpe
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <button 
                                     onClick={() => setServiceType('car')}
-                                    className="p-8 border-2 border-slate-200 dark:border-slate-700 rounded-xl hover:border-brand-primary dark:hover:border-brand-primary hover:bg-brand-light dark:hover:bg-brand-primary/10 transition-all font-semibold text-lg text-slate-800 dark:text-slate-200"
+                                    className="p-8 border-2 border-slate-200 dark:border-slate-700 rounded-xl hover:border-brand-primary dark:hover:border-brand-primary hover:bg-brand-light dark:hover:bg-brand-primary/10 transition-all font-semibold text-lg text-slate-800 dark:text-slate-200 flex flex-col items-center gap-3"
                                 >
-                                    🚗 Rent a Car Listing
+                                    <TruckIcon className="w-8 h-8 text-emerald-600 dark:text-amber-300" />
+                                    <span>Rent a Car Listing</span>
                                 </button>
                                 <button 
                                     onClick={() => setServiceType('wellness')}
-                                    className="p-8 border-2 border-slate-200 dark:border-slate-700 rounded-xl hover:border-brand-primary dark:hover:border-brand-primary hover:bg-brand-light dark:hover:bg-brand-primary/10 transition-all font-semibold text-lg text-slate-800 dark:text-slate-200"
+                                    className="p-8 border-2 border-slate-200 dark:border-slate-700 rounded-xl hover:border-brand-primary dark:hover:border-brand-primary hover:bg-brand-light dark:hover:bg-brand-primary/10 transition-all font-semibold text-lg text-slate-800 dark:text-slate-200 flex flex-col items-center gap-3"
                                 >
-                                    🌿 Wellness Service Listing
+                                    <SparklesIcon className="w-8 h-8 text-emerald-600 dark:text-amber-300" />
+                                    <span>Wellness Service Listing</span>
                                 </button>
                             </div>
                         </div>

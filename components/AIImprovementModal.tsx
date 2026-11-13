@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { GoogleGenAI, Type, Modality } from "@google/genai";
+import { GoogleGenAI, Type, Modality } from "../lib/ai";
 import type { Property } from '../types';
 import { CloseIcon } from './icons/NavIcons';
 import { CpuChipIcon, SparklesIcon, SpeakerWaveIcon, PauseIcon } from './icons/ActionIcons';
@@ -65,7 +65,7 @@ const AIImprovementModal: React.FC<AIImprovementModalProps> = ({ isOpen, onClose
             setError(null);
 
             try {
-                const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+                const ai = new GoogleGenAI();
                 const prompt = `
                     You are an expert real estate marketing AI. Analyze this underperforming property listing and provide actionable suggestions to improve its performance.
 
@@ -113,7 +113,7 @@ const AIImprovementModal: React.FC<AIImprovementModalProps> = ({ isOpen, onClose
         }
         setIsListening(true);
         try {
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+            const ai = new GoogleGenAI();
             const response = await ai.models.generateContent({
                 model: 'gemini-2.5-flash-preview-tts',
                 contents: [{ parts: [{ text }] }],

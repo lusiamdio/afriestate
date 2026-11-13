@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { GoogleGenAI, Modality } from "@google/genai";
+import { GoogleGenAI, Modality } from "../lib/ai";
 import type { Property, User } from '../types';
 import { ListingType, PropertyType, PropertyStatus } from '../types';
 import { CloseIcon } from './icons/NavIcons';
@@ -101,7 +101,7 @@ const PropertyFormModal: React.FC<PropertyFormModalProps> = ({ isOpen, onClose, 
     const handleGenerateDescription = async () => {
         setIsGenerating(true);
         try {
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+            const ai = new GoogleGenAI();
             const prompt = `
                 Generate a compelling, professional, and SEO-friendly real estate property description based on these details.
                 - Property Title: ${property.title}
@@ -129,7 +129,7 @@ const PropertyFormModal: React.FC<PropertyFormModalProps> = ({ isOpen, onClose, 
         if (!text.trim() || isListening) return;
         setIsListening(true);
         try {
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+            const ai = new GoogleGenAI();
             const response = await ai.models.generateContent({
                 model: 'gemini-2.5-flash-preview-tts',
                 contents: [{ parts: [{ text }] }],

@@ -168,30 +168,37 @@ export const getProperties = async (excludeMock = false): Promise<Property[]> =>
 
         if (!data || data.length === 0) return excludeMock ? [] : initialProperties;
 
-        const mappedData = data.map(p => ({
-            ...p,
-            dateListed: p.dateListed ?? p.date_listed ?? (p.created_at ? new Date(p.created_at).getTime() : Date.now()),
-            listingType: p.listingType ?? p.listing_type,
-            propertyType: p.propertyType ?? p.property_type,
-            purchasePrice: p.purchasePrice ?? p.purchase_price,
-            neighborhoodInfo: p.neighborhoodInfo ?? p.neighborhood_info,
-            virtualTourUrl: p.virtualTourUrl ?? p.virtual_tour_url,
-            vrTourUrl: p.vrTourUrl ?? p.vr_tour_url,
-            smartContractReady: p.smartContractReady ?? p.smart_contract_ready,
-            priceHistory: p.priceHistory ?? p.price_history,
-            occupancyRate: p.occupancyRate ?? p.occupancy_rate,
-            marketROI: p.marketROI ?? p.market_roi,
-            perNightPrice: p.perNightPrice ?? p.per_night_price,
-            packageIncludes: p.packageIncludes ?? p.package_includes,
-            vehicleType: p.vehicleType ?? p.vehicle_type,
-            // Handle JSON fields if they come back as strings (rare with supabase-js but possible with some configs)
-            address: typeof p.address === 'string' ? JSON.parse(p.address) : p.address,
-            details: typeof p.details === 'string' ? JSON.parse(p.details) : p.details,
-            amenities: typeof p.amenities === 'string' ? JSON.parse(p.amenities) : p.amenities,
-            images: typeof p.images === 'string' ? JSON.parse(p.images) : p.images,
-            agent: typeof p.agent === 'string' ? JSON.parse(p.agent) : p.agent,
-            financials: typeof p.financials === 'string' ? JSON.parse(p.financials) : p.financials,
-        }));
+        const curatedMap = new Map(initialProperties.map(prop => [String(prop.id), prop]));
+
+        const mappedData = data.map(p => {
+            const parsedImages = typeof p.images === 'string' ? JSON.parse(p.images) : p.images;
+            const curatedProp = curatedMap.get(String(p.id));
+            const hasLocalImage = Array.isArray(parsedImages) && parsedImages.some((img: string) => typeof img === 'string' && img.startsWith('/images/'));
+            return {
+                ...p,
+                dateListed: p.dateListed ?? p.date_listed ?? (p.created_at ? new Date(p.created_at).getTime() : Date.now()),
+                listingType: p.listingType ?? p.listing_type,
+                propertyType: p.propertyType ?? p.property_type,
+                purchasePrice: p.purchasePrice ?? p.purchase_price,
+                neighborhoodInfo: p.neighborhoodInfo ?? p.neighborhood_info,
+                virtualTourUrl: p.virtualTourUrl ?? p.virtual_tour_url,
+                vrTourUrl: p.vrTourUrl ?? p.vr_tour_url,
+                smartContractReady: p.smartContractReady ?? p.smart_contract_ready,
+                priceHistory: p.priceHistory ?? p.price_history,
+                occupancyRate: p.occupancyRate ?? p.occupancy_rate,
+                marketROI: p.marketROI ?? p.market_roi,
+                perNightPrice: p.perNightPrice ?? p.per_night_price,
+                packageIncludes: p.packageIncludes ?? p.package_includes,
+                vehicleType: p.vehicleType ?? p.vehicle_type,
+                // Handle JSON fields if they come back as strings (rare with supabase-js but possible with some configs)
+                address: typeof p.address === 'string' ? JSON.parse(p.address) : p.address,
+                details: typeof p.details === 'string' ? JSON.parse(p.details) : p.details,
+                amenities: typeof p.amenities === 'string' ? JSON.parse(p.amenities) : p.amenities,
+                images: curatedProp && !hasLocalImage ? curatedProp.images : (parsedImages || curatedProp?.images || []),
+                agent: typeof p.agent === 'string' ? JSON.parse(p.agent) : p.agent,
+                financials: typeof p.financials === 'string' ? JSON.parse(p.financials) : p.financials,
+            };
+        });
 
         return mappedData.sort((a, b) => b.dateListed - a.dateListed);
 

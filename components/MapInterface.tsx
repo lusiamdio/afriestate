@@ -20,17 +20,22 @@ interface MapInterfaceProps {
 const UpdateMapCenter: React.FC<{ properties: Property[] }> = ({ properties }) => {
   const map = useMap();
   useEffect(() => {
-    if (properties.length > 0) {
-      if (properties[0].coordinates) {
-         map.setView([properties[0].coordinates.lat, properties[0].coordinates.lng], 12);
-      }
+    const validCoords = properties
+      .filter((p) => p.coordinates && typeof p.coordinates.lat === 'number' && typeof p.coordinates.lng === 'number')
+      .map((p) => [p.coordinates.lat, p.coordinates.lng] as [number, number]);
+
+    if (validCoords.length === 1) {
+      map.setView(validCoords[0], 12);
+    } else if (validCoords.length > 1) {
+      const bounds = L.latLngBounds(validCoords);
+      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 });
     }
   }, [properties, map]);
   return null;
 };
 
 const MapInterface: React.FC<MapInterfaceProps> = ({ properties, onOpenDetailModal }) => {
-  const defaultCenter: [number, number] = [-33.9249, 18.4241]; // Default to Cape Town
+  const defaultCenter: [number, number] = [0.0, 20.0]; // Centered on Africa
 
   return (
     <div className="w-full h-[600px] rounded-2xl overflow-hidden shadow-lg border border-slate-200 dark:border-slate-800 relative z-0">

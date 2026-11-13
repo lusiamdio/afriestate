@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { GoogleGenAI, Modality, Blob } from '@google/genai';
+import { GoogleGenAI, Modality, Blob } from '../lib/ai';
 import { encode, decode, decodeAudioData } from '../lib/audioUtils';
 import { MicrophoneIcon, StopIcon } from './icons/ActionIcons';
 import { CloseIcon } from './icons/NavIcons';
@@ -75,7 +75,7 @@ const AIVoiceChat: React.FC<AIVoiceChatProps> = ({ isOpen, onClose }) => {
       audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
       outputAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
       
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+      const ai = new GoogleGenAI();
 
       sessionPromiseRef.current = ai.live.connect({
         model: 'gemini-2.5-flash-native-audio-preview-09-2025',

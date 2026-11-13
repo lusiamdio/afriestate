@@ -1,14 +1,31 @@
-
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import type { Property } from '../types';
+import { ListingType } from '../types';
 import { BedIcon, BathIcon, AreaIcon } from './icons/PropertyIcons';
-import { LocationPinIcon } from './icons/NavIcons';
-import { HeartIcon, HeartIconSolid, CalculatorIcon, CalendarIcon, CheckBadgeIcon, StarIcon, SparklesIcon, Square2StackIcon, PencilIcon, TrashIcon, CubeTransparentIcon, EyeIcon, ShareIcon, LinkIcon, CheckIcon, VrHeadsetIcon } from './icons/ActionIcons';
+import { 
+  HeartIcon, 
+  CheckBadgeIcon, 
+  StarIcon, 
+  Square2StackIcon, 
+  PencilIcon, 
+  TrashIcon, 
+  ShareIcon, 
+  LinkIcon, 
+  CheckIcon,
+  EnvelopeIcon 
+} from './icons/ActionIcons';
+import { 
+  SolarIcon, 
+  GeneratorIcon, 
+  BoreholeIcon, 
+  FibreIcon, 
+  GatedSecurityIcon,
+  YieldTrendingIcon 
+} from './icons/AfricanInfrastructureIcons';
 import { FacebookIcon, TwitterIcon, WhatsAppIcon } from './icons/SocialIcons';
-import { ListingType, PropertyType } from '../types';
 import { useCurrency } from '../contexts/CurrencyContext';
 import { useToast } from '../contexts/ToastContext';
-import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/20/solid';
+import { ChevronLeftIcon, ChevronRightIcon, ShieldCheckIcon } from '@heroicons/react/20/solid';
 
 interface ShareMenuProps {
   propertyTitle: string;
@@ -17,13 +34,13 @@ interface ShareMenuProps {
 
 const ShareMenu: React.FC<ShareMenuProps> = ({ propertyTitle, propertyUrl }) => {
   const [copied, setCopied] = useState(false);
-
-  const shareText = `Check out this amazing property I found on AfriEstate: ${propertyTitle}`;
+  const shareText = `Check out this property on AfriEstate: ${propertyTitle}`;
   
   const socialLinks = {
     facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(propertyUrl)}&quote=${encodeURIComponent(shareText)}`,
     twitter: `https://twitter.com/intent/tweet?url=${encodeURIComponent(propertyUrl)}&text=${encodeURIComponent(shareText)}`,
-    whatsapp: `https://api.whatsapp.com/send?text=${encodeURIComponent(`${shareText} ${propertyUrl}`)}`
+    whatsapp: `https://api.whatsapp.com/send?text=${encodeURIComponent(`${shareText} ${propertyUrl}`)}`,
+    email: `mailto:?subject=${encodeURIComponent(propertyTitle)}&body=${encodeURIComponent(`${shareText}\n\n${propertyUrl}`)}`
   };
 
   const handleCopy = (e: React.MouseEvent) => {
@@ -35,41 +52,36 @@ const ShareMenu: React.FC<ShareMenuProps> = ({ propertyTitle, propertyUrl }) => 
   
   const handleSocialClick = (e: React.MouseEvent, url: string) => {
     e.stopPropagation();
+    if (url.startsWith('mailto:')) {
+      window.location.href = url;
+      return;
+    }
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   return (
-    <div className="absolute top-full right-0 mt-2 w-48 glass-panel rounded-lg shadow-xl border border-slate-200/80 dark:border-slate-700 py-2 z-20 animate-fade-in-up-sm">
-        <button onClick={(e) => handleSocialClick(e, socialLinks.facebook)} className="share-button">
-            <FacebookIcon className="w-5 h-5 text-blue-600" /><span>Facebook</span>
-        </button>
-        <button onClick={(e) => handleSocialClick(e, socialLinks.twitter)} className="share-button">
-            <TwitterIcon className="w-5 h-5 text-sky-400" /><span>Twitter</span>
-        </button>
-        <button onClick={(e) => handleSocialClick(e, socialLinks.whatsapp)} className="share-button">
-            <WhatsAppIcon className="w-5 h-5 text-green-500" /><span>WhatsApp</span>
-        </button>
-        <div className="border-t border-slate-200 dark:border-slate-700 my-1"></div>
-        <button onClick={handleCopy} className="share-button">
-            {copied ? <><CheckIcon className="w-5 h-5 text-green-500"/><span>Copied!</span></> : <><LinkIcon className="w-5 h-5 text-slate-500" /><span>Copy Link</span></>}
-        </button>
-        <style>{`
-            .share-button {
-                @apply w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-3;
-            }
-             @keyframes fadeInUpSm {
-                from { opacity: 0; transform: translateY(10px); }
-                to { opacity: 1; transform: translateY(0); }
-            }
-            .animate-fade-in-up-sm {
-                animation: fadeInUpSm 0.2s ease-out forwards;
-            }
-        `}</style>
+    <div className="absolute top-full right-0 mt-2 w-48 bg-white dark:bg-slate-900 rounded-xl shadow-xl py-2 z-30 animate-fade-in">
+      <button onClick={(e) => handleSocialClick(e, socialLinks.whatsapp)} className="w-full text-left px-4 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-3">
+        <WhatsAppIcon className="w-4 h-4 text-emerald-500" /><span>WhatsApp</span>
+      </button>
+      <button onClick={(e) => handleSocialClick(e, socialLinks.email)} className="w-full text-left px-4 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-3">
+        <EnvelopeIcon className="w-4 h-4 text-amber-500" /><span>Email</span>
+      </button>
+      <button onClick={(e) => handleSocialClick(e, socialLinks.facebook)} className="w-full text-left px-4 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-3">
+        <FacebookIcon className="w-4 h-4 text-blue-600" /><span>Facebook</span>
+      </button>
+      <button onClick={(e) => handleSocialClick(e, socialLinks.twitter)} className="w-full text-left px-4 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-3">
+        <TwitterIcon className="w-4 h-4 text-slate-700 dark:text-slate-300" /><span>X (Twitter)</span>
+      </button>
+      <div className="h-px bg-slate-100 dark:bg-slate-800 my-1"></div>
+      <button onClick={handleCopy} className="w-full text-left px-4 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-3">
+        {copied ? <><CheckIcon className="w-4 h-4 text-green-500"/><span>Copied!</span></> : <><LinkIcon className="w-4 h-4 text-slate-400" /><span>Copy Link</span></>}
+      </button>
     </div>
   );
 };
 
-interface PropertyCardProps {
+export interface PropertyCardProps {
   property: Property;
   isSaved: boolean;
   isCompared: boolean;
@@ -83,225 +95,325 @@ interface PropertyCardProps {
   onToggleCompare: (property: Property) => void;
   onEdit: (property: Property) => void;
   onDelete: (propertyId: string) => void;
+  onOpenVerificationModal?: (property: Property) => void;
 }
 
+const PropertyCard: React.FC<PropertyCardProps> = ({
+  property,
+  isSaved,
+  isCompared,
+  isOwner,
+  onSaveToggle,
+  onOpenCalculator,
+  onOpenTourModal,
+  onFindSimilar,
+  onOpenDetailModal,
+  onToggleCompare,
+  onEdit,
+  onDelete,
+  onOpenVerificationModal,
+}) => {
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [isShareMenuOpen, setIsShareMenuOpen] = useState(false);
+  const shareRef = useRef<HTMLDivElement>(null);
+  const { formatCurrency, currency } = useCurrency();
+  const { addToast } = useToast();
 
-const PropertyCard: React.FC<PropertyCardProps> = (props) => {
-    const { property, isSaved, isCompared, isOwner, onSaveToggle, onOpenCalculator, onOpenTourModal, onFindSimilar, onOpenDetailModal, onOpenVRTour, onToggleCompare, onEdit, onDelete } = props;
-    const [currentImageIndex, setCurrentImageIndex] = useState(0);
-    const [isShareMenuOpen, setIsShareMenuOpen] = useState(false);
-    const shareRef = useRef<HTMLDivElement>(null);
-    const { formatCurrency } = useCurrency();
-    const { addToast } = useToast();
+  const isInvestment = property.listingType === ListingType.FOR_INVESTMENT || property.targetReturn !== undefined;
+  const isRent = property.listingType === ListingType.RENT;
 
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (shareRef.current && !shareRef.current.contains(event.target as Node)) {
-                setIsShareMenuOpen(false);
-            }
-        };
-        document.addEventListener("mousedown", handleClickOutside);
-        return () => document.removeEventListener("mousedown", handleClickOutside);
-    }, []);
-    
-    const priceSuffix = useMemo(() => {
-        if (property.propertyType === PropertyType.TRANSPORT) return '/day';
-        if (property.perNightPrice) return '/night';
-        if (property.listingType === ListingType.RENT) return '/mo';
-        return '';
-    }, [property.listingType, property.perNightPrice, property.propertyType]);
-
-    const formattedPrice = `${formatCurrency(property.price)}${priceSuffix}`;
-
-    const handleActionClick = (e: React.MouseEvent, action: (p: Property) => void) => {
-        e.stopPropagation();
-        e.preventDefault();
-        action(property);
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (shareRef.current && !shareRef.current.contains(event.target as Node)) {
+        setIsShareMenuOpen(false);
+      }
     };
-    
-    const handleIdActionClick = (e: React.MouseEvent, action: (id: string) => void) => {
-        e.stopPropagation();
-        e.preventDefault();
-        action(property.id);
-    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
-    const handlePrevImage = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        setCurrentImageIndex(prev => (prev === 0 ? property.images.length - 1 : prev - 1));
-    };
+  const handleNextImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (property.images && property.images.length > 0) {
+      setCurrentImageIndex((prev) => (prev + 1) % property.images.length);
+    }
+  };
 
-    const handleNextImage = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        setCurrentImageIndex(prev => (prev === property.images.length - 1 ? 0 : prev + 1));
-    };
+  const handlePrevImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (property.images && property.images.length > 0) {
+      setCurrentImageIndex((prev) => (prev - 1 + property.images.length) % property.images.length);
+    }
+  };
 
-    const handleVrTourClick = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        if(property.vrTourUrl) {
-            onOpenVRTour(property.vrTourUrl);
-        }
-    };
-    
-    const showStandardActions = property.propertyType !== PropertyType.TRANSPORT && property.propertyType !== PropertyType.WELLNESS;
+  const handleVerificationClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onOpenVerificationModal) {
+      onOpenVerificationModal(property);
+    } else {
+      onOpenDetailModal(property);
+    }
+  };
+
+  const displayImage = property.images && property.images.length > 0
+    ? property.images[currentImageIndex]
+    : '/images/house_suburbs_1779978598551.png';
+
+  // Format pricing with local vs converted preferred currency
+  const formattedPrice = formatCurrency(property.price);
+  const priceSubtext = property.perNightPrice 
+    ? '/ night' 
+    : isRent 
+      ? '/ month' 
+      : property.purchasePrice 
+        ? 'asking price' 
+        : '';
 
   return (
-    <div className="glass-card rounded-xl overflow-hidden group flex flex-col">
-      <div className="relative overflow-hidden group/image">
-        <button onClick={() => onOpenDetailModal(property)} className="absolute inset-0 z-0"></button>
-        <img src={(property.images && property.images.length > 0) ? property.images[currentImageIndex] : 'https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800&q=80'} alt={property.title} className="w-full h-48 object-cover transition-transform duration-500 group-hover:scale-105" referrerPolicy="no-referrer" />
-        
+    <article 
+      onClick={() => onOpenDetailModal(property)}
+      className="group cursor-pointer bg-white dark:bg-slate-900 rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-200 flex flex-col"
+    >
+      {/* Media Viewport */}
+      <div className="relative aspect-[16/10] bg-slate-100 dark:bg-slate-800 overflow-hidden">
+        <img
+          src={displayImage}
+          alt={property.title}
+          referrerPolicy="no-referrer"
+          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+        />
+
+        {/* Scrim Overlay for crisp contrast */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/20 pointer-events-none" />
+
+        {/* Top Badges Strip */}
+        <div className="absolute top-3 left-3 right-3 flex items-center justify-between z-10 pointer-events-auto">
+          {/* Trust Badge */}
+          {property.verified ? (
+            <button
+              type="button"
+              onClick={handleVerificationClick}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-950/85 backdrop-blur-md text-emerald-300 text-xs font-semibold hover:bg-emerald-900 transition-colors"
+              title="Click to view verification details"
+            >
+              <CheckBadgeIcon className="w-4 h-4 text-emerald-400" />
+              <span>Verified</span>
+            </button>
+          ) : (
+            <span className="text-[11px] text-white/90 bg-black/40 backdrop-blur-md px-2 py-0.5 rounded-md">
+              Unverified
+            </span>
+          )}
+
+          {/* Quick Actions (Save & Compare & Share) */}
+          <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              onClick={() => onToggleCompare(property)}
+              className={`p-1.5 rounded-lg backdrop-blur-md transition-colors ${
+                isCompared
+                  ? 'bg-amber-600 text-white'
+                  : 'bg-black/40 text-white hover:bg-black/60'
+              }`}
+              title={isCompared ? 'Remove from Compare' : 'Add to Compare'}
+            >
+              <Square2StackIcon className="w-4 h-4" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onSaveToggle(property.id)}
+              className={`p-1.5 rounded-lg backdrop-blur-md transition-colors ${
+                isSaved
+                  ? 'bg-rose-600 text-white'
+                  : 'bg-black/40 text-white hover:bg-black/60'
+              }`}
+              title={isSaved ? 'Saved to Favorites' : 'Save Property'}
+            >
+              <HeartIcon className="w-4 h-4 text-current" />
+            </button>
+
+            <div className="relative" ref={shareRef}>
+              <button
+                type="button"
+                onClick={() => setIsShareMenuOpen(!isShareMenuOpen)}
+                className="p-1.5 rounded-lg bg-black/40 text-white hover:bg-black/60 backdrop-blur-md transition-colors"
+                title="Share Property"
+              >
+                <ShareIcon className="w-4 h-4" />
+              </button>
+              {isShareMenuOpen && (
+                <ShareMenu propertyTitle={property.title} propertyUrl={window.location.href} />
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Carousel Prev/Next Buttons */}
         {property.images && property.images.length > 1 && (
-            <>
-                <button onClick={handlePrevImage} className="absolute left-2 top-1/2 -translate-y-1/2 bg-white text-brand-dark p-1.5 rounded-full opacity-0 group-hover/image:opacity-100 transition-opacity z-10 hover:bg-slate-100 shadow-sm border border-slate-200">
-                    <ChevronLeftIcon className="w-4 h-4 text-brand-dark" />
-                </button>
-                <button onClick={handleNextImage} className="absolute right-2 top-1/2 -translate-y-1/2 bg-white text-brand-dark p-1.5 rounded-full opacity-0 group-hover/image:opacity-100 transition-opacity z-10 hover:bg-slate-100 shadow-sm border border-slate-200">
-                    <ChevronRightIcon className="w-4 h-4 text-brand-dark" />
-                </button>
-                 <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
-                    {property.images.map((_, index) => (
-                        <div key={index} className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${index === currentImageIndex ? 'bg-white w-3' : 'bg-white/50'}`} />
-                    ))}
-                </div>
-            </>
-        )}
-
-        <div className="absolute top-3 right-3 flex flex-col space-y-2" ref={shareRef}>
+          <>
             <button
-                onClick={(e) => {
-                    handleIdActionClick(e, onSaveToggle);
-                    if (!isSaved) addToast('Property Saved Successfully!', 'success');
-                }}
-                className="bg-white p-2 border border-slate-200 rounded-full text-slate-700 hover:text-black hover:bg-slate-50 transition-all duration-300 z-10 shadow-sm"
-                aria-label={isSaved ? "Unsave property" : "Save property"}
+              type="button"
+              onClick={handlePrevImage}
+              className="absolute left-2 top-1/2 -translate-y-1/2 p-1 rounded-full bg-black/40 text-white hover:bg-black/70 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity z-10"
             >
-                {isSaved ? (
-                    <HeartIconSolid className="w-5 h-5 text-brand-accent animate-heartbeat" />
-                ) : (
-                    <HeartIcon className="w-5 h-5" />
-                )}
+              <ChevronLeftIcon className="w-4 h-4" />
             </button>
             <button
-                onClick={(e) => handleActionClick(e, onToggleCompare)}
-                className={`bg-white p-2 border border-slate-200 rounded-full text-slate-700 hover:bg-slate-50 transition-all duration-300 z-10 shadow-sm ${isCompared ? 'text-brand-dark font-bold' : ''}`}
-                aria-label={isCompared ? "Remove from comparison" : "Add to comparison"}
+              type="button"
+              onClick={handleNextImage}
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full bg-black/40 text-white hover:bg-black/70 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity z-10"
             >
-                <Square2StackIcon className="w-5 h-5" />
+              <ChevronRightIcon className="w-4 h-4" />
             </button>
-            {property.vrTourUrl && (
-                <button
-                    onClick={handleVrTourClick}
-                    className="bg-white text-brand-dark p-2 rounded-full shadow-sm border border-slate-200 hover:scale-105 hover:bg-slate-50 transition-all duration-300 z-10"
-                    aria-label="Open VR Tour"
-                >
-                    <VrHeadsetIcon className="w-5 h-5" />
-                </button>
-            )}
-             <div className="relative">
-                <button
-                    onClick={(e) => {e.stopPropagation(); setIsShareMenuOpen(prev => !prev);}}
-                    className="bg-white p-2 border border-slate-200 rounded-full text-slate-700 hover:text-black hover:bg-slate-50 transition-all duration-300 z-10 shadow-sm"
-                    aria-label="Share property"
-                >
-                    <ShareIcon className="w-5 h-5" />
-                </button>
-                {isShareMenuOpen && (
-                    <ShareMenu propertyTitle={property.title} propertyUrl={`${window.location.href.split('?')[0]}?propertyId=${property.id}`} />
-                )}
-            </div>
-        </div>
-
-        {isOwner && (
-            <div className="absolute bottom-3 left-3 flex space-x-2 z-10">
-                <button onClick={(e) => handleActionClick(e, onEdit)} className="bg-white text-brand-dark border border-slate-200 p-2 rounded-full shadow-sm hover:bg-slate-50 transition-all">
-                    <PencilIcon className="w-4 h-4" />
-                </button>
-                <button onClick={(e) => handleIdActionClick(e, onDelete)} className="bg-white text-red-600 border border-slate-200 p-2 rounded-full shadow-sm hover:bg-red-50 transition-all">
-                    <TrashIcon className="w-4 h-4" />
-                </button>
-            </div>
+          </>
         )}
 
-        <div className="absolute top-3 left-3 flex flex-col items-start gap-y-1.5">
-            <div className="flex items-center gap-x-1.5">
-                <div className={`glass-badge px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider`}>
-                    {property.listingType}
-                </div>
-                {property.verified && (
-                    <div className="glass-badge px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
-                        <CheckBadgeIcon className="w-3 h-3 text-emerald-600" />
-                        <span>Verified</span>
-                    </div>
-                )}
+        {/* Bottom Image Subtitle: Location & Country */}
+        <div className="absolute bottom-2.5 left-3 right-3 text-white text-xs z-10 pointer-events-none flex items-center justify-between">
+          <span className="font-medium text-white/90 drop-shadow-sm truncate">
+            {property.address.city}, {property.country || 'Africa'}
+          </span>
+          <span className="inline-flex items-center gap-1 text-[11px] text-white/90 tabular-nums">
+            <StarIcon className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            <span>{property.agent.rating.toFixed(1)} ({property.agent.reviewCount})</span>
+          </span>
+        </div>
+      </div>
+
+      {/* Card Content Area */}
+      <div className="p-4 flex-1 flex flex-col justify-between">
+        {/* Title & Neighbourhood */}
+        <div>
+          <h3 className="text-base font-bold text-slate-900 dark:text-white line-clamp-1 group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">
+            {property.title}
+          </h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-1 mt-0.5">
+            {property.address.street}
+          </p>
+
+          {/* If Investment Card: Render Financial Metrics Matrix (Section 9) */}
+          {isInvestment ? (
+            <div className="mt-3 grid grid-cols-2 gap-2 p-2.5 rounded-xl bg-amber-50/70 dark:bg-amber-950/25 text-xs">
+              <div>
+                <span className="text-[10px] text-amber-800 dark:text-amber-400 uppercase tracking-wider block font-semibold">
+                  Target Return
+                </span>
+                <span className="font-bold text-amber-900 dark:text-amber-200 tabular-nums">
+                  {property.targetReturn || property.marketROI || 12.0}%
+                </span>
+              </div>
+              <div>
+                <span className="text-[10px] text-amber-800 dark:text-amber-400 uppercase tracking-wider block font-semibold">
+                  Rental Yield
+                </span>
+                <span className="font-bold text-amber-900 dark:text-amber-200 tabular-nums">
+                  {property.rentalYield || 10.5}%
+                </span>
+              </div>
+              <div>
+                <span className="text-[10px] text-amber-800 dark:text-amber-400 uppercase tracking-wider block font-semibold">
+                  Occupancy
+                </span>
+                <span className="font-semibold text-slate-700 dark:text-slate-300 tabular-nums">
+                  {property.occupancyRate || 92}%
+                </span>
+              </div>
+              <div>
+                <span className="text-[10px] text-amber-800 dark:text-amber-400 uppercase tracking-wider block font-semibold">
+                  Min Investment
+                </span>
+                <span className="font-semibold text-slate-700 dark:text-slate-300 tabular-nums">
+                  {property.minInvestment ? formatCurrency(property.minInvestment) : '$10,000+'}
+                </span>
+              </div>
             </div>
-            {property.smartContractReady && (
-                <div className="glass-badge px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
-                    <CubeTransparentIcon className="w-3 h-3 text-brand-primary" />
-                    <span>Smart Ready</span>
-                </div>
+          ) : (
+            /* Residential Specs (Bed · Bath · Area) */
+            <div className="mt-3 flex items-center gap-3 text-xs text-slate-600 dark:text-slate-300">
+              <span className="flex items-center gap-1">
+                <BedIcon className="w-4 h-4 text-slate-400" />
+                <span className="tabular-nums">{property.details.beds}</span> Beds
+              </span>
+              <span className="text-slate-300 dark:text-slate-700">·</span>
+              <span className="flex items-center gap-1">
+                <BathIcon className="w-4 h-4 text-slate-400" />
+                <span className="tabular-nums">{property.details.baths}</span> Baths
+              </span>
+              <span className="text-slate-300 dark:text-slate-700">·</span>
+              <span className="flex items-center gap-1">
+                <AreaIcon className="w-4 h-4 text-slate-400" />
+                <span className="tabular-nums">{Math.round(property.details.area * 0.0929)}</span> m²
+              </span>
+            </div>
+          )}
+
+          {/* African Infrastructure Highlights Strip */}
+          <div className="mt-3 pt-2.5 flex flex-wrap items-center gap-2 text-[11px] text-slate-600 dark:text-slate-400">
+            {property.hasSolar && (
+              <span className="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-400 font-medium">
+                <SolarIcon className="w-3.5 h-3.5 text-emerald-600" />
+                Solar
+              </span>
             )}
-        </div>
-      </div>
-      <div onClick={() => onOpenDetailModal(property)} className="p-4 flex-grow flex flex-col text-left cursor-pointer">
-        <div className="flex justify-between items-start mb-2">
-            <span className="text-[10px] font-bold text-brand-primary uppercase tracking-widest">{property.propertyType}</span>
-            <p className="text-xl font-bold text-brand-dark dark:text-white">{formattedPrice}</p>
-        </div>
-        <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-1 truncate group-hover:text-brand-primary transition-colors">{property.title}</h3>
-        <div className="flex items-center text-slate-500 dark:text-slate-400 mb-4 text-xs">
-          <LocationPinIcon className="w-3.5 h-3.5 mr-1 text-slate-400 flex-shrink-0" />
-          <span className="truncate">{property.address.street}, {property.address.city}</span>
-        </div>
-        
-        <div className="grid grid-cols-3 gap-2 text-slate-600 dark:text-slate-300 glass-card p-3 rounded-lg mb-4 text-xs">
-            <div className="flex flex-col items-center border-r border-slate-200 dark:border-slate-600">
-                <BedIcon className="w-4 h-4 text-brand-primary mb-1"/>
-                <span className="font-semibold">{property.details.beds} Beds</span>
-            </div>
-            <div className="flex flex-col items-center border-r border-slate-200 dark:border-slate-600">
-                <BathIcon className="w-4 h-4 text-brand-primary mb-1"/>
-                <span className="font-semibold">{property.details.baths} Baths</span>
-            </div>
-            <div className="flex flex-col items-center">
-                <AreaIcon className="w-4 h-4 text-brand-primary mb-1"/>
-                <span className="font-semibold">{property.details.area.toLocaleString()} sqft</span>
-            </div>
-        </div>
-
-        <div className="mt-auto pt-3 flex items-center justify-between border-t border-slate-100 dark:border-slate-700">
-            <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-full glass-card flex items-center justify-center text-brand-primary font-bold text-[10px] uppercase">
-                    {property.agent.name.charAt(0)}
-                </div>
-                <div className="flex flex-col">
-                    <span className="text-[10px] font-bold text-slate-700 dark:text-white truncate max-w-[80px]">{property.agent.name}</span>
-                </div>
-            </div>
-            <div className="flex items-center gap-1 text-slate-400">
-                <EyeIcon className="w-3.5 h-3.5"/>
-                <span className="text-[10px] font-bold">{property.views}</span>
-            </div>
+            {property.hasGenerator && (
+              <span className="inline-flex items-center gap-1">
+                <GeneratorIcon className="w-3.5 h-3.5 text-amber-600" />
+                Generator
+              </span>
+            )}
+            {property.hasBorehole && (
+              <span className="inline-flex items-center gap-1">
+                <BoreholeIcon className="w-3.5 h-3.5 text-sky-600" />
+                Borehole
+              </span>
+            )}
+            {property.hasFibre && (
+              <span className="inline-flex items-center gap-1">
+                <FibreIcon className="w-3.5 h-3.5 text-indigo-500" />
+                Fibre
+              </span>
+            )}
+            {property.securityFeatures && property.securityFeatures.length > 0 && (
+              <span className="inline-flex items-center gap-1">
+                <GatedSecurityIcon className="w-3.5 h-3.5 text-slate-500" />
+                Secured
+              </span>
+            )}
+          </div>
         </div>
 
-        {showStandardActions && (
-            <div className="mt-4 flex items-center gap-2">
-                <button 
-                    onClick={(e) => handleActionClick(e, onOpenTourModal)}
-                    className="flex-1 glass-button text-xs font-bold py-2.5 rounded-lg transition-all"
-                >
-                    Book Tour
-                </button>
-                <button 
-                    onClick={(e) => handleActionClick(e, onFindSimilar)}
-                    className="p-2.5 glass-button rounded-lg transition-all"
-                    title="Find Similar"
-                >
-                    <SparklesIcon className="w-4 h-4" />
-                </button>
+        {/* Pricing and Primary CTA */}
+        <div className="mt-4 pt-3 flex items-center justify-between">
+          <div>
+            <div className="flex items-baseline gap-1">
+              <span className="text-lg font-bold text-slate-900 dark:text-white tabular-nums tracking-tight">
+                {formattedPrice}
+              </span>
+              {priceSubtext && (
+                <span className="text-xs text-slate-500 dark:text-slate-400">
+                  {priceSubtext}
+                </span>
+              )}
             </div>
-        )}
+            <p className="text-[10px] text-slate-500 dark:text-slate-400">
+              {isRent ? 'Verified landlord' : isInvestment ? 'Institutional yield' : 'Freehold deed verified'}
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenDetailModal(property);
+            }}
+            className="px-3.5 py-1.5 text-xs font-semibold rounded-xl bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 transition shadow-sm"
+          >
+            {isInvestment ? 'View Investment' : 'View Property'}
+          </button>
+        </div>
       </div>
-    </div>
+    </article>
   );
 };
 

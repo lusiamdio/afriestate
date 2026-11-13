@@ -88,6 +88,31 @@ export interface Property {
   vehicleType?: 'Sedan' | 'SUV' | 'Van' | 'Luxury';
   packageIncludes?: string[];
   perNightPrice?: boolean;
+  country?: string;
+  region?: 'Southern Africa' | 'West Africa' | 'East Africa' | 'North Africa' | 'Central Africa';
+  hasSolar?: boolean;
+  hasGenerator?: boolean;
+  hasBorehole?: boolean;
+  hasWaterTank?: boolean;
+  hasFibre?: boolean;
+  securityFeatures?: string[];
+  proximity?: string[];
+  leaseDuration?: 'Long term' | 'Medium term' | 'Short term / Stay';
+  targetReturn?: number; // e.g. 14.8 (%)
+  rentalYield?: number;  // e.g. 11.2 (%)
+  projectedROI?: number; // e.g. 18.4 (%)
+  minInvestment?: number; // e.g. 25000
+  investmentType?: 'Rental Property' | 'Development' | 'REIT' | 'Fractional' | 'Commercial' | 'Student Residence';
+  riskLevel?: 'Low' | 'Moderate' | 'Growth';
+  localCurrency?: string;
+  foreignBuyerEligible?: boolean;
+  verificationDetails?: {
+    verifiedDate: string;
+    titleDeedNumber: string;
+    inspectionDate: string;
+    registryStatus: string;
+    surveyVerified: boolean;
+  };
 }
 
 export interface SearchFilters {
@@ -99,6 +124,16 @@ export interface SearchFilters {
   bedrooms: number;
   bathrooms: number;
   amenities: string[];
+  mode?: 'buy' | 'rent' | 'invest';
+  region?: string;
+  country?: string;
+  leaseDuration?: string;
+  investmentType?: string;
+  targetReturnMin?: number;
+  infrastructure?: string[];
+  security?: string[];
+  proximity?: string[];
+  verifiedOnly?: boolean;
   checkIn?: string;
   checkOut?: string;
   guests?: number;
@@ -144,6 +179,29 @@ export interface User {
   bankDetails?: { accountHolder: string; accountNumber: string; bankName: string; };
   riskProfile?: { score: number; level: 'Conservative' | 'Moderate' | 'Aggressive'; };
   referralCode?: string;
+
+  kycStatus?: 'Not Started' | 'Pending Review' | 'Needs Manual Review' | 'Approved' | 'Rejected' | 'Flagged';
+  status?: string;
+  isWalletFrozen?: boolean;
+}
+
+export type KycVerificationStatus = 'Not Started' | 'Pending Review' | 'Needs Manual Review' | 'Approved' | 'Rejected';
+
+export interface KycVerification {
+  id: string;
+  userId: string;
+  username: string;
+  role: 'user' | 'agent' | 'investor';
+  status: KycVerificationStatus;
+  provider: string;
+  repositoryUrl?: string;
+  faceMatchScore?: number;
+  livenessScore?: number;
+  providerReference?: string;
+  documentType?: string;
+  rejectionReason?: string;
+  createdAt: number;
+  updatedAt: number;
 }
 
 export interface PropertyAlert {
@@ -287,6 +345,7 @@ export enum EventType {
 export interface CalendarEvent {
   id: string;
   title: string;
+  description?: string;
   date: string; // YYYY-MM-DD
   startTime: string; // HH:MM
   endTime: string; // HH:MM

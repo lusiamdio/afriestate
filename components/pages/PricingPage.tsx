@@ -128,28 +128,6 @@ const PricingPage: React.FC<PricingPageProps> = ({ onPlanSelect }) => {
             </div>
         </div>
       </section>
-      
-      {/* App Mockups */}
-      <section className="py-16 glass-panel">
-        <div className="container mx-auto px-6 text-center">
-            <h2 className="text-3xl font-bold text-brand-dark dark:text-white">Experience Your Dashboard</h2>
-            <p className="mt-3 text-slate-500 dark:text-slate-400 max-w-2xl mx-auto">Each plan comes with a powerful, tailored dashboard to help you achieve your goals.</p>
-            <div className="mt-10 grid md:grid-cols-3 gap-8 items-center">
-                <div>
-                    <img src="https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800&q=80" alt="User Dashboard" className="rounded-lg shadow-xl" />
-                    <p className="mt-4 font-semibold text-slate-700 dark:text-slate-200">Basic Analytics</p>
-                </div>
-                <div>
-                    <img src="https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800&q=80" alt="Agent Dashboard" className="rounded-lg shadow-xl border border-brand-primary" />
-                    <p className="mt-4 font-semibold text-brand-primary">Advanced CRM</p>
-                </div>
-                <div>
-                    <img src="https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800&q=80" alt="Investor Dashboard" className="rounded-lg shadow-xl" />
-                    <p className="mt-4 font-semibold text-slate-700 dark:text-slate-200">Financial Tools</p>
-                </div>
-            </div>
-        </div>
-      </section>
     </div>
   );
 };

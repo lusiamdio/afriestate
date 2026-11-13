@@ -8,445 +8,8 @@ import React from 'react';
 import { StarIcon, TrophyIcon } from './components/icons/ActionIcons';
 import { RocketLaunchIcon } from './components/icons/AgentDashboardIcons';
 
-export const ALL_PROPERTIES: Property[] = [
-  {
-    id: '1',
-    title: 'Modern Downtown Loft',
-    listingType: ListingType.RENT,
-    propertyType: PropertyType.APARTMENT,
-    address: { street: '123 Main St', city: 'Urbanville', zip: '10001' },
-    coordinates: { lat: 40.7128, lng: -74.0060 },
-    price: 3500,
-    purchasePrice: 450000,
-    details: { beds: 2, baths: 2, area: 1200 },
-    description: 'A stunning loft in the heart of the city. Features high ceilings, large windows, and a modern kitchen. Perfect for young professionals who want to be in the center of the action.',
-    neighborhoodInfo: "Located in the vibrant Arts District, you're steps away from top-rated restaurants, theaters, and public transport. The neighborhood is known for its lively atmosphere and creative energy.",
-    amenities: ['Gym', 'Rooftop Deck', 'In-unit Laundry', 'Doorman', 'Pet Friendly'],
-    images: [
-    'https://cf.bstatic.com/xdata/images/hotel/max1024x768/671575812.jpg?k=13bcb8cc97c54f10009457a987d6212761522a957584dcbe9f7a521fd246d202&o=',
-],
-    virtualTourUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
-    vrTourUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ?rel=0&autoplay=1&mute=1&loop=1',
-    agent: { name: 'Peter Van der Merwe', phone: '555-123-4567', verified: true, rating: 4.9, reviewCount: 82 },
-    featured: true,
-    verified: true,
-    smartContractReady: true,
-    views: 1284,
-    status: PropertyStatus.ACTIVE,
-    dateListed: Date.now() - 10 * 24 * 60 * 60 * 1000,
-    saves: 102,
-    priceHistory: [
-        { date: Date.now() - 365 * 24 * 60 * 60 * 1000, price: 420000 },
-        { date: Date.now() - 180 * 24 * 60 * 60 * 1000, price: 435000 },
-        { date: Date.now() - 30 * 24 * 60 * 60 * 1000, price: 445000 },
-        { date: Date.now(), price: 450000 },
-    ],
-    occupancyRate: 95,
-    marketROI: 6.5,
-    financials: [
-        { date: Date.now() + 2 * 24 * 60 * 60 * 1000, type: 'Income', description: 'Rent Payment', amount: 3500 },
-        { date: Date.now() + 4 * 24 * 60 * 60 * 1000, type: 'Expense', description: 'Mortgage', amount: -1800 },
-        { date: Date.now() + 12 * 24 * 60 * 60 * 1000, type: 'Expense', description: 'Property Tax', amount: -400 },
-    ]
-  },
-  {
-    id: '2',
-    title: 'Cozy Student Room near Campus',
-    listingType: ListingType.RENT,
-    propertyType: PropertyType.STUDENT_HOUSING,
-    address: { street: '456 University Ave', city: 'Collegia', zip: '20002' },
-    coordinates: { lat: 34.0522, lng: -118.2437 },
-    price: 850,
-    purchasePrice: 90000,
-    details: { beds: 1, baths: 1, area: 300 },
-    description: 'Fully furnished room, just a 5-minute walk from the main campus. All utilities included. Ideal for students looking for convenience and a quiet study environment.',
-    neighborhoodInfo: "The University Park neighborhood is bustling with student life. You'll find plenty of cafes, libraries, and late-night eateries. The campus shuttle stop is right outside the building.",
-    amenities: ['Furnished', 'Utilities Included', 'High-speed Internet', 'Study Lounge'],
-    images: [
-    'https://public.sturents.com/photos/9557475.jpg',
-],
-    agent: { name: 'Campus Rentals', phone: '555-987-6543', verified: true, rating: 4.7, reviewCount: 150 },
-    featured: true,
-    verified: true,
-    views: 2543,
-    status: PropertyStatus.ACTIVE,
-    dateListed: Date.now() - 5 * 24 * 60 * 60 * 1000,
-    saves: 230,
-  },
-  {
-    id: '3',
-    title: 'Spacious Township Family Home',
-    listingType: ListingType.SALE,
-    propertyType: PropertyType.TOWNSHIP,
-    address: { street: '789 Hope St', city: 'Soweto', zip: '1804' },
-    coordinates: { lat: -26.2661, lng: 27.8587 },
-    price: 850000,
-    purchasePrice: 600000,
-    details: { beds: 4, baths: 2, area: 1800 },
-    description: 'A beautiful and spacious family home in a vibrant township. Features a large yard, modern finishes, and is close to schools and shops.',
-    neighborhoodInfo: "A family-friendly area with a strong sense of community. The property is near the newly built community center, which features a library and sports facilities.",
-    amenities: ['Garden', 'Secure Parking', 'Patio', 'Alarm System'],
-    images: [
-    'https://cf.bstatic.com/xdata/images/hotel/max1024x768/512614095.jpg?k=1a14dab995c1cf633700f7dd712088123ade04e7d7ff07c98860a12bdc654f55&o=',
-],
-    agent: { name: 'Peter Van der Merwe', phone: '555-222-3333', verified: true, rating: 4.8, reviewCount: 45 },
-    featured: true,
-    verified: false,
-    views: 3102,
-    status: PropertyStatus.ACTIVE,
-    dateListed: Date.now() - 30 * 24 * 60 * 60 * 1000,
-    saves: 150,
-    priceHistory: [
-        { date: Date.now() - 730 * 24 * 60 * 60 * 1000, price: 600000 },
-        { date: Date.now() - 365 * 24 * 60 * 60 * 1000, price: 710000 },
-        { date: Date.now() - 90 * 24 * 60 * 60 * 1000, price: 820000 },
-        { date: Date.now(), price: 850000 },
-    ],
-    marketROI: 18.5,
-  },
-  {
-    id: '4',
-    title: 'Affordable Starter Apartment',
-    listingType: ListingType.SALE,
-    propertyType: PropertyType.APARTMENT,
-    address: { street: '101 Opportunity Ln', city: 'New Dawn', zip: '30003' },
-    coordinates: { lat: 33.7490, lng: -84.3880 },
-    price: 120000,
-    purchasePrice: 95000,
-    details: { beds: 1, baths: 1, area: 650 },
-    description: 'A fantastic opportunity for first-time buyers. This affordable apartment is in a well-maintained building with great community features.',
-    neighborhoodInfo: "New Dawn is an up-and-coming neighborhood with significant investment in public parks and infrastructure. A new light rail station is planned to open next year just two blocks away.",
-    amenities: ['Community Pool', 'Playground', 'On-site Security', 'Gym'],
-    images: [
-    'https://images.prop24.com/363254248',
-],
-    agent: { name: 'Future Homes Inc.', phone: '555-444-5555', verified: false, rating: 4.5, reviewCount: 112 },
-    featured: false,
-    verified: true,
-    views: 890,
-    status: PropertyStatus.PENDING,
-    dateListed: Date.now() - 2 * 24 * 60 * 60 * 1000,
-    saves: 45,
-  },
-  {
-    id: '5',
-    title: 'Quiet Rural Farmhouse',
-    listingType: ListingType.SALE,
-    propertyType: PropertyType.RURAL,
-    address: { street: '222 Country Rd', city: 'Stellenbosch', zip: '7600' },
-    coordinates: { lat: -33.9321, lng: 18.8602 },
-    price: 3200000,
-    purchasePrice: 2500000,
-    details: { beds: 5, baths: 3, area: 3500 },
-    description: 'Escape the city to this beautiful farmhouse on 10 acres of land. Perfect for a large family or for agricultural pursuits. Breathtaking views of the surrounding vineyards.',
-    neighborhoodInfo: "Nestled in the heart of the Cape Winelands, this property offers tranquility and privacy, yet is only a 15-minute drive from the historic town of Stellenbosch.",
-    amenities: ['Acreage', 'Barn', 'Fireplace', 'Mountain View', 'Swimming Pool'],
-    images: [
-    'https://a0.muscache.com/im/pictures/hosting/Hosting-U3RheVN1cHBseUxpc3Rpbmc6NTI2NDQxMTk%3D/original/b61b1bc4-39f6-4650-91f4-8fbaa5db25d0.jpeg',
-],
-    agent: { name: 'Peter Van der Merwe', phone: '555-666-7777', verified: true, rating: 4.9, reviewCount: 38 },
-    featured: false,
-    verified: true,
-    views: 4510,
-    status: PropertyStatus.ACTIVE,
-    dateListed: Date.now() - 60 * 24 * 60 * 60 * 1000,
-    saves: 412,
-  },
-  {
-    id: '6',
-    title: 'Prime Commercial Retail Space',
-    listingType: ListingType.RENT,
-    propertyType: PropertyType.COMMERCIAL,
-    address: { street: '333 Business Blvd', city: 'Urbanville', zip: '10005' },
-    coordinates: { lat: 40.7061, lng: -73.9969 },
-    price: 12000,
-    purchasePrice: 2000000,
-    details: { beds: 0, baths: 2, area: 2500 },
-    description: 'High-traffic retail space in the central business district. Large storefront windows and an open floor plan. Ready for your business.',
-    neighborhoodInfo: "Situated on the busiest commercial street in Urbanville, this location guarantees high foot traffic and visibility. It's surrounded by corporate offices and luxury condos.",
-    amenities: ['High-traffic Area', 'Storefront', 'Ample Parking', 'Central AC'],
-    images: [
-    'https://anvil-property-smith.b-cdn.net/uploads/uploaded_file/filename/1562550/brochure_20250403_111800.jpg',
-],
-    agent: { name: 'Commercial Kings', phone: '555-888-9999', verified: true, rating: 4.6, reviewCount: 91 },
-    featured: false,
-    verified: true,
-    smartContractReady: true,
-    views: 1982,
-    status: PropertyStatus.ACTIVE,
-    dateListed: Date.now() - 15 * 24 * 60 * 60 * 1000,
-    saves: 33,
-  },
-   {
-    id: '7',
-    title: 'Suburban Family Dream Home',
-    listingType: ListingType.SALE,
-    propertyType: PropertyType.HOUSE,
-    address: { street: '45 Green Valley Dr', city: 'Suburbia', zip: '50005' },
-    coordinates: { lat: 41.5868, lng: -93.6250 },
-    price: 550000,
-    purchasePrice: 420000,
-    details: { beds: 4, baths: 3, area: 2400 },
-    description: 'Perfect family home in a quiet, safe suburb. Features a large backyard with a pool, a modern kitchen, and a two-car garage. Close to top-rated schools.',
-    neighborhoodInfo: "Green Valley is known for its excellent school district, numerous parks, and family-friendly community events. The local grocery store and community center are just a short walk away.",
-    amenities: ['Swimming Pool', 'Fenced Yard', 'Garage', 'Modern Kitchen', 'Patio'],
-    images: [
-    'https://images.homify.com/v1485788998/p/photo/image/1801611/DSC_0236-2_7-2_8-2.jpg',
-],
-    agent: { name: 'Susan Miller', phone: '555-111-2222', verified: false, rating: 4.8, reviewCount: 67 },
-    featured: false,
-    verified: false,
-    views: 5678,
-    status: PropertyStatus.SOLD,
-    dateListed: Date.now() - 1 * 24 * 60 * 60 * 1000,
-    saves: 5,
-  },
-  {
-    id: '8',
-    title: 'Student Studio near Tech Campus',
-    listingType: ListingType.RENT,
-    propertyType: PropertyType.STUDENT_HOUSING,
-    address: { street: '808 Binary Blvd', city: 'Collegia', zip: '20004' },
-    coordinates: { lat: 34.0422, lng: -118.2537 },
-    price: 1100,
-    purchasePrice: 130000,
-    details: { beds: 1, baths: 1, area: 450 },
-    description: 'Modern studio apartment perfect for a tech student. Includes a built-in desk, fiber internet, and access to a shared study lounge.',
-    neighborhoodInfo: "Located in the 'Silicon Triangle' district of Collegia, this building is surrounded by tech startups and incubators, making it ideal for networking and internships.",
-    amenities: ['High-speed Internet', 'Study Lounge', 'Bike Storage', 'In-unit Laundry'],
-    images: [
-    'https://i.ytimg.com/vi/bz_bMpheT2s/hq720.jpg?sqp=-oaymwEhCK4FEIIDSFryq4qpAxMIARUAAAAAGAElAADIQj0AgKJD&rs=AOn4CLBDwM6aCGRiOEDHOTzO_EyvK6TuTw',
-],
-    agent: { name: 'Campus Rentals', phone: '555-987-6543', verified: true, rating: 4.7, reviewCount: 150 },
-    featured: false,
-    verified: true,
-    views: 1120,
-    status: PropertyStatus.EXPIRED,
-    dateListed: Date.now() - 90 * 24 * 60 * 60 * 1000,
-    saves: 88,
-  },
-  {
-    id: '9',
-    title: 'Waterfront Luxury Estate',
-    listingType: ListingType.SALE,
-    propertyType: PropertyType.LUXURY_ESTATE,
-    address: { street: '1 Ocean View', city: 'Malibu', zip: '90265' },
-    coordinates: { lat: 34.0305, lng: -118.7845 },
-    price: 22500000,
-    purchasePrice: 18000000,
-    details: { beds: 6, baths: 8, area: 9500 },
-    description: 'An architectural masterpiece with panoramic ocean views. This estate features an infinity pool, a private theater, a wine cellar, and direct beach access. Unparalleled luxury and privacy.',
-    neighborhoodInfo: "Located in the exclusive Carbon Beach area, this property is surrounded by celebrity homes and offers the ultimate in coastal living. World-class dining and shopping are just moments away.",
-    amenities: ['Swimming Pool', 'Ocean View', 'Private Theater', 'Wine Cellar', 'Garage', 'Gated Community'],
-    images: [
-    'https://villaconcepts.com/wp-content/uploads/2025/05/Oceana-Villa-4-e1747829660625.jpg',
-],
-    vrTourUrl: 'https://www.youtube.com/embed/A45gAEQRd_A?rel=0&autoplay=1&mute=1&loop=1',
-    agent: { name: 'Luxury Living', phone: '555-101-2020', verified: true, rating: 5.0, reviewCount: 25 },
-    featured: true,
-    verified: true,
-    smartContractReady: true,
-    views: 9854,
-    status: PropertyStatus.ACTIVE,
-    dateListed: Date.now() - 25 * 24 * 60 * 60 * 1000,
-    saves: 998,
-  },
-  {
-    id: '10',
-    title: 'Vast Commercial Land Parcel',
-    listingType: ListingType.SALE,
-    propertyType: PropertyType.LAND,
-    address: { street: '555 Development Way', city: 'New Dawn', zip: '30008' },
-    coordinates: { lat: 33.7990, lng: -84.4880 },
-    price: 4500000,
-    purchasePrice: 3000000,
-    details: { beds: 0, baths: 0, area: 435600 }, // 10 acres in sqft
-    description: 'A 10-acre parcel of undeveloped land zoned for commercial use. Ideal for a shopping center, office park, or logistics hub. All utilities are available at the lot line.',
-    neighborhoodInfo: "This rapidly growing area is seeing significant commercial and residential development. A new highway interchange is planned a mile away, promising excellent future accessibility.",
-    amenities: ['Acreage', 'Zoned Commercial', 'Utilities Available'],
-    images: [
-    'https://cdn.remax.co.za/listings/4251796/original/173e5f37-332e-006c-9a1a-d63b5bc60ac1.jpg',
-],
-    agent: { name: 'Future Homes Inc.', phone: '555-444-5555', verified: false, rating: 4.5, reviewCount: 112 },
-    featured: false,
-    verified: false,
-    views: 750,
-    status: PropertyStatus.PENDING,
-    dateListed: Date.now() - 3 * 24 * 60 * 60 * 1000,
-    saves: 12,
-  },
-  {
-    id: '11',
-    title: 'Penthouse with City Views',
-    listingType: ListingType.SALE,
-    propertyType: PropertyType.APARTMENT,
-    address: { street: '77 Sky High Rd', city: 'Urbanville', zip: '10001' },
-    coordinates: { lat: 40.7138, lng: -74.0070 },
-    price: 2800000,
-    purchasePrice: 2100000,
-    details: { beds: 3, baths: 3, area: 2100 },
-    description: 'A luxurious penthouse with breathtaking panoramic views of the city skyline. Private elevator access, floor-to-ceiling windows, and a gourmet kitchen make this an entertainer\'s dream.',
-    neighborhoodInfo: "Located in the prestigious financial district, enjoy close proximity to fine dining, luxury shopping, and cultural landmarks. Unmatched convenience and status.",
-    amenities: ['Rooftop Deck', 'Doorman', 'Gym', 'Mountain View', 'Private Elevator'],
-    images: [
-    'https://blenderartists.org/uploads/default/original/4X/a/1/e/a1e31fb75e794a17042eb34bfd2aa3b51162e45b.jpeg',
-],
-    agent: { name: 'Jane Doe', phone: '555-123-4567', verified: true, rating: 4.9, reviewCount: 82 },
-    featured: false,
-    verified: true,
-    smartContractReady: true,
-    views: 2100,
-    status: PropertyStatus.SOLD,
-    dateListed: Date.now() - 1 * 24 * 60 * 60 * 1000,
-    saves: 250,
-  },
-  {
-    id: '12',
-    title: 'Luxury Hotel Development',
-    listingType: ListingType.FOR_INVESTMENT,
-    propertyType: PropertyType.IN_CONSTRUCTION,
-    address: { street: '505 Waterfront Plaza', city: 'Urbanville', zip: '10007' },
-    coordinates: { lat: 40.7100, lng: -74.0100 },
-    price: 15000000,
-    purchasePrice: 15000000,
-    details: { beds: 150, baths: 150, area: 120000 },
-    description: 'A unique opportunity to invest in a 5-star hotel development in the bustling waterfront district. Construction is underway with completion scheduled for Q4 2025. Projected ROI of 12% annually. Full investment prospectus available.',
-    neighborhoodInfo: "The waterfront is Urbanville's premier destination for tourism and business, ensuring high occupancy rates and premium room prices.",
-    amenities: ['Water View', 'Conference Center', 'Rooftop Pool', 'Fine Dining Restaurant', 'Spa & Wellness Center'],
-    images: [
-    'https://businesstech.co.za/news/wp-content/uploads/2026/04/2-3-1024x576.jpg',
-],
-    agent: { name: 'Peter Van der Merwe', phone: '555-123-4567', verified: true, rating: 4.9, reviewCount: 82 },
-    featured: false,
-    verified: true,
-    smartContractReady: true,
-    views: 850,
-    status: PropertyStatus.ACTIVE,
-    dateListed: Date.now() - 20 * 24 * 60 * 60 * 1000,
-    saves: 95,
-    marketROI: 12.0,
-  },
-  {
-    id: '13',
-    title: 'Downtown Office Block',
-    listingType: ListingType.FOR_INVESTMENT,
-    propertyType: PropertyType.COMMERCIAL,
-    address: { street: '88 Business Core', city: 'Urbanville', zip: '10005' },
-    coordinates: { lat: 40.7075, lng: -74.0095 },
-    price: 8200000,
-    purchasePrice: 7000000,
-    details: { beds: 0, baths: 20, area: 50000 },
-    description: 'Fully tenanted commercial office building in the heart of the financial district. Long-term leases with AAA-rated corporate tenants provide a stable and secure income stream. Low maintenance and professionally managed.',
-    neighborhoodInfo: "Located in the central business district, this property is surrounded by major corporate headquarters, premium retail, and excellent transport links.",
-    amenities: ['24/7 Security', 'Underground Parking', 'Fiber Internet', 'LEED Certified', 'On-site Cafe'],
-    images: [
-    'https://images.pp.co.za/listing/11852522/z5sXnlU9eH9nWi48fAQRB2/1600/1066/contain/jpegorpng',
-],
-    agent: { name: 'Peter Van der Merwe', phone: '555-123-4567', verified: true, rating: 4.9, reviewCount: 82 },
-    featured: false,
-    verified: true,
-    views: 430,
-    status: PropertyStatus.ACTIVE,
-    dateListed: Date.now() - 45 * 24 * 60 * 60 * 1000,
-    saves: 68,
-    marketROI: 7.5,
-    occupancyRate: 100,
-  },
-  {
-    id: '14',
-    title: 'Charming Parisian Apartment',
-    listingType: ListingType.SALE,
-    propertyType: PropertyType.APARTMENT,
-    address: { street: '15 Rue de Rivoli', city: 'Paris', zip: '75001' },
-    coordinates: { lat: 48.8615, lng: 2.3431 },
-    price: 1200000,
-    details: { beds: 2, baths: 1, area: 850 },
-    description: 'A beautiful apartment in a historic building, overlooking the Tuileries Garden. Features classic Parisian charm with modern amenities.',
-    neighborhoodInfo: 'Located in the 1st arrondissement, steps from the Louvre Museum and luxury shopping.',
-    amenities: ['Hardwood Floors', 'Fireplace', 'Elevator', 'City View'],
-    images: [
-    'https://media.vrbo.com/lodging/19000000/18980000/18973100/18973013/6981129e.jpg?impolicy=resizecrop&rw=575&rh=575&ra=fill',
-],
-    agent: { name: 'Parisian Homes', phone: '555-111-3333', verified: true, rating: 4.8, reviewCount: 50 },
-    featured: false,
-    verified: true,
-    views: 1800,
-    status: PropertyStatus.ACTIVE,
-    dateListed: Date.now() - 40 * 24 * 60 * 60 * 1000,
-    saves: 210,
-  },
-  {
-    id: '15',
-    title: 'Modern Tokyo Micro-Loft',
-    listingType: ListingType.RENT,
-    propertyType: PropertyType.APARTMENT,
-    address: { street: '7-1, Dogenzaka 2-chome', city: 'Tokyo', zip: '150-0043' },
-    coordinates: { lat: 35.6595, lng: 139.6983 },
-    price: 1500,
-    details: { beds: 1, baths: 1, area: 350 },
-    description: 'A sleek and efficient micro-loft in the heart of Shibuya. Perfect for a single professional. Features smart home technology and minimalist design.',
-    neighborhoodInfo: 'Experience the energy of Shibuya Crossing, with endless dining, shopping, and entertainment options at your doorstep.',
-    amenities: ['Smart Home', 'High-speed Internet', 'In-unit Laundry', 'Security System'],
-    images: [
-    'https://www.blessthisstuff.com/imagens/stuff/zoku-loft.jpg',
-],
-    agent: { name: 'Tokyo Living', phone: '555-222-4444', verified: true, rating: 4.9, reviewCount: 120 },
-    featured: false,
-    verified: true,
-    views: 2200,
-    status: PropertyStatus.ACTIVE,
-    dateListed: Date.now() - 12 * 24 * 60 * 60 * 1000,
-    saves: 305,
-  },
-  {
-    id: '16',
-    title: 'Sydney Harbour View House',
-    listingType: ListingType.SALE,
-    propertyType: PropertyType.HOUSE,
-    address: { street: '22 Kirribilli Ave', city: 'Sydney', zip: '2061' },
-    coordinates: { lat: -33.8479, lng: 151.2133 },
-    price: 8500000,
-    details: { beds: 5, baths: 4, area: 4500 },
-    description: 'A stunning modern house with direct, unobstructed views of the Sydney Opera House and Harbour Bridge. Features a private pool and expansive terrace.',
-    neighborhoodInfo: "Kirribilli is one of Sydney's most prestigious suburbs, offering an exclusive lifestyle with easy access to the CBD via ferry.",
-    amenities: ['Swimming Pool', 'Ocean View', 'Garage', 'Modern Kitchen', 'Patio'],
-    images: [
-    'https://media.vrbo.com/lodging/112000000/111520000/111514600/111514594/eaf2b1ab.jpg?impolicy=resizecrop&rw=575&rh=575&ra=fill',
-],
-    agent: { name: 'Sydney Luxury', phone: '555-333-5555', verified: true, rating: 5.0, reviewCount: 40 },
-    featured: true,
-    verified: true,
-    views: 3500,
-    status: PropertyStatus.ACTIVE,
-    dateListed: Date.now() - 50 * 24 * 60 * 60 * 1000,
-    saves: 450,
-  },
-  {
-    id: '17',
-    title: 'Chic City Studio for Weekend Getaway',
-    listingType: ListingType.RENT,
-    propertyType: PropertyType.SHORT_TERM_RENTAL,
-    address: { street: '205 Bree Street', city: 'Cape Town', zip: '8001' },
-    coordinates: { lat: -33.9224, lng: 18.4168 },
-    price: 150,
-    perNightPrice: true,
-    details: { beds: 1, baths: 1, area: 450 },
-    description: 'A stylish, modern studio in the heart of Cape Town\'s vibrant Bree Street. Perfect for solo travelers or couples. Features a fully-equipped kitchenette, high-speed Wi-Fi, and a small balcony with city views. Walking distance to the best cafes, restaurants, and art galleries.',
-    neighborhoodInfo: "Bree Street is Cape Town's foodie and design hotspot, known for its trendy bars, art galleries, and artisanal shops. Experience the city's creative pulse right at your doorstep.",
-    amenities: ['Wi-Fi', 'Kitchenette', 'Air Conditioning', 'Smart TV', 'Balcony'],
-    images: [
-    'https://cf.bstatic.com/xdata/images/hotel/max1024x768/858483126.jpg?k=5031f8b94398ed3013d47e38c570b9bb4eae79c1462891ee642bf44c69011150&o=',
-],
-    agent: { name: 'Cape Stays', phone: '555-303-4040', verified: true, rating: 4.9, reviewCount: 125 },
-    featured: true,
-    verified: true,
-    views: 3500,
-    status: PropertyStatus.ACTIVE,
-    dateListed: Date.now() - 10 * 24 * 60 * 60 * 1000,
-    saves: 450,
-    guests: 2,
-  },
-  ];
+export { ALL_PROPERTIES } from './africanProperties';
+
 
 export const CATEGORIES = [
   {
@@ -485,7 +48,7 @@ export const NEIGHBORHOOD_GUIDES: NeighborhoodGuide[] = [
         id: 'Durbanville_arts_district',
         name: 'Durbanville Arts District',
         description: 'Vibrant, creative, and always buzzing. The perfect spot for those who love city life.',
-        image: 'https://www.south-africa-info.co.za/info/towns/1369/images/bottom_images/5.jpg',
+        image: '/images/house_suburbs_1779978598551.png',
         coordinates: { lat: 40.7128, lng: -74.0060 },
         profile: {
             history: "The Durbanville Arts District is anchored by the historic Rust-en-Vrede Gallery and Clay Museum. Set in an 1850s Cape Dutch building, it serves as the cultural nucleus for contemporary art, ceramics, and community workshops in the Northern Suburbs.",
@@ -504,7 +67,7 @@ export const NEIGHBORHOOD_GUIDES: NeighborhoodGuide[] = [
             { month: 'Mar', avgRent: 3500, avgSalePrice: 980000 },
             { month: 'Apr', avgRent: 3520, avgSalePrice: 995000 },
         ],
-        gallery: ['https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800&q=80', 'https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800&q=80', 'https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800&q=80'],
+        gallery: ['/images/house_suburbs_1779978598551.png', '/images/loft_interior_1779978697203.png', '/images/apartment_dining_1779978782850.png'],
         virtualTourUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ?rel=0&autoplay=1&mute=1&loop=1',
         reviews: [
             { author: 'Chloe R.', quote: "Living here is an inspiration. There's always a new gallery opening or a street performance to see. The energy is unmatched!", image: 'https://i.pravatar.cc/150?u=chloe' }
@@ -513,14 +76,14 @@ export const NEIGHBORHOOD_GUIDES: NeighborhoodGuide[] = [
             { name: 'First Friday Art Walk', date: 'First Friday of every month', description: 'Galleries stay open late, offering free wine and showcasing new exhibits.' }
         ],
         hiddenGems: [
-            { name: 'The Speakeasy Scribe', category: 'Cafe', description: 'A hidden basement coffee shop with vintage typewriters for patrons to use.', image: 'https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800&q=80' }
+            { name: 'The Speakeasy Scribe', category: 'Cafe', description: 'A hidden basement coffee shop with vintage typewriters for patrons to use.', image: '/images/interior_beanbags_1779978650034.png' }
         ]
     },
     {
         id: 'suburbia_green_valley',
         name: 'Suburbia Green Valley',
         description: 'Family-friendly with top-rated schools, parks, and a strong sense of community.',
-        image: 'https://southafrica.co.za/images/rustenberg-wine-estate-786x522.jpg',
+        image: '/images/house_pool_1779978750296.png',
         coordinates: { lat: 41.5868, lng: -93.6250 },
         profile: {
             history: "The term 'Suburbia Green Valley' usually refers to a blend of two things in the greater Rustenburg/North West area: local self-catering accommodations (like Suburbia or Emerald Green Family Haven) and tourist destinations mimicking lush valleys (like the Lost Valley or Valley of Waves near Sun City).",
@@ -539,7 +102,7 @@ export const NEIGHBORHOOD_GUIDES: NeighborhoodGuide[] = [
             { month: 'Mar', avgRent: 2250, avgSalePrice: 535000 },
             { month: 'Apr', avgRent: 2300, avgSalePrice: 550000 },
         ],
-        gallery: ['https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800&q=80', 'https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800&q=80', 'https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800&q=80'],
+        gallery: ['/images/house_pool_1779978750296.png', '/images/modern_house_tan_1779978632706.png', '/images/luxury_kitchen_living_1779978720358.png'],
         virtualTourUrl: 'https://www.youtube.com/embed/A45gAEQRd_A?rel=0&autoplay=1&mute=1&loop=1',
         reviews: [
             { author: 'The Miller Family', quote: "It's the perfect place to raise our kids. The schools are fantastic, and we feel so safe. We love the weekend farmers' market!", image: 'https://i.pravatar.cc/150?u=millers' }
@@ -548,14 +111,14 @@ export const NEIGHBORHOOD_GUIDES: NeighborhoodGuide[] = [
             { name: "Green Valley Farmers' Market", date: 'Every Saturday, 9am - 1pm', description: 'Fresh local produce, baked goods, and crafts at the community park.' }
         ],
         hiddenGems: [
-            { name: 'Willow Creek Duck Pond', category: 'Park', description: 'A serene little pond hidden behind the community center, perfect for a quiet afternoon.', image: 'https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800&q=80' }
+            { name: 'Willow Creek Duck Pond', category: 'Park', description: 'A serene little pond hidden behind the community center, perfect for a quiet afternoon.', image: '/images/house_suburbs_1779978598551.png' }
         ]
     },
     {
         id: 'stellenbosch_winelands',
         name: 'Stellenbosch Winelands',
         description: 'Breathtaking scenery, world-class vineyards, and a tranquil, luxurious lifestyle.',
-        image: 'https://www.sapeople.com/wp-content/uploads/2026/01/Stellenbosch-university-.jpg',
+        image: '/images/images%20(14).jpg',
         coordinates: { lat: -33.9321, lng: 18.8602 },
         profile: {
             history: "Established in 1679, Stellenbosch is South Africa’s second oldest town and most inspiring wine, food, art and cultural destination. The scenic Stellenbosch Wine Route is the oldest in the country and one of the most popular destinations for local and international visitors alike. .",
@@ -574,7 +137,7 @@ export const NEIGHBORHOOD_GUIDES: NeighborhoodGuide[] = [
             { month: 'Mar', avgRent: 1600, avgSalePrice: 3100000 },
             { month: 'Apr', avgRent: 1600, avgSalePrice: 3200000 },
         ],
-        gallery: ['https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800&q=80', 'https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800&q=80', 'https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800&q=80'],
+        gallery: ['/images/images%20(14).jpg', '/images/coastal_mansion_1779978805301.png', '/images/luxury_kitchen_living_1779978720358.png'],
         virtualTourUrl: 'https://www.youtube.com/embed/IyFLAz5_1I8?rel=0&autoplay=1&mute=1&loop=1',
         reviews: [
             { author: 'James B.', quote: "Retiring here was the best decision I've ever made. The views are incredible, the food is world-class, and there's a new wine to discover every weekend.", image: 'https://i.pravatar.cc/150?u=james' }
@@ -583,14 +146,14 @@ export const NEIGHBORHOOD_GUIDES: NeighborhoodGuide[] = [
             { name: 'Stellenbosch Wine Festival', date: 'Annually in February', description: 'A celebration of the regions finest wines, with tastings, food pairings, and live music.' }
         ],
         hiddenGems: [
-            { name: 'Jonkershoek Nature Reserve', category: 'Park', description: 'Stunning hiking and mountain biking trails just a short drive from the town center.', image: 'https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800&q=80' }
+            { name: 'Jonkershoek Nature Reserve', category: 'Park', description: 'Stunning hiking and mountain biking trails just a short drive from the town center.', image: '/images/spa_wellness_1779978823248.png' }
         ]
     },
     {
         id: 'soweto_cultural_hub',
         name: 'Soweto Cultural Hub',
         description: 'Rich in history and culture, offering a unique and vibrant community experience.',
-        image: 'https://travelessencemag.com/wp-content/uploads/2023/06/travelessence-sowetos-vilikazi-street-1.webp',
+        image: '/images/tersia-kroonstad.webp',
         coordinates: { lat: -26.2661, lng: 27.8587 },
         profile: {
             history: "Soweto's history is inextricably linked to the struggle against apartheid. It was home to Nelson Mandela and Desmond Tutu. Today it's a symbol of resilience and a center of vibrant culture.",
@@ -609,7 +172,7 @@ export const NEIGHBORHOOD_GUIDES: NeighborhoodGuide[] = [
             { month: 'Mar', avgRent: 260, avgSalePrice: 820000 },
             { month: 'Apr', avgRent: 270, avgSalePrice: 850000 },
         ],
-        gallery: ['https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800&q=80', 'https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800&q=80', 'https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800&q=80'],
+        gallery: ['/images/tersia-kroonstad.webp', '/images/house_suburbs_1779978598551.png', '/images/apartment_dining_1779978782850.png'],
         virtualTourUrl: 'https://www.youtube.com/embed/0uY8_ALH5Vw?rel=0&autoplay=1&mute=1&loop=1',
         reviews: [
             { author: 'Thabo M.', quote: "There is no place like Soweto. The sense of community, the history, the music... it's a place with a soul. I'm proud to call it home.", image: 'https://i.pravatar.cc/150?u=thabo' }
@@ -618,7 +181,7 @@ export const NEIGHBORHOOD_GUIDES: NeighborhoodGuide[] = [
             { name: 'Soweto Festival of Light', date: 'Annually in December', description: 'A festive celebration with lights, music, and food, bringing the community together.' }
         ],
         hiddenGems: [
-            { name: 'Credo Mutwa Cultural Village', category: 'Art', description: 'An outdoor exhibition of sculptures and buildings depicting African folklore and culture.', image: 'https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800&q=80' }
+            { name: 'Credo Mutwa Cultural Village', category: 'Art', description: 'An outdoor exhibition of sculptures and buildings depicting African folklore and culture.', image: '/images/apartment_dining_1779978782850.png' }
         ]
     }
 ];
@@ -922,11 +485,11 @@ export const CURRENCY_CONVERSION_RATES: Record<Currency, number> = {
 };
 
 export const languageOptions: Record<Language, { name: string; flag: string }> = {
-    [Language.EN]: { name: 'English', flag: '🇬🇧' },
-    [Language.FR]: { name: 'Français', flag: '🇫🇷' },
-    [Language.PT]: { name: 'Português', flag: '🇵🇹' },
-    [Language.ES]: { name: 'Español', flag: '🇪🇸' },
-    [Language.AR]: { name: 'العربية', flag: '🇸🇦' },
+    [Language.EN]: { name: 'English', flag: 'EN' },
+    [Language.FR]: { name: 'Français', flag: 'FR' },
+    [Language.PT]: { name: 'Português', flag: 'PT' },
+    [Language.ES]: { name: 'Español', flag: 'ES' },
+    [Language.AR]: { name: 'العربية', flag: 'AR' },
 };
 
 export const currencyOptions: Record<Currency, { name: string; symbol: string }> = {
@@ -1018,4 +581,75 @@ export const RealTimeNews_NOTIFICATIONS: Omit<Notification, 'isRead'>[] = [
     message: 'Congratulations! You\'ve earned the "Sales Pro" badge.',
     timestamp: Date.now() - 24 * 60 * 60 * 1000,
   },
+];
+
+export const MOCK_NOTIFICATIONS = RealTimeNews_NOTIFICATIONS;
+
+export const DEFAULT_BLOG_POSTS = [
+  {
+    title: 'Navigating Property Acquisition and Title Deeds in South Africa',
+    author: 'Kagiso Mokoena',
+    date: 'November 4, 2026',
+    image: '/images/media_1759112685.webp',
+    summary: 'A comprehensive guide for first-time buyers on understanding the conveyancing process, transfer duties, and sectional titles.',
+    content: `## Understanding the Conveyancing Lifecycle
+
+Purchasing real estate across major metropolitan centers requires a clear understanding of conveyancing, notary deed registration, and regulatory transfer fees. Whether you are acquiring an apartment in Johannesburg or an estate in the Western Cape, each phase protects your financial interest.
+
+## Key Steps in the Transfer Process
+
+First-time buyers must account for bond registration fees, transfer duty payable to the South African Revenue Service (SARS), and municipal rates clearance certificates. Engaging a verified conveyancing attorney ensures that the title deed is properly updated at the deeds registry without unexpected delays.
+
+## Key Takeaways
+
+Always obtain pre-approval before making an offer to purchase, review body corporate financials for sectional title units, and calculate auxiliary closing costs upfront.
+
+## Partner with AfriEstate
+
+Explore our verified listings and schedule a consultation with accredited agents to find your dream property today.`
+  },
+  {
+    title: 'The Rise of Fractional and REIT Real Estate Investment in Africa',
+    author: 'Amara Diallo',
+    date: 'November 1, 2026',
+    image: '/images/2ec34ce4ca57aef13fc8b3239a99345e.jpg',
+    summary: 'How fractional ownership models and Real Estate Investment Trusts are democratizing prime property investment across the continent.',
+    content: `## Democratizing Commercial and Luxury Real Estate
+
+Historically, commercial office towers, industrial logistics hubs, and beachfront luxury villas required substantial capital reserves. Today, innovative syndicated frameworks and fractional models allow individual investors to participate with accessible ticket sizes.
+
+## High-Yield Growth Corridors
+
+Key urban corridors in Nairobi, Lagos, and Cape Town continue to showcase resilient rental yields driven by urbanization, tech hubs, and commercial logistics demand. Co-ownership structures distribute risk while delivering steady quarterly dividend distributions.
+
+## Key Takeaways
+
+Fractional property ownership offers liquidity, diversification, and passive income without the operational burdens of sole asset management.
+
+## Start Investing Today
+
+Visit the AfriEstate Investor Hub to discover institutional-grade commercial deals and fractional investment portfolios.`
+  },
+  {
+    title: 'Sustainable Architecture: Off-Grid and Solar-Powered African Homes',
+    author: 'David Ndlovu',
+    date: 'October 27, 2026',
+    image: '/images/50_88d3447798594a3781403aa23f0baf00_t_w_1440_h_900.jpg',
+    summary: 'Exploring how solar microgrids, rainwater harvesting, and bioclimatic building techniques are defining modern African housing.',
+    content: `## The Modern Self-Sustaining Home
+
+With increasing demand for energy security and eco-friendly living, property developers are integrating high-efficiency solar photovoltaic systems, borehole filtration, and smart battery storage into modern residential designs.
+
+## Value Appreciation and Resilience
+
+Properties equipped with renewable microgrids and water autonomy routinely command higher resale valuations and premium rental yields. Tenants and buyers actively prioritize homes that guarantee uninterrupted power and lower utility expenditures.
+
+## Key Takeaways
+
+Sustainable infrastructure not only shields homeowners from grid interruptions but significantly enhances long-term capital appreciation.
+
+## Browse Eco-Friendly Listings
+
+Discover our curated selection of solar-ready and off-grid residential homes on AfriEstate.`
+  }
 ];

@@ -1,7 +1,7 @@
 
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { GoogleGenAI, Type } from '@google/genai';
+import { GoogleGenAI, Type } from '../lib/ai';
 import type { Property, User } from '../types';
 import PropertyList from './PropertyList';
 import { SparklesIcon } from './icons/ActionIcons';
@@ -57,7 +57,7 @@ const RecommendedProperties: React.FC<RecommendedPropertiesProps> = (props) => {
             setRecommended([]);
 
             try {
-                const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+                const ai = new GoogleGenAI();
                 
                 const otherProperties = allProperties.filter(p => p.id !== targetProperty.id);
                 
@@ -112,8 +112,8 @@ const RecommendedProperties: React.FC<RecommendedPropertiesProps> = (props) => {
     }
 
     return (
-        <section id="recommendations" className="py-12 lg:py-16 bg-slate-50">
-            <div className="container mx-auto px-6">
+        <section id="recommendations" className="py-12 lg:py-16 bg-slate-50 dark:bg-slate-950">
+            <div className="w-full px-4 sm:px-6 lg:px-10">
                 <div className="text-center mb-12">
                     <div className="flex justify-center items-center gap-2">
                          <SparklesIcon className="w-8 h-8 text-brand-primary" />

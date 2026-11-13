@@ -11,7 +11,7 @@ export const wellnessDirectory = [
         "businessAddress": "1 Discovery Place, Sandton, Johannesburg, 2196",
         "notes": "South Africa's leading health and wellness incentive programme, 3+ million members",
         "rating": "4.5",
-        "image": "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=800&q=80"
+        "image": "/images/safari_lodge_retreat.jpg"
     },
     {
         "name": "Dis-Chem Pharmacies",
@@ -25,7 +25,7 @@ export const wellnessDirectory = [
         "businessAddress": "Dis-Chem House, 89 Stibitz Str, Midrand, Johannesburg, 1682",
         "notes": "Leading health, beauty, sport & wellness retail pharmacy chain",
         "rating": "4.2",
-        "image": "https://images.unsplash.com/photo-1579684385127-1ef15d508118?w=800&q=80"
+        "image": "/images/spa_wellness_1779978823248.png"
     },
     {
         "name": "Clicks Group",
@@ -39,7 +39,7 @@ export const wellnessDirectory = [
         "businessAddress": "Clicks House, 66 Sloane Street, Bryanston, Johannesburg, 2021",
         "notes": "990+ stores across Southern Africa",
         "rating": "4.8",
-        "image": "https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=800&q=80"
+        "image": "/images/getlstd-property-photo.jpg"
     },
     {
         "name": "Company Wellness Solutions",
@@ -53,7 +53,7 @@ export const wellnessDirectory = [
         "businessAddress": "1st Floor, 12A Turnberry, Fourways Golf Park, 36 Roos Street, Witkoppen, Johannesburg, 2021",
         "notes": "Corporate wellness, EAP & occupational health; operates in 87 countries",
         "rating": "4.8",
-        "image": "https://images.unsplash.com/photo-1499951360447-b19be8fe80f5?w=800&q=80"
+        "image": "/images/house_pool_1779978750296.png"
     },
     {
         "name": "Wellness Warehouse",
@@ -67,7 +67,7 @@ export const wellnessDirectory = [
         "businessAddress": "Shop 1-8, 50 Kloof Street, Gardens, Cape Town, 8001",
         "notes": "Organic health foods, supplements, natural beauty & wellness products",
         "rating": "4.5",
-        "image": "https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=800&q=80"
+        "image": "/images/interior_beanbags_1779978650034.png"
     },
     {
         "name": "WHIPS (Wellness Health Insurance Pathology Services)",
@@ -81,7 +81,7 @@ export const wellnessDirectory = [
         "businessAddress": "Brakpan, Gauteng, South Africa",
         "notes": "Mobile medical & wellness days, executive medicals, occupational health",
         "rating": "4.4",
-        "image": "https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=800&q=80"
+        "image": "/images/harbour_house_1779978766107.png"
     },
     {
         "name": "Health with Heart",
@@ -95,7 +95,7 @@ export const wellnessDirectory = [
         "businessAddress": "8 Merchant Place Wellbeing Centre, 1 Fredman Drive, Sandton, Gauteng, 2196",
         "notes": "Women's health, corporate wellness, functional medicine & vitamin drips",
         "rating": "4.2",
-        "image": "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=800&q=80"
+        "image": "/images/safari_lodge_retreat.jpg"
     },
     {
         "name": "Wellness Africa",
@@ -109,7 +109,7 @@ export const wellnessDirectory = [
         "businessAddress": "Pretoria, South Africa",
         "notes": "Workplace wellness culture, consulting & training across Africa",
         "rating": "4.9",
-        "image": "https://images.unsplash.com/photo-1579684385127-1ef15d508118?w=800&q=80"
+        "image": "/images/spa_wellness_1779978823248.png"
     },
     {
         "name": "Virgin Active South Africa",
@@ -123,7 +123,7 @@ export const wellnessDirectory = [
         "businessAddress": "4th Floor, Great Westerford, 240 Main Road, Rondebosch, Cape Town, 7700",
         "notes": "Premium gym & wellness club network with 130+ clubs nationally",
         "rating": "4.3",
-        "image": "https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=800&q=80"
+        "image": "/images/getlstd-property-photo.jpg"
     },
     {
         "name": "Planet Fitness South Africa",
@@ -137,7 +137,7 @@ export const wellnessDirectory = [
         "businessAddress": "1 Protea Place, Sandton, Johannesburg, 2196",
         "notes": "Affordable gym network with wellness facilities across South Africa",
         "rating": "4.3",
-        "image": "https://images.unsplash.com/photo-1499951360447-b19be8fe80f5?w=800&q=80"
+        "image": "/images/house_pool_1779978750296.png"
     },
     {
         "name": "CANSA (Cancer Association of South Africa)",
@@ -151,7 +151,7 @@ export const wellnessDirectory = [
         "businessAddress": "26 Concorde Road West, Bedfordview, Johannesburg, 2007",
         "notes": "Cancer prevention, employee wellness initiatives & screening programmes",
         "rating": "4.9",
-        "image": "https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=800&q=80"
+        "image": "/images/interior_beanbags_1779978650034.png"
     },
     {
         "name": "Anova Health Institute",
@@ -165,7 +165,7 @@ export const wellnessDirectory = [
         "businessAddress": "2nd Floor, 138 West Street, Sandown, Johannesburg, 2196",
         "notes": "HIV/TB management, community health & corporate wellness",
         "rating": "4.7",
-        "image": "https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=800&q=80"
+        "image": "/images/harbour_house_1779978766107.png"
     },
     {
         "name": "Lenmed Health",
@@ -179,7 +179,7 @@ export const wellnessDirectory = [
         "businessAddress": "6 Sherborne Road, Parktown, Johannesburg, 2193",
         "notes": "Private hospital group with wellness & rehabilitation services",
         "rating": "4.7",
-        "image": "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=800&q=80"
+        "image": "/images/safari_lodge_retreat.jpg"
     },
     {
         "name": "Biogen South Africa",
@@ -193,7 +193,7 @@ export const wellnessDirectory = [
         "businessAddress": "Unit 5, Montague Business Park, Milnerton, Cape Town, 7441",
         "notes": "Sports supplements & nutritional wellness products",
         "rating": "4.2",
-        "image": "https://images.unsplash.com/photo-1579684385127-1ef15d508118?w=800&q=80"
+        "image": "/images/spa_wellness_1779978823248.png"
     },
     {
         "name": "Sorbet",
@@ -207,7 +207,7 @@ export const wellnessDirectory = [
         "businessAddress": "28 Skeen Blvd, Bedfordview, Johannesburg, 2007",
         "notes": "Beauty & personal care wellness salon franchise; 200+ outlets",
         "rating": "4.8",
-        "image": "https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=800&q=80"
+        "image": "/images/getlstd-property-photo.jpg"
     },
     {
         "name": "Intercare Group",
@@ -221,7 +221,7 @@ export const wellnessDirectory = [
         "businessAddress": "Intercare Centre, 348 Atterbury Road, Menlyn, Pretoria, 0181",
         "notes": "Multi-disciplinary primary healthcare & Vitality wellness centres",
         "rating": "5.0",
-        "image": "https://images.unsplash.com/photo-1499951360447-b19be8fe80f5?w=800&q=80"
+        "image": "/images/house_pool_1779978750296.png"
     },
     {
         "name": "Bestmed Medical Scheme",
@@ -235,7 +235,7 @@ export const wellnessDirectory = [
         "businessAddress": "Bestmed House, 403 Rodericks Road, Lynnwood, Pretoria, 0081",
         "notes": "Medical scheme with integrated wellness benefits",
         "rating": "4.1",
-        "image": "https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=800&q=80"
+        "image": "/images/interior_beanbags_1779978650034.png"
     },
     {
         "name": "Real Foods Group",
@@ -249,7 +249,7 @@ export const wellnessDirectory = [
         "businessAddress": "35 Montague Drive, Montague Gardens, Cape Town, 7441",
         "notes": "Multi-brand natural & organic food and wellness group",
         "rating": "4.8",
-        "image": "https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=800&q=80"
+        "image": "/images/harbour_house_1779978766107.png"
     },
     {
         "name": "EverHale Living",
@@ -263,7 +263,7 @@ export const wellnessDirectory = [
         "businessAddress": "South Africa",
         "notes": "Natural health solutions; launched October 2025 to transform health across Africa",
         "rating": "4.2",
-        "image": "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=800&q=80"
+        "image": "/images/safari_lodge_retreat.jpg"
     },
     {
         "name": "Wellness Healthcare Group",
@@ -277,7 +277,7 @@ export const wellnessDirectory = [
         "businessAddress": "10 Agboyi Road, Alapere, Lagos, Nigeria",
         "notes": "Nigeria's leading healthcare service provider with pharmacy & HMO services",
         "rating": "4.9",
-        "image": "https://images.unsplash.com/photo-1579684385127-1ef15d508118?w=800&q=80"
+        "image": "/images/spa_wellness_1779978823248.png"
     },
     {
         "name": "DRASA Health Trust (Dr. Ameyo Stella Adadevoh)",
@@ -291,7 +291,7 @@ export const wellnessDirectory = [
         "businessAddress": "Plot 1590 Oluwole Awosika Avenue, Victoria Island, Lagos, Nigeria",
         "notes": "Disease prevention, community health education & wellness outreach",
         "rating": "4.6",
-        "image": "https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=800&q=80"
+        "image": "/images/getlstd-property-photo.jpg"
     },
     {
         "name": "mDoc Healthcare",
@@ -305,7 +305,7 @@ export const wellnessDirectory = [
         "businessAddress": "2A Bayo Kuku Street, Ikoyi, Lagos, Nigeria",
         "notes": "eHealth startup for chronic disease management & wellness via mobile",
         "rating": "4.9",
-        "image": "https://images.unsplash.com/photo-1499951360447-b19be8fe80f5?w=800&q=80"
+        "image": "/images/house_pool_1779978750296.png"
     },
     {
         "name": "Digi-Dibia Health Tech",
@@ -319,7 +319,7 @@ export const wellnessDirectory = [
         "businessAddress": "Lagos, Nigeria",
         "notes": "Health technology & wellness services platform",
         "rating": "4.5",
-        "image": "https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=800&q=80"
+        "image": "/images/interior_beanbags_1779978650034.png"
     },
     {
         "name": "Recomed Nigeria",
@@ -333,7 +333,7 @@ export const wellnessDirectory = [
         "businessAddress": "Lagos, Nigeria",
         "notes": "Corporate telehealth, wellness & employee assistance programmes",
         "rating": "4.3",
-        "image": "https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=800&q=80"
+        "image": "/images/harbour_house_1779978766107.png"
     },
     {
         "name": "Hygeia HMO",
@@ -347,7 +347,7 @@ export const wellnessDirectory = [
         "businessAddress": "17 Commercial Avenue, Sabo-Yaba, Lagos, Nigeria",
         "notes": "Health insurance & wellness services across Nigeria",
         "rating": "4.7",
-        "image": "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=800&q=80"
+        "image": "/images/safari_lodge_retreat.jpg"
     },
     {
         "name": "Redbird",
@@ -361,7 +361,7 @@ export const wellnessDirectory = [
         "businessAddress": "Lagos, Nigeria",
         "notes": "Mental health platform & emotional wellness services",
         "rating": "4.6",
-        "image": "https://images.unsplash.com/photo-1579684385127-1ef15d508118?w=800&q=80"
+        "image": "/images/spa_wellness_1779978823248.png"
     },
     {
         "name": "Insight Health Advisors",
@@ -375,7 +375,7 @@ export const wellnessDirectory = [
         "businessAddress": "P.O. Box 29775-00202, Nairobi, Kenya",
         "notes": "Corporate health advisory & wellness consulting",
         "rating": "4.3",
-        "image": "https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=800&q=80"
+        "image": "/images/getlstd-property-photo.jpg"
     },
     {
         "name": "One Health Medical Centre",
@@ -389,7 +389,7 @@ export const wellnessDirectory = [
         "businessAddress": "Hurlingham Shopping Centre, Argwings Kodhek Road, Nairobi, Kenya",
         "notes": "Holistic primary care & workplace wellness services",
         "rating": "4.8",
-        "image": "https://images.unsplash.com/photo-1499951360447-b19be8fe80f5?w=800&q=80"
+        "image": "/images/house_pool_1779978750296.png"
     },
     {
         "name": "Inspire Wellness Center",
@@ -403,7 +403,7 @@ export const wellnessDirectory = [
         "businessAddress": "Westlands, Nairobi, Kenya",
         "notes": "Physiotherapy, occupational therapy, clinical psychology & wellness services",
         "rating": "4.5",
-        "image": "https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=800&q=80"
+        "image": "/images/interior_beanbags_1779978650034.png"
     },
     {
         "name": "Pro-Wellness Solutions",
@@ -417,7 +417,7 @@ export const wellnessDirectory = [
         "businessAddress": "Nairobi, Kenya",
         "notes": "Corporate & individual health and wellness solutions",
         "rating": "4.7",
-        "image": "https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=800&q=80"
+        "image": "/images/harbour_house_1779978766107.png"
     },
     {
         "name": "MYDAWA",
@@ -431,7 +431,7 @@ export const wellnessDirectory = [
         "businessAddress": "Delta House, Westlands, Nairobi, Kenya",
         "notes": "Online pharmacy & digital wellness platform",
         "rating": "4.6",
-        "image": "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=800&q=80"
+        "image": "/images/safari_lodge_retreat.jpg"
     },
     {
         "name": "Life Mentors Ltd",
@@ -445,7 +445,7 @@ export const wellnessDirectory = [
         "businessAddress": "Nairobi, Kenya",
         "notes": "Mental wellness, psychological counselling & marriage coaching",
         "rating": "4.8",
-        "image": "https://images.unsplash.com/photo-1579684385127-1ef15d508118?w=800&q=80"
+        "image": "/images/spa_wellness_1779978823248.png"
     },
     {
         "name": "Sues Wellness Centre",
@@ -459,7 +459,7 @@ export const wellnessDirectory = [
         "businessAddress": "Nairobi, Kenya",
         "notes": "Wellness centre & health food store",
         "rating": "4.1",
-        "image": "https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=800&q=80"
+        "image": "/images/getlstd-property-photo.jpg"
     },
     {
         "name": "Maasaini Health Farm & Mobile Spa",
@@ -473,7 +473,7 @@ export const wellnessDirectory = [
         "businessAddress": "Nairobi, Kenya",
         "notes": "Health farm and mobile spa wellness services",
         "rating": "4.1",
-        "image": "https://images.unsplash.com/photo-1499951360447-b19be8fe80f5?w=800&q=80"
+        "image": "/images/house_pool_1779978750296.png"
     },
     {
         "name": "Ojay Greene Limited",
@@ -487,7 +487,7 @@ export const wellnessDirectory = [
         "businessAddress": "Nairobi, Kenya",
         "notes": "Organic wellness and health products",
         "rating": "4.7",
-        "image": "https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=800&q=80"
+        "image": "/images/interior_beanbags_1779978650034.png"
     },
     {
         "name": "Health and Wellness Solutions Ltd",
@@ -501,7 +501,7 @@ export const wellnessDirectory = [
         "businessAddress": "Accra, Ghana",
         "notes": "Holistic health and wellness services for physical and mental transformation",
         "rating": "5.0",
-        "image": "https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=800&q=80"
+        "image": "/images/harbour_house_1779978766107.png"
     },
     {
         "name": "Skin Gourmet",
@@ -515,7 +515,7 @@ export const wellnessDirectory = [
         "businessAddress": "Accra, Ghana",
         "notes": "Handmade natural & organic skincare wellness products",
         "rating": "4.6",
-        "image": "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=800&q=80"
+        "image": "/images/safari_lodge_retreat.jpg"
     },
     {
         "name": "Yoga Experiences Africa",
@@ -529,7 +529,7 @@ export const wellnessDirectory = [
         "businessAddress": "Accra, Ghana",
         "notes": "Pan-African yoga & wellness community; 22-country network; GWS 2023 winner",
         "rating": "4.8",
-        "image": "https://images.unsplash.com/photo-1579684385127-1ef15d508118?w=800&q=80"
+        "image": "/images/spa_wellness_1779978823248.png"
     },
     {
         "name": "Healing Earth",
@@ -543,7 +543,7 @@ export const wellnessDirectory = [
         "businessAddress": "Cape Town, South Africa",
         "notes": "African wellness spa products & therapist training; expanding in East Africa",
         "rating": "4.1",
-        "image": "https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=800&q=80"
+        "image": "/images/getlstd-property-photo.jpg"
     },
     {
         "name": "Singita",
@@ -557,7 +557,7 @@ export const wellnessDirectory = [
         "businessAddress": "14 Pepper Street, Cape Town, 8001",
         "notes": "Conservation-led luxury wellness tourism across 6 African countries",
         "rating": "4.5",
-        "image": "https://images.unsplash.com/photo-1499951360447-b19be8fe80f5?w=800&q=80"
+        "image": "/images/house_pool_1779978750296.png"
     },
     {
         "name": "Mazagan Beach and Golf Resort",
@@ -571,7 +571,7 @@ export const wellnessDirectory = [
         "businessAddress": "Route de Mazar, El Jadida, Morocco",
         "notes": "Leading Moroccan wellness resort with spa, golf & fitness facilities",
         "rating": "4.5",
-        "image": "https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=800&q=80"
+        "image": "/images/interior_beanbags_1779978650034.png"
     },
     {
         "name": "Employee Wellness Journey Solutions",
@@ -585,7 +585,7 @@ export const wellnessDirectory = [
         "businessAddress": "Cairo, Egypt",
         "notes": "Employee wellness programmes tailored for Egyptian corporate sector",
         "rating": "4.0",
-        "image": "https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=800&q=80"
+        "image": "/images/harbour_house_1779978766107.png"
     },
     {
         "name": "Merakido",
@@ -599,7 +599,7 @@ export const wellnessDirectory = [
         "businessAddress": "Cairo, Egypt",
         "notes": "Gamified wellness platform for habit modification & wellbeing",
         "rating": "4.2",
-        "image": "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=800&q=80"
+        "image": "/images/safari_lodge_retreat.jpg"
     },
     {
         "name": "Nureab Company",
@@ -613,7 +613,7 @@ export const wellnessDirectory = [
         "businessAddress": "Cairo, Egypt",
         "notes": "Pioneer in rehabilitation robotics & wellness technology in Africa & Middle East",
         "rating": "4.9",
-        "image": "https://images.unsplash.com/photo-1579684385127-1ef15d508118?w=800&q=80"
+        "image": "/images/spa_wellness_1779978823248.png"
     },
     {
         "name": "Villa Rosa Kempinski",
@@ -627,7 +627,7 @@ export const wellnessDirectory = [
         "businessAddress": "P.O. Box 42899-00100, Upper Hill, Nairobi, Kenya",
         "notes": "5-star luxury hotel with award-winning spa & wellness facilities",
         "rating": "4.8",
-        "image": "https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=800&q=80"
+        "image": "/images/getlstd-property-photo.jpg"
     },
     {
         "name": "Tribe Hotel",
@@ -641,7 +641,7 @@ export const wellnessDirectory = [
         "businessAddress": "00606 Limuru Road, Gigiri, Nairobi, Kenya",
         "notes": "Boutique hotel with dedicated wellness, spa & yoga facilities",
         "rating": "4.9",
-        "image": "https://images.unsplash.com/photo-1499951360447-b19be8fe80f5?w=800&q=80"
+        "image": "/images/house_pool_1779978750296.png"
     },
     {
         "name": "Chamomile Spa and Beauty",
@@ -655,7 +655,7 @@ export const wellnessDirectory = [
         "businessAddress": "Johannesburg, South Africa",
         "notes": "Mobile beauty spa & wellness treatments with 17-therapist team",
         "rating": "4.5",
-        "image": "https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=800&q=80"
+        "image": "/images/interior_beanbags_1779978650034.png"
     },
     {
         "name": "Sublime Produtos Cosmeticos Naturais",
@@ -669,7 +669,7 @@ export const wellnessDirectory = [
         "businessAddress": "Maputo, Mozambique",
         "notes": "100% natural handmade cosmetics & artisanal perfumes for wellness",
         "rating": "4.0",
-        "image": "https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=800&q=80"
+        "image": "/images/harbour_house_1779978766107.png"
     },
     {
         "name": "Agrowise Kenya",
@@ -683,7 +683,7 @@ export const wellnessDirectory = [
         "businessAddress": "Nairobi, Kenya",
         "notes": "Herbal and natural plant wellness products development",
         "rating": "4.5",
-        "image": "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=800&q=80"
+        "image": "/images/safari_lodge_retreat.jpg"
     },
     {
         "name": "KATARINA Cosmetic Collections",
@@ -697,7 +697,7 @@ export const wellnessDirectory = [
         "businessAddress": "Nairobi, Kenya",
         "notes": "Cosmetics and personal care wellness products",
         "rating": "4.2",
-        "image": "https://images.unsplash.com/photo-1579684385127-1ef15d508118?w=800&q=80"
+        "image": "/images/spa_wellness_1779978823248.png"
     },
     {
         "name": "Dr. Ameet Aggarwal Naturopath",
@@ -711,7 +711,7 @@ export const wellnessDirectory = [
         "businessAddress": "101 Mayani Road, Nairobi, Kenya",
         "notes": "Naturopathic medicine, emotional wellness & holistic healing",
         "rating": "4.8",
-        "image": "https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=800&q=80"
+        "image": "/images/getlstd-property-photo.jpg"
     },
     {
         "name": "Bodyworx Wellness",
@@ -725,7 +725,7 @@ export const wellnessDirectory = [
         "businessAddress": "Nairobi, Kenya",
         "notes": "Holistic body and wellness services",
         "rating": "4.2",
-        "image": "https://images.unsplash.com/photo-1499951360447-b19be8fe80f5?w=800&q=80"
+        "image": "/images/house_pool_1779978750296.png"
     },
     {
         "name": "Nutrifit Options",
@@ -739,7 +739,7 @@ export const wellnessDirectory = [
         "businessAddress": "Nairobi, Kenya",
         "notes": "Organic food, herbs & therapeutic nutrition for wellness",
         "rating": "4.1",
-        "image": "https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=800&q=80"
+        "image": "/images/interior_beanbags_1779978650034.png"
     },
     {
         "name": "Whole and Well Living",
@@ -753,7 +753,7 @@ export const wellnessDirectory = [
         "businessAddress": "Nairobi, Kenya",
         "notes": "Holistic health & wellness lifestyle coaching",
         "rating": "4.2",
-        "image": "https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=800&q=80"
+        "image": "/images/harbour_house_1779978766107.png"
     },
     {
         "name": "Natures Way Clinic",
@@ -767,7 +767,7 @@ export const wellnessDirectory = [
         "businessAddress": "P.O. Box 4760, Nairobi, Kenya",
         "notes": "Naturopathic & integrative medical wellness clinic",
         "rating": "4.6",
-        "image": "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=800&q=80"
+        "image": "/images/safari_lodge_retreat.jpg"
     },
     {
         "name": "hearX Group",
@@ -781,7 +781,7 @@ export const wellnessDirectory = [
         "businessAddress": "c/o Lynnwood Road & Roper Street, Menlo Park, Pretoria, 0081",
         "notes": "Hearing health diagnostics & digital wellness platform",
         "rating": "4.2",
-        "image": "https://images.unsplash.com/photo-1579684385127-1ef15d508118?w=800&q=80"
+        "image": "/images/spa_wellness_1779978823248.png"
     },
     {
         "name": "Recomed South Africa",
@@ -795,6 +795,6 @@ export const wellnessDirectory = [
         "businessAddress": "Sandton, Johannesburg, South Africa",
         "notes": "Telehealth platform for corporate wellness & employee health management",
         "rating": "4.0",
-        "image": "https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=800&q=80"
+        "image": "/images/getlstd-property-photo.jpg"
     }
 ];

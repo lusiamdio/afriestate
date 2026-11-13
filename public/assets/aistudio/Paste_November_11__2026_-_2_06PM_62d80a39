@@ -1,0 +1,1040 @@
+For AfriEstate, I would use Booking.com's proven search → filter → compare → trust → transact architecture, but redesign the entire experience around African real estate discovery, renting, buying and investing.
+
+The objective should be:
+AfriEstate — Africa's property marketplace for real people, real assets and real investment opportunities.
+
+Below is the complete UI/UX blueprint.
+AfriEstate — Deep UI/UX Design System
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+1. Core UX Philosophy
+AfriEstate should borrow the interaction architecture of Booking.com, not its visual identity.
+
+The core loop becomes:
+DISCOVER
+   ↓
+SEARCH
+   ↓
+FILTER
+   ↓
+COMPARE
+   ↓
+VERIFY
+   ↓
+VIEW
+   ↓
+CONTACT / BOOK
+   ↓
+APPLY / BUY / INVEST
+
+The platform should support three fundamentally different intentions:
+RENT
+"I need somewhere to live."
+
+BUY
+"I want to own property."
+
+INVEST
+"I want my capital to earn from African real estate."
+
+These should be first-class experiences from the homepage.
+2. AfriEstate Global Navigation
+Desktop
+┌────────────────────────────────────────────────────────────────────┐
+│ AFRIESTATE   Buy   Rent   Invest   Sell   Develop   🔍 Search      │
+│                                      ♡ Saved   Messages   👤 Account │
+└────────────────────────────────────────────────────────────────────┘
+
+Primary navigation
+Buy
+
+Rent
+
+Invest
+
+Sell
+
+Develop
+
+Explore
+Secondary navigation
+- Properties
+- Land
+- Commercial
+- Student housing
+- Affordable housing
+- Luxury
+- Developments
+- REITs
+- Property investment opportunities
+Right side
+- 🌍 Country / currency
+- ♡ Saved
+- 💬 Messages
+- List your property
+- Sign in
+3. Homepage
+The homepage should immediately communicate:
+Africa is your property market.
+
+Hero section:
+──────────────────────────────────────────────────────────────
+
+              FIND YOUR PLACE IN AFRICA
+
+       Buy • Rent • Invest • Discover
+
+   ┌──────────────────────────────────────────────────────┐
+   │ What are you looking for?                            │
+   │                                                      │
+   │ 📍 City, neighbourhood, landmark or country          │
+   │                                                      │
+   │ [ Buy ] [ Rent ] [ Invest ]                          │
+   │                                                      │
+   │ Property type     Price        Bedrooms              │
+   │ [ Apartment ▼ ]   [ R____ ]    [ Any ▼ ]             │
+   │                                                      │
+   │                         [ Search Properties ]         │
+   └──────────────────────────────────────────────────────┘
+
+              Explore 54 African markets
+
+──────────────────────────────────────────────────────────────
+
+The search box is the most important component on the homepage.
+4. Three-Mode Search
+Instead of one generic search experience, AfriEstate should dynamically change according to the user's intent.
+BUY
+Where?
+[ Cape Town ]
+
+Property type
+[ Apartment ]
+
+Price
+[ R1M – R5M ]
+
+Bedrooms
+[ 2+ ]
+
+[ Search ]
+
+RENT
+Where?
+[ Johannesburg ]
+
+Monthly budget
+[ R8,000 – R15,000 ]
+
+Property type
+[ Apartment ]
+
+Lease
+[ Long term ]
+
+[ Search ]
+
+INVEST
+The interface becomes completely different.
+Where do you want to invest?
+
+[ Africa ▼ ]
+
+Investment type
+
+[ Rental Property ]
+[ Development ]
+[ REIT ]
+[ Fractional ]
+[ Commercial ]
+
+Investment amount
+
+[ R50,000 – R500,000 ]
+
+Target return
+
+[ 10%+ ]
+
+[ Find Investments ]
+
+This is one of the major ways AfriEstate can differentiate itself from ordinary property portals.
+5. Geographic Discovery
+Africa should be treated as the platform's core geographic advantage.
+
+The user should be able to search:
+AFRICA
+│
+├── North Africa
+│   ├── Egypt
+│   ├── Morocco
+│   ├── Tunisia
+│   └── Algeria
+│
+├── West Africa
+│   ├── Nigeria
+│   ├── Ghana
+│   ├── Senegal
+│   └── Côte d'Ivoire
+│
+├── East Africa
+│   ├── Kenya
+│   ├── Tanzania
+│   ├── Rwanda
+│   └── Uganda
+│
+├── Central Africa
+│   ├── Angola
+│   ├── Cameroon
+│   ├── DRC
+│   └── Gabon
+│
+└── Southern Africa
+    ├── South Africa
+    ├── Namibia
+    ├── Botswana
+    ├── Zambia
+    └── Mozambique
+
+The experience should make cross-border property discovery feel natural.
+6. "Explore Africa" Map
+A major AfriEstate feature should be an interactive African property map.
+┌──────────────────────────────────────────────────────────────┐
+│                    EXPLORE AFRICA                            │
+│                                                              │
+│              🇸🇳                                             │
+│                    🇳🇬       🇪🇹                              │
+│                         🇰🇪                                   │
+│                                                              │
+│               🇬🇭                                             │
+│                                                              │
+│                         🇦🇴                                  │
+│                             🇿🇲                               │
+│                  🇳🇦       🇿🇦                                │
+│                                                              │
+│     [ Properties ] [ Investments ] [ Developments ]          │
+│                                                              │
+└──────────────────────────────────────────────────────────────┘
+
+Users could zoom into:
+
+Africa → Country → City → Neighbourhood → Property
+7. Search Results
+The AfriEstate results page should directly borrow Booking.com's information architecture.
+┌──────────────────────────────────────────────────────────────┐
+│ AFRIESTATE                                                    │
+│                                                              │
+│ Cape Town                         1,842 properties            │
+│                                                              │
+│ [ Search ] [ Dates/Move-in ] [ Price ] [ Property Type ]     │
+├───────────────────┬──────────────────────────────────────────┤
+│                   │                                          │
+│ FILTERS            │ PROPERTY RESULTS                        │
+│                   │                                          │
+│ Buy / Rent / Invest│ ┌────────────────────────────────────┐ │
+│                   │ │ IMAGE     Apartment                  │ │
+│ Price             │ │           Cape Town CBD              │ │
+│ R0 ─────── R20M   │ │           ★ 4.8                       │ │
+│                   │ │           2 beds • 2 baths            │ │
+│ Property type     │ │           R2,450,000                  │ │
+│ □ Apartment       │ │           Verified Property           │ │
+│ □ House           │ │           [ View Property ]            │ │
+│ □ Villa           │ └────────────────────────────────────┘ │
+│ □ Land            │                                          │
+│                   │ ┌────────────────────────────────────┐ │
+│ Bedrooms          │ │ IMAGE     Apartment                  │ │
+│ □ 1 □ 2 □ 3 □ 4+ │ │           Sea Point                   │ │
+│                   │ │           R18,500 / month             │ │
+│ Location          │ │           [ View Property ]            │ │
+│                   │ └────────────────────────────────────┘ │
+│ Investment        │                                          │
+│ □ High yield      │                                          │
+│ □ REIT            │                                          │
+│ □ Development     │                                          │
+└───────────────────┴──────────────────────────────────────────┘
+
+8. Property Cards
+This is AfriEstate's equivalent of Booking.com's hotel card.
+
+Every property card should answer:
+
+What?
+
+Where?
+
+How much?
+
+What does it look like?
+
+Can I trust it?
+
+What can I do with it?
+
+Example:
+┌─────────────────────────────────────────────────────┐
+│                                                     │
+│              PROPERTY IMAGE                         │
+│                                                     │
+│       ♡                         VERIFIED ✓           │
+├─────────────────────────────────────────────────────┤
+│ Modern 2 Bedroom Apartment                           │
+│ Sea Point, Cape Town                                │
+│                                                     │
+│ ★ 4.8     37 reviews                                │
+│                                                     │
+│ 2 Beds • 2 Baths • 94 m²                            │
+│                                                     │
+│ R18,500 / month                                     │
+│                                                     │
+│ ✓ Verified owner                                   │
+│ ✓ Secure parking                                   │
+│ ✓ Fibre                                             │
+│                                                     │
+│                  [ View Property ]                  │
+└─────────────────────────────────────────────────────┘
+
+9. Property Card for Investment
+Investment properties should have a different information hierarchy.
+┌─────────────────────────────────────────────────────┐
+│                  PROPERTY IMAGE                     │
+│                                                     │
+│                 INVESTMENT ✓                        │
+├─────────────────────────────────────────────────────┤
+│ Student Residence Development                       │
+│ Accra, Ghana                                        │
+│                                                     │
+│ Target Return                 14.8%                 │
+│ Occupancy                     91%                   │
+│ Investment                   $25,000+               │
+│                                                     │
+│ Rental Yield                  11.2%                 │
+│ Projected ROI                 18.4%                 │
+│                                                     │
+│ Risk                         Moderate               │
+│                                                     │
+│              [ View Investment ]                    │
+└─────────────────────────────────────────────────────┘
+
+This turns AfriEstate into something much more powerful than a property listing website.
+10. Filters
+Filters should be extremely sophisticated.
+Property
+- Apartment
+- House
+- Villa
+- Townhouse
+- Estate
+- Land
+- Farm
+- Student housing
+- Office
+- Retail
+- Warehouse
+- Industrial
+- Hotel
+- Resort
+Transaction
+- Rent
+- Buy
+- Invest
+- Lease
+- Auction
+Price
+- Minimum
+- Maximum
+- Monthly
+- Total
+Property characteristics
+- Bedrooms
+- Bathrooms
+- Floor area
+- Land size
+- Parking
+- Furnished
+- Pet friendly
+- Generator
+- Solar
+- Water security
+- Internet
+- Security
+11. African-Specific Filters
+This is where AfriEstate can become genuinely differentiated.
+Infrastructure
+□ Solar
+□ Backup power
+□ Borehole
+□ Water tank
+□ Generator
+□ Fibre
+□ 4G/5G
+
+Security
+□ Gated community
+□ Security guards
+□ CCTV
+□ Access control
+□ Perimeter security
+
+Accessibility
+□ Near airport
+□ Near CBD
+□ Near university
+□ Near hospital
+□ Near public transport
+
+These filters reflect actual African property considerations rather than simply copying Western property portals.
+12. Map + List Mode
+AfriEstate should have a powerful:
+
+Map / List
+
+toggle.
+┌─────────────────────┬──────────────────────────────┐
+│                     │                              │
+│  PROPERTY LIST      │         MAP                  │
+│                     │                              │
+│ Property A          │     ●                       │
+│ R2.4M               │          ●                  │
+│                     │                ●             │
+│ Property B          │      ●                       │
+│ R3.1M               │                    ●         │
+│                     │                              │
+│ Property C          │             ●                │
+│ R1.8M               │                              │
+│                     │                              │
+└─────────────────────┴──────────────────────────────┘
+
+Clicking a map marker should highlight the corresponding property card.
+13. Property Detail Page
+This becomes the equivalent of Booking.com's hotel page.
+Breadcrumb
+Africa / South Africa / Cape Town / Sea Point
+
+Modern Ocean View Apartment
+
+★★★★★ 4.8
+Sea Point, Cape Town
+Verified Property ✓
+
+┌──────────────┬──────────────┬──────────────┐
+│              │              │              │
+│              │              │              │
+│   IMAGE      │    IMAGE     │    IMAGE     │
+│              │              │              │
+├──────────────┴──────────────┴──────────────┤
+│              │              │              │
+│    IMAGE     │    IMAGE     │    IMAGE     │
+│              │              │              │
+└──────────────┴──────────────┴──────────────┘
+
+[♡ Save] [Share]
+
+R18,500 / month
+
+[ Contact Agent ]
+[ Schedule Viewing ]
+[ Apply Now ]
+
+14. Property Page Tabs
+Instead of an endless page, use:
+Overview
+Rooms
+Features
+Location
+Investment
+Reviews
+Documents
+Neighbourhood
+
+For investment properties:
+Overview
+Financials
+Returns
+Documents
+Market
+Risks
+Developer
+Reviews
+
+15. "Trust Layer"
+This is extremely important.
+
+AfriEstate should make verification a visible product feature.
+Property verification
+✓ Property verified
+✓ Owner verified
+✓ Address verified
+✓ Ownership documents verified
+✓ Agent verified
+✓ Listing recently inspected
+
+A user should be able to click:
+
+"Why is this property verified?"
+
+and see the verification history.
+16. Owner / Agent Identity
+Every property should show who is behind it.
+LISTED BY
+
+       [Profile Photo]
+
+       Sarah M.
+       Verified Agent ✓
+
+       126 properties
+       4.8 ★
+       98% response rate
+
+       [ Contact ]
+
+This dramatically improves marketplace trust.
+17. AI Property Assistant
+AfriEstate should have an AI layer that Booking.com does not make central to the experience.
+
+A floating assistant:
+                 ┌─────────────────────────┐
+                 │ AfriEstate AI            │
+                 │                          │
+                 │ "What are you looking    │
+                 │  for?"                   │
+                 │                          │
+                 │ "I need a 2-bedroom      │
+                 │  apartment in Lagos      │
+                 │  under $1,500/month,     │
+                 │  safe for a family and   │
+                 │  close to an international│
+                 │  school."                │
+                 │                          │
+                 │ [Find properties]        │
+                 └─────────────────────────┘
+
+The AI translates natural language into structured filters.
+18. AI Recommendation Engine
+Instead of simply:
+"You searched for apartments."
+
+AfriEstate could say:
+"Based on your search, here are 8 properties with the best combination of price, location, safety and rental potential."
+
+Then show:
+MATCH SCORE
+
+94%
+Excellent match
+
+Why?
+
+✓ Within budget
+✓ 8 min from school
+✓ High neighbourhood safety
+✓ Strong rental demand
+✓ Verified owner
+
+19. Investment Intelligence
+This is where AfriEstate becomes an African property intelligence platform.
+
+Every investment opportunity can have:
+Market score
+87/100
+Rental yield
+11.4%
+Capital appreciation
+8.2% projected
+Occupancy
+93%
+Demand
+High
+Risk
+Moderate
+Liquidity
+Medium
+20. Investment Dashboard
+AFRIESTATE INVEST
+
+Portfolio Value
+$248,400
+
+Annual Income
+$27,850
+
+Yield
+11.2%
+
+Occupancy
+94%
+
+────────────────────────────────
+
+PORTFOLIO
+
+Cape Town Apartment
+$120,000
+Yield 8.7%
+
+Lagos Student Housing
+$68,000
+Yield 13.4%
+
+Accra Commercial
+$60,400
+Yield 12.1%
+
+This creates an entirely different customer relationship.
+
+The user isn't simply searching for property.
+
+They are managing an African property portfolio.
+21. Currency UX
+Cross-border property requires excellent currency handling.
+
+A user could see:
+R 2,450,000
+≈ $130,400
+≈ €119,200
+≈ ₦195.8M
+
+The user can choose their preferred currency.
+
+Important:
+
+Never hide the property's original local currency.
+
+Show:
+Local price + user's preferred currency conversion.
+
+22. Cross-Border Experience
+Suppose someone in Angola wants to buy in South Africa.
+
+AfriEstate should provide:
+PROPERTY
+Cape Town, South Africa
+
+Price
+R4,500,000
+
+Estimated USD
+$240,000
+
+Foreign buyer information
+
+✓ Ownership eligibility
+✓ Transfer costs
+✓ Taxes
+✓ Legal requirements
+✓ Estimated transaction costs
+✓ Currency considerations
+
+This is where AfriEstate can become a true Pan-African property platform.
+23. Rent Experience
+Renting should have its own flow.
+SEARCH
+ ↓
+PROPERTY
+ ↓
+VERIFY
+ ↓
+SCHEDULE VIEWING
+ ↓
+APPLICATION
+ ↓
+DOCUMENT UPLOAD
+ ↓
+BACKGROUND / KYC
+ ↓
+APPROVAL
+ ↓
+LEASE
+ ↓
+PAYMENT
+ ↓
+MOVE-IN
+
+The entire process can happen inside AfriEstate.
+24. Buy Experience
+Buying:
+DISCOVER
+ ↓
+SHORTLIST
+ ↓
+VIEW
+ ↓
+MAKE OFFER
+ ↓
+DOCUMENT VERIFICATION
+ ↓
+LEGAL PROCESS
+ ↓
+PAYMENT
+ ↓
+TRANSFER
+ ↓
+OWNERSHIP
+
+25. Invest Experience
+Investment:
+DISCOVER OPPORTUNITY
+ ↓
+ANALYZE
+ ↓
+RISK REVIEW
+ ↓
+DOCUMENTS
+ ↓
+INVESTMENT TERMS
+ ↓
+KYC
+ ↓
+INVEST
+ ↓
+PORTFOLIO
+ ↓
+RETURNS
+
+These three flows should share the same design language but have different UX logic.
+26. Saved Properties
+The user gets a universal Saved area.
+MY SAVED PROPERTIES
+
+♡ Cape Town Apartment
+♡ Lagos Villa
+♡ Accra Commercial Property
+♡ Nairobi Student Residence
+
+Compare 4 properties
+
+Then:
+Compare
+                    A          B          C
+
+Price             R2.4M      R2.7M      R2.1M
+Bedrooms             2          3          2
+Area                94m²      112m²      87m²
+Yield               7.8%       8.9%      10.2%
+Rating              4.8        4.6        4.9
+Security             ✓          ✓          ✓
+Solar                ✓          ✕          ✓
+Verified             ✓          ✓          ✓
+
+This is extremely valuable for property decisions.
+27. Neighbourhood Intelligence
+Every property should have an AI-powered neighbourhood page.
+SEA POINT
+
+Property prices
+R25k – R80k/month
+
+Average sale price
+R4.2M
+
+Rental yield
+7.8%
+
+Safety
+★★★★☆
+
+Transport
+★★★★★
+
+Schools
+★★★★☆
+
+Restaurants
+★★★★★
+
+Investment outlook
+STRONG
+
+This transforms AfriEstate from a listing site into a property intelligence platform.
+28. Developer Experience
+Property developers should get a separate dashboard.
+DEVELOPER COMMAND CENTER
+
+Projects
+├── Cape Town Residences
+├── Lagos Heights
+└── Accra Business Park
+
+Inventory
+342 units
+
+Sold
+187
+
+Available
+155
+
+Revenue
+R184M
+
+Leads
+4,284
+
+Conversions
+8.7%
+
+29. Agent Dashboard
+Agents:
+MY LISTINGS
+
+Active                 126
+Views                48,920
+Leads                 1,842
+Viewings                327
+Applications            84
+Closed                   31
+
+They should be able to:
+- upload properties
+- manage photos
+- manage enquiries
+- schedule viewings
+- communicate
+- manage documents
+- track leads
+- receive analytics
+30. Admin Command Center
+AfriEstate's backend should be much more sophisticated than a normal property CMS.
+AFRIESTATE COMMAND CENTER
+
+Properties              842,391
+Verified                 621,442
+Pending verification      28,391
+Agents                    14,208
+Developers                 3,842
+Investors                 92,481
+Fraud alerts                 184
+
+────────────────────────────────
+
+AI MODERATION
+
+Suspicious listings          28
+Duplicate listings           41
+Price anomalies              19
+Fake documents                7
+
+31. Fraud Prevention UX
+African property marketplaces need strong anti-fraud design.
+
+Every property should have:
+
+Verification status
+
+Document status
+
+Owner identity
+
+Agent identity
+
+Listing history
+
+Price anomaly detection
+
+Duplicate image detection
+
+Duplicate listing detection
+
+The UI should communicate this without overwhelming the user.
+32. Mobile Navigation
+Mobile should use a bottom navigation system:
+┌─────────────────────────────────────────┐
+│                                         │
+│               CONTENT                   │
+│                                         │
+├─────────────────────────────────────────┤
+│ Home │ Search │ Saved │ Messages │ You  │
+└─────────────────────────────────────────┘
+
+The Search button should remain highly accessible.
+33. AfriEstate Design Language
+I would avoid making AfriEstate look like a generic real-estate website.
+
+The design should feel:
+
+African
+
+Premium
+
+Trustworthy
+
+Financial
+
+Modern
+
+Technology-driven
+Visual direction
+Clean
++
+Editorial photography
++
+Strong typography
++
+Generous whitespace
++
+Subtle African visual identity
++
+Financial dashboard precision
+
+Not:
+Traditional property portal
++
+100 tiny filters
++
+dated gradients
++
+cluttered cards
+
+34. Recommended Design System
+Typography
+Use a modern sans-serif such as:
+
+Inter / Manrope / Plus Jakarta Sans
+Border radius
+12–16px for cards.
+
+8–12px for controls.
+Shadows
+Very subtle.
+Cards
+White surfaces with light borders rather than heavy shadows.
+Icons
+Minimal line icons.
+Photography
+Large, high-quality property photography.
+Motion
+Subtle:
+- hover elevation
+- image transitions
+- filter animations
+- map movement
+- loading skeletons
+- AI response animation
+35. AfriEstate's Core UI Architecture
+The entire platform can be represented as:
+                         AFRIESTATE
+                              │
+          ┌───────────────────┼───────────────────┐
+          │                   │                   │
+         BUY                RENT               INVEST
+          │                   │                   │
+       Search              Search              Discover
+          │                   │                   │
+       Filter              Filter              Analyze
+          │                   │                   │
+      Compare             Compare             Compare
+          │                   │                   │
+       Verify              Verify              Verify
+          │                   │                   │
+        View                View              Invest
+          │                   │                   │
+       Offer               Apply             Portfolio
+          │                   │                   │
+       Purchase             Lease              Returns
+
+Above all three sits:
+AI
+│
+├── Search
+├── Recommendations
+├── Property Intelligence
+├── Market Intelligence
+├── Fraud Detection
+└── Investment Analysis
+
+36. The AfriEstate Homepage — Final Recommended Structure
+┌─────────────────────────────────────────────────────────────┐
+│ AFRIESTATE      Buy Rent Invest Sell Develop     🌍 ♡ 👤   │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│                  FIND YOUR PLACE IN AFRICA                   │
+│                                                             │
+│        Buy • Rent • Invest • Discover                       │
+│                                                             │
+│ ┌─────────────────────────────────────────────────────────┐ │
+│ │ 📍 Where?                                               │ │
+│ │ Cape Town, Lagos, Nairobi, Accra...                    │ │
+│ │                                                         │ │
+│ │ [ BUY ] [ RENT ] [ INVEST ]                             │ │
+│ │                                                         │ │
+│ │ Type       Price        Beds             [ SEARCH ]     │ │
+│ └─────────────────────────────────────────────────────────┘ │
+│                                                             │
+│             Explore Property Across Africa                  │
+│                                                             │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│ TRENDING IN AFRICA                                          │
+│                                                             │
+│ Cape Town   Lagos   Nairobi   Accra   Johannesburg           │
+│                                                             │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│ DISCOVER AFRICA                                             │
+│                                                             │
+│ [MAP OF AFRICA]                                             │
+│                                                             │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│ RECOMMENDED FOR YOU                                         │
+│                                                             │
+│ [PROPERTY] [PROPERTY] [PROPERTY] [PROPERTY]                 │
+│                                                             │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│ INVEST IN AFRICA                                            │
+│                                                             │
+│ High-yield properties • Developments • REITs               │
+│                                                             │
+│ [INVESTMENT] [INVESTMENT] [INVESTMENT]                     │
+│                                                             │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│ AFRIESTATE INTELLIGENCE                                     │
+│                                                             │
+│ Property prices • Rental yields • Market trends             │
+│                                                             │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│ TRUSTED AFRICAN PROPERTY                                   │
+│                                                             │
+│ ✓ Verified Properties   ✓ Verified Agents                   │
+│ ✓ Secure Transactions  ✓ AI Fraud Detection                │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+
+37. The Strategic Difference
+The biggest opportunity is not to build "Booking.com for property."
+
+Build:
+Booking.com + Zillow + Airbnb + a property investment terminal — designed specifically for Africa.
+
+The product should have three layers:
+Layer 1 — Marketplace
+Find property
+
+Buy • Rent • Sell
+Layer 2 — Intelligence
+Understand property
+
+Prices • neighbourhoods • yields • market trends • AI recommendations
+Layer 3 — Financial infrastructure
+Invest in property
+
+REITs • developments • fractional opportunities • portfolio management • returns
+
+That combination would make AfriEstate substantially more ambitious than a conventional African property listing portal.
+
+If you want this translated directly into a production-ready UI specification, the next logical artifact is a screen-by-screen system covering Homepage → Search → Filters → Property Detail → Map → Compare → Rent Application → Buy/OFFER → Investment → Wallet/Portfolio → Agent Dashboard → Developer Dashboard → Admin Command Center, with exact components, states, interactions, responsive behavior and design tokens.
