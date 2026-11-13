@@ -12,7 +12,7 @@ import {
   ShieldCheckIcon,
   ExclamationCircleIcon,
 } from '@heroicons/react/24/outline';
-import { BuildingStorefrontIcon, UserIcon } from '@heroicons/react/24/solid';
+import { BuildingStorefrontIcon, BuildingOffice2Icon, UserIcon } from '@heroicons/react/24/solid';
 import { BanknotesIcon } from '../icons/ActionIcons';
 
 export type AuthView =
@@ -33,6 +33,7 @@ interface AuthPageProps {
   onLogin: () => void;
   onSwitchToPricing?: () => void;
   onSuperAdminLogin?: () => void;
+  onSelectHotelManager?: () => void;
 }
 
 interface PasswordCriteria {
@@ -361,6 +362,7 @@ const AuthPage: React.FC<AuthPageProps> = ({
   onLogin,
   onSwitchToPricing,
   onSuperAdminLogin,
+  onSelectHotelManager,
 }) => {
   const [view, setView] = useState<AuthView>(initialView);
   const [error, setError] = useState('');
@@ -904,6 +906,32 @@ const AuthPage: React.FC<AuthPageProps> = ({
                     <ArrowRightIcon className="w-5 h-5 text-slate-400 group-hover:text-emerald-800 dark:group-hover:text-amber-300 group-hover:translate-x-1 transition-all shrink-0" />
                   </button>
                 ))}
+
+                {/* Hotel Manager Button directly below Investor */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (onSelectHotelManager) {
+                      onSelectHotelManager();
+                    }
+                  }}
+                  className="w-full text-left p-5 rounded-2xl bg-slate-100/80 dark:bg-slate-800/80 hover:bg-emerald-950/5 dark:hover:bg-slate-800 flex items-center justify-between gap-4 group transition-all"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-white dark:bg-slate-900 shadow-sm flex items-center justify-center text-emerald-800 dark:text-amber-300 group-hover:bg-[#0B1F1A] group-hover:text-amber-300 transition-colors shrink-0">
+                      <BuildingOffice2Icon className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-slate-900 dark:text-white font-heading">
+                        Hotel Manager
+                      </h3>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5 leading-relaxed">
+                        Register your hotel, configure rooms &amp; dynamic rates, and launch your Hotel Command Center.
+                      </p>
+                    </div>
+                  </div>
+                  <ArrowRightIcon className="w-5 h-5 text-slate-400 group-hover:text-emerald-800 dark:group-hover:text-amber-300 group-hover:translate-x-1 transition-all shrink-0" />
+                </button>
               </div>
 
               <p className="text-center text-sm text-slate-600 dark:text-slate-400">

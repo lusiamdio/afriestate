@@ -64,8 +64,9 @@ import FindWellnessPage from './components/pages/FindWellnessPage';
 import BookAStayPage from './components/pages/BookAStayPage';
 import NeighborhoodExplorerPage from './components/pages/NeighborhoodExplorerPage';
 import FindProfessionalPage from './components/pages/FindProfessionalPage';
+import HotelRegistrationPage from './components/pages/HotelRegistrationPage';
 
-type Page = 'home' | 'about' | 'services' | 'contact' | 'pricing' | 'rent-a-car' | 'find-wellness' | 'book-a-stay' | 'auth' | 'property-detail' | 'neighborhood-explorer' | 'find-professional';
+type Page = 'home' | 'about' | 'services' | 'contact' | 'pricing' | 'rent-a-car' | 'find-wellness' | 'book-a-stay' | 'auth' | 'property-detail' | 'neighborhood-explorer' | 'find-professional' | 'hotel-registration';
 
 const initialFilters: SearchFilters = {
     location: '',
@@ -1261,6 +1262,10 @@ const App: React.FC = () => {
               onBack={() => scrollToSection('home')}
               onLogin={handleLogin}
               onSwitchToPricing={() => scrollToSection('pricing')}
+              onSelectHotelManager={() => {
+                setPage('hotel-registration');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
               onSuperAdminLogin={() => {
                 setIsSuperAdminLoggedIn(true);
                 setPage('home');
@@ -1302,7 +1307,7 @@ const App: React.FC = () => {
       case 'contact':
           return <ContactPage />;
       case 'pricing':
-          return <PricingPage onPlanSelect={handlePlanSelect} />;
+          return <PricingPage onPlanSelect={handlePlanSelect} onBack={() => scrollToSection('home')} />;
       case 'rent-a-car':
           return <RentACarPage properties={allProperties.filter(p => p.propertyType === PropertyType.TRANSPORT)} />;
       case 'find-wellness':
@@ -1333,6 +1338,13 @@ const App: React.FC = () => {
               onExploreNeighborhood={(neighborhoodId) =>
                 handleOpenNeighborhoodExplorer(neighborhoodId)
               }
+            />
+          );
+      case 'hotel-registration':
+          return (
+            <HotelRegistrationPage
+              onBack={() => scrollToSection('home')}
+              onSignInClick={() => openAuthPage('login')}
             />
           );
       case 'home':
