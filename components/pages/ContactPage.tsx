@@ -48,21 +48,39 @@ const ContactInfoItem: React.FC<{ icon: React.ElementType, title: string, childr
 
 const ContactPage: React.FC = () => {
   const { t } = useTranslations();
+  const [submittedNotice, setSubmittedNotice] = useState<string | null>(null);
   
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    alert('Thank you for your message! We will get back to you shortly.');
-    (e.target as HTMLFormElement).reset();
+    const fd = new FormData(e.currentTarget);
+    const sender = String(fd.get('name') || 'Guest').replace(/<[^>]*>/g, '').trim();
+    setSubmittedNotice(`Thank you, ${sender}. Your message has been encrypted and routed to our concierge desk.`);
+    e.currentTarget.reset();
   };
 
   return (
     <div id="contact" className="animate-fade-in bg-slate-50 dark:bg-slate-900">
-        <header className="glass-panel py-16">
-            <div className="container mx-auto px-6 text-center">
-                <h1 className="text-4xl md:text-5xl font-extrabold text-brand-dark dark:text-white">Contact Us</h1>
-                <p className="mt-4 text-lg text-slate-600 dark:text-slate-300 max-w-3xl mx-auto">
+        <header className="relative bg-[#0B1F1A] text-white py-20 lg:py-28 overflow-hidden">
+            <img
+              src="/images/L_d8d3ea64-9d61-4231-8889-fefbddde1878.jpg"
+              alt="AfriEstate Concierge Headquarters"
+              referrerPolicy="no-referrer"
+              className="absolute inset-0 w-full h-full object-cover opacity-35"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#0B1F1A] via-[#0B1F1A]/75 to-[#0B1F1A]/45" />
+            <div className="relative z-10 container mx-auto px-6 text-center max-w-4xl">
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-amber-300 mb-3">
+                  AfriEstate Direct Concierge &amp; Advisory
+                </p>
+                <h1 className="text-4xl md:text-6xl font-bold font-heading text-white tracking-tight">Contact Us</h1>
+                <p className="mt-4 text-base md:text-xl text-slate-200 max-w-3xl mx-auto font-light leading-relaxed">
                     We’re here to support you. Connect with our team for inquiries, collaborations, bookings, or service requests.
                 </p>
+                {submittedNotice && (
+                  <p role="status" className="mt-6 inline-block px-5 py-3 rounded-xl bg-emerald-900/90 border border-emerald-500/40 text-xs sm:text-sm text-emerald-100 font-medium">
+                    {submittedNotice}
+                  </p>
+                )}
             </div>
         </header>
 

@@ -23,12 +23,20 @@ import {
   Cog6ToothIcon,
   MegaphoneIcon,
   BanknotesIcon,
+  ExclamationCircleIcon,
+  PhotoIcon,
 } from '@heroicons/react/24/outline';
 import { CheckBadgeIcon, StarIcon } from '@heroicons/react/24/solid';
+import { ListingType, PropertyStatus, PropertyType, type Property } from '../../types';
+import { FLAGSHIP_AFRICAN_GRAND_HOTEL, type StayPropertyProfile } from '../../data/stayDetailData';
+import { publishHotelListing } from '../../lib/data';
+import { generateListingSignature, sanitizeText } from '../../lib/security';
 
 interface HotelRegistrationPageProps {
   onBack: () => void;
   onSignInClick: () => void;
+  onPublishHotel?: (stayProfile: StayPropertyProfile, propertyRecord: Property) => void;
+  onViewLiveStays?: () => void;
 }
 
 type ViewMode = 'landing' | 'wizard' | 'submitted' | 'command-center';
@@ -214,7 +222,12 @@ const COMMAND_NAV_ITEMS: { id: CommandTab; icon: React.ElementType }[] = [
   { id: 'Settings', icon: Cog6ToothIcon },
 ];
 
-const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({ onBack, onSignInClick }) => {
+const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({
+  onBack,
+  onSignInClick,
+  onPublishHotel,
+  onViewLiveStays,
+}) => {
   const { addToast } = useToast();
 
   // Check if a draft already exists for Save & Resume banner
@@ -291,6 +304,9 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({ onBack, o
       `About the Hotel\nPositioned along Cape Town’s scenic Atlantic corridor, The Cape Meridian Hotel blends coastal architecture with executive hospitality.\n\nRooms & Accommodation\n• 142 sunlit suites & rooms with private balconies and soundproofed glazing\n• High-speed fibre connectivity and smart workspace desks\n\nDining & Wellness\n• Signature ocean-view restaurant, rooftop terrace bar, heated lap pool, and full spa\n\nBusiness Facilities\n• 400-seat conference center and private boardrooms minutes from the CBD`
   );
   const [aiCopyLoading, setAiCopyLoading] = useState<boolean>(false);
+  const [hasLogo, setHasLogo] = useState<boolean>(savedDraft?.hasLogo ?? true);
+  const [hasCoverImage, setHasCoverImage] = useState<boolean>(savedDraft?.hasCoverImage ?? true);
+  const [stageErrors, setStageErrors] = useState<string[]>([]);
   const [selectedGalleryCats, setSelectedGalleryCats] = useState<string[]>(['Exterior', 'Lobby', 'Rooms', 'Pool', 'Restaurant']);
   const [galleryImages, setGalleryImages] = useState<string[]>([
     '/images/coastal_mansion_1779978805301.png',
@@ -376,6 +392,7 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({ onBack, o
     'Meeting rooms',
     'Conference center',
     'High-speed internet',
+    'Family rooms',
   ]);
 
   // Stage 7 State (Rates, Dynamic Pricing, Availability & Policies)
@@ -479,36 +496,180 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({ onBack, o
     return { len, upper, lower, num, spec, count, strength };
   }, [password]);
 
+  const validateStage = (targetStage: number): string[] => {
+    const errs: string[] = [];
+    if (targetStage === 1) {
+      if (!firstName.trim()) errs.push('First name is required.');
+      if (!middleName.trim()) errs.push('Middle name is required (enter N/A if none).');
+      if (!lastName.trim()) errs.push('Last name is required.');
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(businessEmail.trim())) {
+        errs.push('A valid business email address is required.');
+      }
+      if (phoneNumber.replace(/\D/g, '').length < 6) {
+        errs.push('A valid mobile phone number is required.');
+      }
+      if (!accountVerified) {
+        if (passwordChecks.count < 5) {
+          errs.push('Password must satisfy all 5 security requirements.');
+        }
+        if (!confirmPassword || password !== confirmPassword) {
+          errs.push('Confirm Password must match Password.');
+        }
+      }
+      if (!consentTerms || !consentPrivacy || !consentUpdates) {
+        errs.push('All 3 account consent checkboxes are required.');
+      }
+      if (awaitingOtp) {
+        if (emailOtp.join('').trim().length < 6) errs.push('Enter the 6-digit Email verification code.');
+        if (phoneOtp.join('').trim().length < 6) errs.push('Enter the 6-digit Phone verification code.');
+      }
+    } else if (targetStage === 2) {
+      if (!operatorType.trim()) errs.push('Select your hotel operator type.');
+      if (!companyName.trim()) errs.push('Registered Business Name is required.');
+      if (!tradingName.trim()) errs.push('Trading Name is required.');
+      if (!regNumber.trim()) errs.push('Registration Number is required.');
+      if (!regCountry.trim()) errs.push('Country of Registration is required.');
+      if (!taxNumber.trim()) errs.push('Tax / VAT Number is required.');
+      if (!businessType.trim()) errs.push('Business Type is required.');
+      if (!regProvince.trim() || !regCity.trim() || !regStreet.trim() || !regPostal.trim()) {
+        errs.push('Complete Registered Address (Province, City, Street, Postal code) is required.');
+      }
+      if (!relationship.trim()) errs.push('Select your ownership / management relationship.');
+      const reqDocs = [
+        'Certificate of incorporation',
+        'Tax certificate',
+        'Business registration',
+        'Operating license',
+        ...(relationship !== 'Owner' ? ['Authorization evidence'] : []),
+      ];
+      const missingDocs = reqDocs.filter((d) => !uploadedDocs[d]);
+      if (missingDocs.length > 0) {
+        errs.push(`Upload all required business documents: ${missingDocs.join(', ')}.`);
+      }
+    } else if (targetStage === 3) {
+      if (!hotelName.trim()) errs.push('Hotel Name is required.');
+      if (!hotelType.trim()) errs.push('Hotel Type is required.');
+      if (!starRating.trim()) errs.push('Star Rating is required.');
+      if (officiallyAccredited === 'Yes') {
+        if (!accreditingAuthority.trim() || !certificateNumber.trim() || !certificateExpiry.trim()) {
+          errs.push('Accrediting Authority, Certificate Number, and Expiry Date are required.');
+        }
+      }
+      if (shortDesc.trim().length < 20) errs.push('Short Description must be at least 20 characters.');
+      if (fullDesc.trim().length < 50) errs.push('Full Structured Description must be at least 50 characters.');
+      if (!hasLogo || !hasCoverImage) errs.push('Both Hotel Logo and Cover Image are required.');
+      if (galleryImages.length < 5) errs.push('At least 5 gallery photos are required.');
+      if (selectedGalleryCats.length < 1) errs.push('Select at least 1 gallery category.');
+    } else if (targetStage === 4) {
+      if (!hotelCountry.trim() || !hotelProvince.trim() || !hotelCity.trim() || !hotelDistrict.trim() || !hotelStreet.trim() || !hotelPostal.trim()) {
+        errs.push('All 6 physical hotel location fields are required.');
+      }
+      if (!locationConfirmed) errs.push('Confirm your exact GPS hotel location pin on the map.');
+      if (!publicAddress.trim() || !operationalAddress.trim() || !billingAddress.trim() || !emergencyAddress.trim()) {
+        errs.push('All 4 classified addresses (Public, Operational, Billing, Emergency) are required.');
+      }
+    } else if (targetStage === 5) {
+      if (buildingsCount < 1 || floorsCount < 1 || totalRoomsCount < 1 || yearOpened < 1850 || lastRenovation < yearOpened || totalCapacity < 1) {
+        errs.push('All 6 physical property metrics must have valid positive values.');
+      }
+      if (roomTypes.length < 1) errs.push('At least 1 Room Type is required.');
+      roomTypes.forEach((r, idx) => {
+        if (!r.name.trim() || r.sizeSqm < 8 || r.availableCount < 1 || r.maxAdults < 1) {
+          errs.push(`Room Type #${idx + 1}: Name, valid m² size, room count, and adult occupancy are required.`);
+        }
+        if (r.amenities.length < 1) {
+          errs.push(`Room Type #${idx + 1}: Select at least 1 in-room amenity.`);
+        }
+        if (r.photoCount < 1) {
+          errs.push(`Room Type #${idx + 1}: Upload at least 1 room photo.`);
+        }
+      });
+    } else if (targetStage === 6) {
+      if (selectedAccessibility.length < 1) {
+        errs.push('Select at least 1 Accessibility Feature.');
+      }
+      Object.entries(AMENITY_CATEGORIES).forEach(([catName, items]) => {
+        if (!items.some((item) => selectedAmenities.includes(item))) {
+          errs.push(`Select at least 1 amenity in the ${catName} category.`);
+        }
+      });
+    } else if (targetStage === 7) {
+      if (!baseCurrency.trim()) errs.push('Base Currency is required.');
+      if (flexibleRate <= 0 || nonRefundableRate <= 0 || breakfastRate <= 0 || halfBoardRate <= 0) {
+        errs.push('All 4 rate plans (Flexible, Non-Refundable, Breakfast, Half Board) must be greater than 0.');
+      }
+      if (!checkInTime.trim() || !checkOutTime.trim()) errs.push('Check-in and Check-out times are required.');
+      if (minStay < 1 || maxStay < minStay) errs.push('Minimum stay (>=1) and Maximum stay (>= Min stay) are required.');
+      if (!cancellationPolicy.trim()) errs.push('Cancellation Policy is required.');
+      if (minGuestAge < 18) errs.push('Minimum Guest Age must be at least 18.');
+    } else if (targetStage === 8) {
+      if (!accountHolder.trim() || !bankName.trim() || accountNumber.trim().length < 5 || !branchCode.trim() || !swiftBic.trim()) {
+        errs.push('All 6 Payout Banking fields are required.');
+      }
+      if (chargesTaxes === 'Yes' && (vatRate < 0 || tourismLevyPct < 0 || !taxDisplayMode.trim())) {
+        errs.push('Complete Tax Configuration (VAT %, Levy %, Checkout Display Rule) is required.');
+      }
+    } else if (targetStage === 9) {
+      if (!legalChecks.every(Boolean)) {
+        errs.push('All 5 Required Legal & Compliance Declarations must be checked.');
+      }
+    }
+    return errs;
+  };
+
   // Persistent Completion Calculation
   const checklistItems = useMemo(() => {
     return [
-      { label: 'Account', done: accountVerified || (Boolean(firstName && businessEmail)) },
-      { label: 'Business', done: Boolean(operatorType && companyName) },
-      { label: 'Hotel profile', done: Boolean(hotelName && shortDesc.length > 20) },
-      { label: 'Photos', done: galleryImages.length >= 5 },
-      { label: 'Rooms', done: roomTypes.length > 0 },
-      { label: 'Amenities', done: selectedAmenities.length >= 4 },
-      { label: 'Rates', done: flexibleRate > 0 },
-      { label: 'Policies', done: Boolean(cancellationPolicy && checkInTime) },
-      { label: 'Payments', done: Boolean(bankName && accountNumber) },
+      { label: 'Account', done: accountVerified && Boolean(firstName && middleName && lastName && businessEmail && consentTerms && consentPrivacy && consentUpdates) },
+      { label: 'Business', done: validateStage(2).length === 0 },
+      { label: 'Hotel profile', done: Boolean(hotelName && shortDesc.length >= 20 && fullDesc.length >= 50) },
+      { label: 'Photos', done: hasLogo && hasCoverImage && galleryImages.length >= 5 && selectedGalleryCats.length > 0 },
+      { label: 'Rooms', done: validateStage(5).length === 0 },
+      { label: 'Amenities', done: validateStage(6).length === 0 },
+      { label: 'Rates', done: flexibleRate > 0 && nonRefundableRate > 0 && breakfastRate > 0 && halfBoardRate > 0 },
+      { label: 'Policies', done: Boolean(cancellationPolicy && checkInTime && checkOutTime && minGuestAge >= 18) },
+      { label: 'Payments', done: validateStage(8).length === 0 },
       { label: 'Verification', done: legalChecks.every(Boolean) || mode === 'submitted' || mode === 'command-center' },
     ];
   }, [
     accountVerified,
     firstName,
+    middleName,
+    lastName,
     businessEmail,
+    consentTerms,
+    consentPrivacy,
+    consentUpdates,
     operatorType,
     companyName,
+    tradingName,
+    regNumber,
+    taxNumber,
+    uploadedDocs,
+    relationship,
     hotelName,
     shortDesc,
+    fullDesc,
+    hasLogo,
+    hasCoverImage,
     galleryImages.length,
-    roomTypes.length,
-    selectedAmenities.length,
+    selectedGalleryCats.length,
+    roomTypes,
+    selectedAccessibility,
+    selectedAmenities,
     flexibleRate,
+    nonRefundableRate,
+    breakfastRate,
+    halfBoardRate,
     cancellationPolicy,
     checkInTime,
+    checkOutTime,
+    minGuestAge,
+    accountHolder,
     bankName,
     accountNumber,
+    branchCode,
+    swiftBic,
     legalChecks,
     mode,
   ]);
@@ -575,6 +736,8 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({ onBack, o
         hotelStreet,
         hotelPostal,
         locationConfirmed,
+        hasLogo,
+        hasCoverImage,
         roomTypes,
       };
       localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(payload));
@@ -596,49 +759,128 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({ onBack, o
   };
 
   const handleNextStage = () => {
+    if (stage === 1 && !accountVerified) {
+      if (!awaitingOtp) {
+        const errs = validateStage(1);
+        if (errs.length > 0) {
+          setStageErrors(errs);
+          addToast(errs[0], 'error');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          return;
+        }
+        setStageErrors([]);
+        setAwaitingOtp(true);
+        addToast(`Verification codes sent to ${businessEmail} and ${phoneCode} ${phoneNumber}.`, 'success');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      } else {
+        handleVerifyCodes();
+        return;
+      }
+    }
+
+    const errs = validateStage(stage);
+    if (errs.length > 0) {
+      setStageErrors(errs);
+      addToast(errs[0], 'error');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    setStageErrors([]);
     if (stage < 9) {
       const next = stage + 1;
       setStage(next);
       saveDraft(next);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } else {
-      setMode('submitted');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      handleSubmitRegistration();
     }
   };
 
   const handlePrevStage = () => {
+    setStageErrors([]);
+    if (stage === 1 && awaitingOtp) {
+      setAwaitingOtp(false);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
     if (stage > 1) {
       setStage(stage - 1);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } else {
       setMode('landing');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
+  };
+
+  const handleJumpStage = (targetStage: number) => {
+    if (targetStage <= stage) {
+      setStageErrors([]);
+      setStage(targetStage);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    for (let s = stage; s < targetStage; s += 1) {
+      const errs = validateStage(s);
+      if (s === 1 && !accountVerified) {
+        setStage(1);
+        setStageErrors(errs.length > 0 ? errs : ['Complete Email & Phone verification before continuing.']);
+        addToast('Complete Stage 01 account creation and verification first.', 'error');
+        return;
+      }
+      if (errs.length > 0) {
+        setStage(s);
+        setStageErrors(errs);
+        addToast(`Complete all required fields in Stage 0${s} first.`, 'error');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+    }
+    setStageErrors([]);
+    setStage(targetStage);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleCreateAccountStep = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!firstName.trim() || !lastName.trim() || !businessEmail.trim()) {
-      addToast('Please fill in your full name and business email.', 'error');
+    const errs = validateStage(1);
+    if (errs.length > 0) {
+      setStageErrors(errs);
+      addToast(errs[0], 'error');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
-    if (password && password !== confirmPassword) {
-      addToast('Passwords do not match.', 'error');
-      return;
-    }
-    if (!consentTerms || !consentPrivacy) {
-      addToast('Please agree to the Terms of Service and Privacy Policy.', 'error');
+    setStageErrors([]);
+    if (accountVerified) {
+      setStage(2);
+      saveDraft(2);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
     setAwaitingOtp(true);
-    addToast(`Verification codes sent to ${businessEmail} and ${phoneCode} ${phoneNumber || '82 555 1234'}.`, 'success');
+    addToast(`Verification codes sent to ${businessEmail} and ${phoneCode} ${phoneNumber}.`, 'success');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleVerifyCodes = () => {
+    const emailCode = emailOtp.join('').trim();
+    const phoneCodeVal = phoneOtp.join('').trim();
+    if (emailCode.length < 6 || phoneCodeVal.length < 6) {
+      const errs = [
+        ...(emailCode.length < 6 ? ['Enter the 6-digit Email verification code.'] : []),
+        ...(phoneCodeVal.length < 6 ? ['Enter the 6-digit Phone verification code.'] : []),
+      ];
+      setStageErrors(errs);
+      addToast(errs[0], 'error');
+      return;
+    }
+    setStageErrors([]);
     setAccountVerified(true);
     setAwaitingOtp(false);
     addToast('Email and mobile verification confirmed.', 'success');
     setStage(2);
+    saveDraft(2);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -687,13 +929,129 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({ onBack, o
     addToast('Added new room configuration.', 'success');
   };
 
-  const handleSubmitRegistration = () => {
-    if (!legalChecks.slice(0, 4).every(Boolean)) {
-      addToast('Please confirm all mandatory legal and compliance declarations.', 'error');
-      return;
+  const handleSubmitRegistration = async () => {
+    for (let s = 1; s <= 9; s += 1) {
+      const errs = validateStage(s);
+      if (s === 1 && !accountVerified) {
+        setStage(1);
+        setStageErrors(['Complete Stage 01 account verification before final submission.']);
+        addToast('Complete Stage 01 verification first.', 'error');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+      if (errs.length > 0) {
+        setStage(s);
+        setStageErrors(errs);
+        addToast(`Stage 0${s}: ${errs[0]}`, 'error');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
     }
+
+    const hotelId = `hotel_${Date.now().toString(36)}`;
+    const cleanName = sanitizeText(hotelName || 'The Cape Meridian Hotel', 120);
+    const cleanCity = sanitizeText(hotelCity || 'Cape Town', 60);
+    const cleanCountry = sanitizeText(hotelCountry || 'South Africa', 60);
+    const lowestRate = Math.max(450, Math.min(...roomTypes.map((r) => Number(r.baseRate) || 2150), Number(flexibleRate) || 2450));
+    const parsedStars = Math.min(5, Math.max(3, parseInt(starRating, 10) || 5));
+    const sig = generateListingSignature(hotelId, businessEmail || cleanName, lowestRate);
+
+    const stayProfile: StayPropertyProfile = {
+      ...FLAGSHIP_AFRICAN_GRAND_HOTEL,
+      id: hotelId,
+      name: cleanName,
+      subtitle: `${parsedStars}-Star ${sanitizeText(hotelType, 40)}`,
+      country: cleanCountry,
+      province: sanitizeText(hotelProvince || cleanCity, 60),
+      city: cleanCity,
+      suburb: sanitizeText(hotelDistrict || cleanCity, 60),
+      category: 'Hotels',
+      propertyType: 'Hotel',
+      starRating: parsedStars,
+      score: 9.3,
+      scoreLabel: 'Exceptional',
+      reviewCount: 1,
+      nightlyFromZar: lowestRate,
+      monthlyFromZar: Math.round(lowestRate * 19),
+      locationLabel: `${sanitizeText(hotelDistrict || cleanCity, 50)}, ${cleanCity}, ${cleanCountry}`,
+      overviewShort: sanitizeText(shortDesc || fullDesc, 260) || `${cleanName} — verified partner hotel in ${cleanCity}.`,
+      overviewExtended:
+        sanitizeText(fullDesc || shortDesc, 900) ||
+        `${cleanName} welcomes travelers and corporate guests to ${cleanCity}, ${cleanCountry}.`,
+      heroImages: [
+        {
+          url: '/images/coastal_mansion_1779978805301.png',
+          category: 'Exterior',
+          caption: `${cleanName} · Flagship Exterior`,
+          specs: `${roomTypes.length} Room Categories · Verified Partner`,
+          aiTags: ['Verified Partner', cleanCity],
+        },
+        ...FLAGSHIP_AFRICAN_GRAND_HOTEL.heroImages.slice(1),
+      ],
+      specs: {
+        ...FLAGSHIP_AFRICAN_GRAND_HOTEL.specs,
+        rooms: roomTypes.reduce((sum, r) => sum + (Number(r.availableCount) || 10), 0),
+      },
+      investmentEligible: false,
+    };
+
+    const propertyRecord: Property = {
+      id: hotelId,
+      title: cleanName,
+      listingType: ListingType.RENT,
+      propertyType: PropertyType.HOTEL,
+      address: {
+        street: sanitizeText(hotelStreet || hotelDistrict || cleanCity, 140),
+        city: cleanCity,
+        zip: sanitizeText(hotelPostal || '8001', 20),
+      },
+      country: cleanCountry,
+      coordinates: { lat: -33.9522, lng: 18.3775 },
+      price: lowestRate,
+      perNightPrice: true,
+      localCurrency: baseCurrency || 'ZAR',
+      guests: Math.max(2, ...roomTypes.map((r) => (r.maxAdults || 2) + (r.maxChildren || 0))),
+      leaseDuration: 'Short term / Stay',
+      details: {
+        beds: roomTypes.length,
+        baths: roomTypes.length,
+        area: Math.round((roomTypes[0]?.sizeSqm || 42) * 10.764),
+      },
+      description: stayProfile.overviewShort,
+      neighborhoodInfo: `${stayProfile.locationLabel} · ${roomTypes.length} Verified Room Categories`,
+      amenities: selectedAmenities.length > 0 ? selectedAmenities.slice(0, 8) : ['Solar Backup', 'High-Speed Fibre', '24/7 Reception'],
+      images: ['/images/coastal_mansion_1779978805301.png', '/images/loft_interior_1779978697203.png'],
+      agent: {
+        name: sanitizeText(companyName || cleanName, 80),
+        phone: sanitizeText(`${phoneCode} ${phoneNumber}`, 30),
+        verified: true,
+        rating: 4.9,
+        reviewCount: 1,
+      },
+      featured: true,
+      verified: true,
+      views: 1,
+      status: PropertyStatus.ACTIVE,
+      dateListed: Date.now(),
+      saves: 0,
+      hasSolar: true,
+      hasFibre: true,
+      verificationDetails: {
+        verifiedDate: new Date().toISOString().split('T')[0],
+        titleDeedNumber: sig,
+        inspectionDate: new Date().toISOString().split('T')[0],
+        registryStatus: `Hotel Partner Verified · ${sanitizeText(businessEmail, 80)}`,
+        surveyVerified: true,
+      },
+    };
+
+    const published = await publishHotelListing(stayProfile, propertyRecord);
+    onPublishHotel?.(stayProfile, published);
+
+    setStageErrors([]);
     localStorage.removeItem(DRAFT_STORAGE_KEY);
     setMode('submitted');
+    addToast(`${cleanName} is now live across AfriEstate Stays & Accommodation!`, 'success');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -751,8 +1109,15 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({ onBack, o
         </div>
 
         {/* Hero Entry Point */}
-        <section className="relative bg-[#0B1F1A] text-white">
-          <div className="w-full px-4 sm:px-6 lg:px-10 py-14 lg:py-20 grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
+        <section className="relative bg-[#0B1F1A] text-white overflow-hidden">
+          <img
+            src="/images/Property-1b0835e9d2737f661ff88feb4dfa6cdf-128596052.jpg"
+            alt="AfriEstate Partner Hospitality Collection"
+            referrerPolicy="no-referrer"
+            className="absolute inset-0 w-full h-full object-cover opacity-25"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#0B1F1A] via-[#0B1F1A]/80 to-[#0B1F1A]/50" />
+          <div className="relative z-10 w-full px-4 sm:px-6 lg:px-10 py-14 lg:py-20 grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
             <div className="lg:col-span-7 space-y-6">
               <p className="text-xs font-semibold uppercase tracking-widest text-amber-300">
                 AfriEstate Hospitality Partner Onboarding
@@ -885,8 +1250,9 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({ onBack, o
                 key={st.key}
                 type="button"
                 onClick={() => {
-                  setStage(st.num);
                   setMode('wizard');
+                  if (st.num > 1) handleJumpStage(st.num);
+                  else setStage(1);
                 }}
                 className="text-left bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 hover:border-emerald-700/60 dark:hover:border-amber-400/60 transition-all group"
               >
@@ -1018,21 +1384,46 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({ onBack, o
                 ))}
               </div>
 
-              <div className="pt-4 flex flex-wrap gap-3">
+              <div className="pt-4 flex flex-wrap items-center justify-between gap-3">
                 <button
                   type="button"
-                  onClick={() => setMode('command-center')}
-                  className="flex-1 py-3.5 px-5 rounded-xl bg-slate-900 hover:bg-emerald-900 dark:bg-amber-400 dark:hover:bg-amber-300 text-white dark:text-slate-950 text-xs sm:text-sm font-bold transition-colors whitespace-nowrap"
+                  onClick={() => {
+                    setStage(9);
+                    setMode('wizard');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="inline-flex items-center gap-2 py-3.5 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-800"
                 >
-                  Open Hotel Command Center →
+                  <ArrowLeftIcon className="w-4 h-4 shrink-0" />
+                  <span>Back to Review</span>
                 </button>
-                <button
-                  type="button"
-                  onClick={onBack}
-                  className="py-3.5 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-800"
-                >
-                  Back to Marketplace
-                </button>
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    onClick={onBack}
+                    className="py-3.5 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-800"
+                  >
+                    Back to Marketplace
+                  </button>
+                  {onViewLiveStays && (
+                    <button
+                      type="button"
+                      onClick={onViewLiveStays}
+                      className="inline-flex items-center gap-2 py-3.5 px-5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs sm:text-sm font-bold transition-colors whitespace-nowrap"
+                    >
+                      <span>View Live on Stays Page</span>
+                      <ArrowRightIcon className="w-4 h-4 shrink-0" />
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setMode('command-center')}
+                    className="inline-flex items-center gap-2 py-3.5 px-5 rounded-xl bg-slate-900 hover:bg-emerald-900 dark:bg-amber-400 dark:hover:bg-amber-300 text-white dark:text-slate-950 text-xs sm:text-sm font-bold transition-colors whitespace-nowrap"
+                  >
+                    <span>Next: Open Hotel Command Center</span>
+                    <ArrowRightIcon className="w-4 h-4 shrink-0" />
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -1113,7 +1504,19 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({ onBack, o
                 Your hotel is live. · {commandTab}
               </h1>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => {
+                  const idx = COMMAND_NAV_ITEMS.findIndex((i) => i.id === commandTab);
+                  if (idx > 0) setCommandTab(COMMAND_NAV_ITEMS[idx - 1].id);
+                  else setMode('submitted');
+                }}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800"
+              >
+                <ArrowLeftIcon className="w-3.5 h-3.5" />
+                <span>Back</span>
+              </button>
               <button
                 type="button"
                 onClick={() => {
@@ -1126,10 +1529,19 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({ onBack, o
               </button>
               <button
                 type="button"
-                onClick={() => addToast('Live rate sync pushed across all connected channels.', 'success')}
-                className="px-4 py-2 rounded-xl bg-[#0B1F1A] hover:bg-emerald-900 dark:bg-amber-400 dark:hover:bg-amber-300 text-white dark:text-slate-950 text-xs font-bold"
+                onClick={() => {
+                  const idx = COMMAND_NAV_ITEMS.findIndex((i) => i.id === commandTab);
+                  if (idx < COMMAND_NAV_ITEMS.length - 1) setCommandTab(COMMAND_NAV_ITEMS[idx + 1].id);
+                  else addToast('Live rate sync pushed across all connected channels.', 'success');
+                }}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#0B1F1A] hover:bg-emerald-900 dark:bg-amber-400 dark:hover:bg-amber-300 text-white dark:text-slate-950 text-xs font-bold"
               >
-                Sync Channels
+                <span>
+                  {COMMAND_NAV_ITEMS.findIndex((i) => i.id === commandTab) < COMMAND_NAV_ITEMS.length - 1
+                    ? 'Next Module'
+                    : 'Sync Channels'}
+                </span>
+                <ArrowRightIcon className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
@@ -1454,7 +1866,7 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({ onBack, o
                 <React.Fragment key={st.key}>
                   <button
                     type="button"
-                    onClick={() => setStage(st.num)}
+                    onClick={() => handleJumpStage(st.num)}
                     className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap shrink-0 flex items-center gap-1.5 ${
                       active
                         ? 'bg-[#0B1F1A] dark:bg-amber-400 text-white dark:text-slate-950'
@@ -1483,6 +1895,25 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({ onBack, o
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* MAIN FORM COLUMN */}
           <div className="lg:col-span-8 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 space-y-6">
+            <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-100 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-400">
+              <span>All sections and marked fields (<span className="text-rose-600 font-bold">*</span>) are required before advancing.</span>
+              <span className="font-mono font-semibold text-emerald-700 dark:text-amber-300">Required Flow Enforcement Active</span>
+            </div>
+
+            {stageErrors.length > 0 && (
+              <div className="rounded-xl border border-rose-300 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/40 p-4 space-y-1.5 text-xs text-rose-800 dark:text-rose-200">
+                <div className="flex items-center gap-2 font-bold">
+                  <ExclamationCircleIcon className="w-4 h-4 shrink-0" />
+                  <span>Complete all required fields in this stage to continue:</span>
+                </div>
+                <ul className="list-disc pl-5 space-y-0.5">
+                  {stageErrors.map((err) => (
+                    <li key={err}>{err}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             {/* ================= STAGE 1: ACCOUNT CREATION & OTP ================= */}
             {stage === 1 && !awaitingOtp && (
               <form onSubmit={handleCreateAccountStep} className="space-y-6">
@@ -1500,7 +1931,9 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({ onBack, o
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">First name</label>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                      First name <span className="text-rose-600">*</span>
+                    </label>
                     <input
                       type="text"
                       required
@@ -1512,18 +1945,21 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({ onBack, o
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                      Middle name <span className="text-slate-400 font-normal">— optional</span>
+                      Middle name <span className="text-rose-600">*</span>
                     </label>
                     <input
                       type="text"
+                      required
                       value={middleName}
                       onChange={(e) => setMiddleName(e.target.value)}
-                      placeholder="Optional"
+                      placeholder="Middle name (or N/A)"
                       className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Last name</label>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                      Last name <span className="text-rose-600">*</span>
+                    </label>
                     <input
                       type="text"
                       required
@@ -1537,7 +1973,9 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({ onBack, o
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Business Email</label>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                      Business Email <span className="text-rose-600">*</span>
+                    </label>
                     <input
                       type="email"
                       required
@@ -1549,7 +1987,9 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({ onBack, o
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Mobile Number</label>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                      Mobile Number <span className="text-rose-600">*</span>
+                    </label>
                     <div className="flex gap-2">
                       <select
                         value={phoneCountry}
@@ -1568,6 +2008,7 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({ onBack, o
                       </select>
                       <input
                         type="tel"
+                        required
                         value={phoneNumber}
                         onChange={(e) => setPhoneNumber(e.target.value)}
                         placeholder="82 555 1234"
@@ -1579,7 +2020,9 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({ onBack, o
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Password</label>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                      Password <span className="text-rose-600">*</span>
+                    </label>
                     <input
                       type="password"
                       value={password}
@@ -1589,7 +2032,9 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({ onBack, o
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Confirm Password</label>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                      Confirm Password <span className="text-rose-600">*</span>
+                    </label>
                     <input
                       type="password"
                       value={confirmPassword}
@@ -1643,6 +2088,9 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({ onBack, o
 
                 {/* Consent Checkboxes */}
                 <div className="space-y-2.5 text-xs sm:text-sm">
+                  <p className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                    Required Consents <span className="text-rose-600">*</span>
+                  </p>
                   <label className="flex items-center gap-2.5 cursor-pointer">
                     <input
                       type="checkbox"
@@ -1650,7 +2098,7 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({ onBack, o
                       onChange={(e) => setConsentTerms(e.target.checked)}
                       className="h-4 w-4 rounded text-emerald-700"
                     />
-                    <span>I agree to AfriEstate Terms of Service</span>
+                    <span>I agree to AfriEstate Terms of Service <span className="text-rose-600">*</span></span>
                   </label>
                   <label className="flex items-center gap-2.5 cursor-pointer">
                     <input
@@ -1659,7 +2107,7 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({ onBack, o
                       onChange={(e) => setConsentPrivacy(e.target.checked)}
                       className="h-4 w-4 rounded text-emerald-700"
                     />
-                    <span>I agree to the Privacy Policy</span>
+                    <span>I agree to the Privacy Policy <span className="text-rose-600">*</span></span>
                   </label>
                   <label className="flex items-center gap-2.5 cursor-pointer">
                     <input
@@ -1668,16 +2116,27 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({ onBack, o
                       onChange={(e) => setConsentUpdates(e.target.checked)}
                       className="h-4 w-4 rounded text-emerald-700"
                     />
-                    <span>I consent to receiving hotel partner updates</span>
+                    <span>I consent to receiving hotel partner updates <span className="text-rose-600">*</span></span>
                   </label>
                 </div>
 
-                <button
-                  type="submit"
-                  className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-[#0B1F1A] hover:bg-emerald-900 dark:bg-amber-400 dark:hover:bg-amber-300 text-white dark:text-slate-950 text-sm font-bold transition-colors"
-                >
-                  Create Hotel Account →
-                </button>
+                <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
+                  <button
+                    type="button"
+                    onClick={handlePrevStage}
+                    className="inline-flex items-center gap-2 px-5 py-3 rounded-xl border border-slate-200 dark:border-slate-700 text-xs sm:text-sm font-semibold hover:bg-slate-100 dark:hover:bg-slate-800"
+                  >
+                    <ArrowLeftIcon className="w-4 h-4" />
+                    <span>Back</span>
+                  </button>
+                  <button
+                    type="submit"
+                    className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-[#0B1F1A] hover:bg-emerald-900 dark:bg-amber-400 dark:hover:bg-amber-300 text-white dark:text-slate-950 text-xs sm:text-sm font-bold transition-colors"
+                  >
+                    <span>{accountVerified ? 'Next: Business Verification' : 'Next: Verify Email & Phone'}</span>
+                    <ArrowRightIcon className="w-4 h-4" />
+                  </button>
+                </div>
               </form>
             )}
 
@@ -1686,20 +2145,20 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({ onBack, o
               <div className="space-y-6">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700 dark:text-amber-300">
-                    Email &amp; Phone Verification
+                    Email &amp; Phone Verification · Required
                   </p>
                   <h2 className="text-2xl font-bold font-heading text-slate-900 dark:text-white mt-1">
                     Verify your account
                   </h2>
                   <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-                    We&apos;ve sent a verification code to your email and phone.
+                    Enter both 6-digit verification codes sent to your email and mobile phone.
                   </p>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="rounded-xl bg-[#FAF8F5] dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-5 space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold uppercase text-slate-500">Email</span>
+                      <span className="text-xs font-bold uppercase text-slate-500">Email <span className="text-rose-600">*</span></span>
                       <button
                         type="button"
                         onClick={() => setAwaitingOtp(false)}
@@ -1730,7 +2189,7 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({ onBack, o
 
                   <div className="rounded-xl bg-[#FAF8F5] dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-5 space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold uppercase text-slate-500">Phone</span>
+                      <span className="text-xs font-bold uppercase text-slate-500">Phone <span className="text-rose-600">*</span></span>
                       <button
                         type="button"
                         onClick={() => setAwaitingOtp(false)}
@@ -1760,25 +2219,49 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({ onBack, o
                   </div>
                 </div>
 
-                <div className="rounded-xl border border-amber-200 dark:border-amber-900/60 bg-amber-50/70 dark:bg-amber-950/30 p-4 text-xs text-amber-900 dark:text-amber-200 flex items-start gap-2.5">
-                  <ShieldCheckIcon className="w-4 h-4 shrink-0 mt-0.5" />
-                  <span>For your security, additional verification may be required if suspicious activity is detected.</span>
+                <div className="rounded-xl border border-amber-200 dark:border-amber-900/60 bg-amber-50/70 dark:bg-amber-950/30 p-4 text-xs text-amber-900 dark:text-amber-200 flex flex-wrap items-center justify-between gap-2.5">
+                  <div className="flex items-start gap-2.5">
+                    <ShieldCheckIcon className="w-4 h-4 shrink-0 mt-0.5" />
+                    <span>For your security, additional verification may be required if suspicious activity is detected.</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEmailOtp(['1', '2', '3', '4', '5', '6']);
+                        setPhoneOtp(['1', '2', '3', '4', '5', '6']);
+                        addToast('Demo verification codes populated.', 'info');
+                      }}
+                      className="px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-amber-300 text-xs font-bold text-slate-800 dark:text-amber-300"
+                    >
+                      Auto-fill Demo Codes
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => addToast('New 6-digit verification codes dispatched.', 'success')}
+                      className="px-3 py-1.5 rounded-lg border border-amber-300 text-xs font-semibold hover:bg-white/60"
+                    >
+                      Resend code
+                    </button>
+                  </div>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-3">
+                <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
                   <button
                     type="button"
-                    onClick={handleVerifyCodes}
-                    className="px-6 py-3 rounded-xl bg-[#0B1F1A] hover:bg-emerald-900 dark:bg-amber-400 dark:hover:bg-amber-300 text-white dark:text-slate-950 text-sm font-bold"
+                    onClick={handlePrevStage}
+                    className="inline-flex items-center gap-2 px-5 py-3 rounded-xl border border-slate-200 dark:border-slate-700 text-xs sm:text-sm font-semibold hover:bg-slate-100 dark:hover:bg-slate-800"
                   >
-                    Verify
+                    <ArrowLeftIcon className="w-4 h-4" />
+                    <span>Back</span>
                   </button>
                   <button
                     type="button"
-                    onClick={() => addToast('New 6-digit verification codes dispatched.', 'success')}
-                    className="px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-800"
+                    onClick={handleVerifyCodes}
+                    className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-[#0B1F1A] hover:bg-emerald-900 dark:bg-amber-400 dark:hover:bg-amber-300 text-white dark:text-slate-950 text-xs sm:text-sm font-bold"
                   >
-                    Resend code
+                    <span>Verify &amp; Next</span>
+                    <ArrowRightIcon className="w-4 h-4" />
                   </button>
                 </div>
               </div>
@@ -1948,44 +2431,70 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({ onBack, o
                   </div>
 
                   {/* Business & Authorization Documents Upload */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-                    {[
-                      'Certificate of incorporation',
-                      'Tax certificate',
-                      'Business registration',
-                      'Operating license',
-                      ...(relationship !== 'Owner' ? ['Authorization evidence'] : []),
-                    ].map((docName) => {
-                      const isUp = Boolean(uploadedDocs[docName]);
-                      return (
-                        <div
-                          key={docName}
-                          className="p-4 rounded-xl bg-[#FAF8F5] dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-between gap-3"
-                        >
-                          <div>
-                            <p className="text-xs font-bold text-slate-900 dark:text-white">{docName}</p>
-                            <p className="text-[11px] text-slate-500 mt-0.5">
-                              {isUp ? 'Uploaded · Readable · Verification pending' : 'PDF or image required'}
-                            </p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setUploadedDocs((prev) => ({ ...prev, [docName]: true }));
-                              addToast(`${docName} uploaded & scanned readable.`, 'success');
-                            }}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap ${
-                              isUp
-                                ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300'
-                                : 'bg-slate-900 dark:bg-amber-400 text-white dark:text-slate-950'
-                            }`}
+                  <div className="pt-2 space-y-2">
+                    <p className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                      Required Business &amp; Compliance Documents <span className="text-rose-600">*</span>
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {[
+                        'Certificate of incorporation',
+                        'Tax certificate',
+                        'Business registration',
+                        'Operating license',
+                        ...(relationship !== 'Owner' ? ['Authorization evidence'] : []),
+                      ].map((docName) => {
+                        const isUp = Boolean(uploadedDocs[docName]);
+                        return (
+                          <div
+                            key={docName}
+                            className="p-4 rounded-xl bg-[#FAF8F5] dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-between gap-3"
                           >
-                            {isUp ? 'Uploaded' : 'Upload'}
-                          </button>
-                        </div>
-                      );
-                    })}
+                            <div>
+                              <p className="text-xs font-bold text-slate-900 dark:text-white">
+                                {docName} <span className="text-rose-600">*</span>
+                              </p>
+                              <p className="text-[11px] text-slate-500 mt-0.5">
+                                {isUp ? 'Uploaded · Readable · Verification pending' : 'Required — upload PDF or image'}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setUploadedDocs((prev) => ({ ...prev, [docName]: true }));
+                                addToast(`${docName} uploaded & scanned readable.`, 'success');
+                              }}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap ${
+                                isUp
+                                  ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300'
+                                  : 'bg-slate-900 dark:bg-amber-400 text-white dark:text-slate-950'
+                              }`}
+                            >
+                              {isUp ? 'Uploaded' : 'Upload'}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
+                </div>
+
+                <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
+                  <button
+                    type="button"
+                    onClick={handlePrevStage}
+                    className="inline-flex items-center gap-2 px-5 py-3 rounded-xl border border-slate-200 dark:border-slate-700 text-xs sm:text-sm font-semibold hover:bg-slate-100 dark:hover:bg-slate-800"
+                  >
+                    <ArrowLeftIcon className="w-4 h-4" />
+                    <span>Back</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleNextStage}
+                    className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-[#0B1F1A] hover:bg-emerald-900 dark:bg-amber-400 dark:hover:bg-amber-300 text-white dark:text-slate-950 text-xs sm:text-sm font-bold transition-colors"
+                  >
+                    <span>Next: Hotel Identity</span>
+                    <ArrowRightIcon className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
             )}
@@ -2144,9 +2653,9 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({ onBack, o
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
                       <h3 className="text-base font-bold font-heading text-slate-900 dark:text-white">
-                        Hotel Branding, Gallery &amp; AI Image Quality Check
+                        Hotel Branding, Gallery &amp; AI Image Quality Check <span className="text-rose-600">*</span>
                       </h3>
-                      <p className="text-xs text-slate-500">Minimum 5 images (Recommended 15–30) · Cover recommended 2400 × 1200</p>
+                      <p className="text-xs text-slate-500">Logo, Cover Banner (2400 × 1200), and minimum 5 gallery images required.</p>
                     </div>
                     <button
                       type="button"
@@ -2159,6 +2668,64 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({ onBack, o
                       <CloudArrowUpIcon className="w-4 h-4" />
                       <span>Upload Photo ({galleryImages.length})</span>
                     </button>
+                  </div>
+
+                  {/* Required Logo & Cover Banner Cards */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="p-4 rounded-xl bg-[#FAF8F5] dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <PhotoIcon className="w-5 h-5 text-emerald-700 dark:text-amber-300 shrink-0" />
+                        <div>
+                          <p className="text-xs font-bold text-slate-900 dark:text-white">
+                            Hotel Logo <span className="text-rose-600">*</span>
+                          </p>
+                          <p className="text-[11px] text-slate-500">
+                            {hasLogo ? 'Uploaded · Vector / PNG verified' : 'Upload square hotel emblem'}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setHasLogo(true);
+                          addToast('Hotel logo verified.', 'success');
+                        }}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${
+                          hasLogo
+                            ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300'
+                            : 'bg-slate-900 dark:bg-amber-400 text-white dark:text-slate-950'
+                        }`}
+                      >
+                        {hasLogo ? 'Verified' : 'Upload'}
+                      </button>
+                    </div>
+                    <div className="p-4 rounded-xl bg-[#FAF8F5] dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <PhotoIcon className="w-5 h-5 text-emerald-700 dark:text-amber-300 shrink-0" />
+                        <div>
+                          <p className="text-xs font-bold text-slate-900 dark:text-white">
+                            Cover Banner (2400 × 1200) <span className="text-rose-600">*</span>
+                          </p>
+                          <p className="text-[11px] text-slate-500">
+                            {hasCoverImage ? 'Uploaded · High-resolution hero active' : 'Upload primary hero banner'}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setHasCoverImage(true);
+                          addToast('Cover banner verified.', 'success');
+                        }}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${
+                          hasCoverImage
+                            ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300'
+                            : 'bg-slate-900 dark:bg-amber-400 text-white dark:text-slate-950'
+                        }`}
+                      >
+                        {hasCoverImage ? 'Verified' : 'Upload'}
+                      </button>
+                    </div>
                   </div>
 
                   <div className="flex flex-wrap gap-1.5">
@@ -2213,6 +2780,25 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({ onBack, o
                       <p className="text-xs text-emerald-300 mt-1">Zero duplicates or watermarks detected</p>
                     </div>
                   </div>
+                </div>
+
+                <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
+                  <button
+                    type="button"
+                    onClick={handlePrevStage}
+                    className="inline-flex items-center gap-2 px-5 py-3 rounded-xl border border-slate-200 dark:border-slate-700 text-xs sm:text-sm font-semibold hover:bg-slate-100 dark:hover:bg-slate-800"
+                  >
+                    <ArrowLeftIcon className="w-4 h-4" />
+                    <span>Back</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleNextStage}
+                    className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-[#0B1F1A] hover:bg-emerald-900 dark:bg-amber-400 dark:hover:bg-amber-300 text-white dark:text-slate-950 text-xs sm:text-sm font-bold transition-colors"
+                  >
+                    <span>Next: Location &amp; Property</span>
+                    <ArrowRightIcon className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
             )}
@@ -2379,7 +2965,9 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({ onBack, o
                       />
                     </div>
                     <div>
-                      <label className="block font-semibold mb-1">Emergency contact address</label>
+                      <label className="block font-semibold mb-1">
+                        Emergency contact address <span className="text-rose-600">*</span>
+                      </label>
                       <input
                         type="text"
                         value={emergencyAddress}
@@ -2388,6 +2976,25 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({ onBack, o
                       />
                     </div>
                   </div>
+                </div>
+
+                <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
+                  <button
+                    type="button"
+                    onClick={handlePrevStage}
+                    className="inline-flex items-center gap-2 px-5 py-3 rounded-xl border border-slate-200 dark:border-slate-700 text-xs sm:text-sm font-semibold hover:bg-slate-100 dark:hover:bg-slate-800"
+                  >
+                    <ArrowLeftIcon className="w-4 h-4" />
+                    <span>Back</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleNextStage}
+                    className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-[#0B1F1A] hover:bg-emerald-900 dark:bg-amber-400 dark:hover:bg-amber-300 text-white dark:text-slate-950 text-xs sm:text-sm font-bold transition-colors"
+                  >
+                    <span>Next: Rooms &amp; Inventory</span>
+                    <ArrowRightIcon className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
             )}
@@ -2599,41 +3206,80 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({ onBack, o
                         </div>
                       </div>
 
-                      {/* Room Amenities */}
-                      <div className="flex flex-wrap gap-1.5 pt-2 border-t border-slate-200 dark:border-slate-700">
-                        {ROOM_AMENITY_OPTIONS.map((am) => {
-                          const has = room.amenities.includes(am);
-                          return (
-                            <button
-                              key={am}
-                              type="button"
-                              onClick={() =>
-                                setRoomTypes((prev) =>
-                                  prev.map((r) =>
-                                    r.id === room.id
-                                      ? {
-                                          ...r,
-                                          amenities: has
-                                            ? r.amenities.filter((x) => x !== am)
-                                            : [...r.amenities, am],
-                                        }
-                                      : r
+                      {/* Room Amenities & Room Photos */}
+                      <div className="space-y-2.5 pt-2 border-t border-slate-200 dark:border-slate-700">
+                        <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                          <span className="font-semibold text-slate-700 dark:text-slate-300">
+                            In-Room Amenities <span className="text-rose-600">*</span> ({room.amenities.length} selected)
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setRoomTypes((prev) =>
+                                prev.map((r) => (r.id === room.id ? { ...r, photoCount: r.photoCount + 1 } : r))
+                              );
+                              addToast(`Uploaded photo for ${room.name}.`, 'success');
+                            }}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900 dark:bg-amber-400 text-white dark:text-slate-950 font-semibold"
+                          >
+                            <CloudArrowUpIcon className="w-3.5 h-3.5" />
+                            <span>Room Photos ({room.photoCount} min 1) *</span>
+                          </button>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {ROOM_AMENITY_OPTIONS.map((am) => {
+                            const has = room.amenities.includes(am);
+                            return (
+                              <button
+                                key={am}
+                                type="button"
+                                onClick={() =>
+                                  setRoomTypes((prev) =>
+                                    prev.map((r) =>
+                                      r.id === room.id
+                                        ? {
+                                            ...r,
+                                            amenities: has
+                                              ? r.amenities.filter((x) => x !== am)
+                                              : [...r.amenities, am],
+                                          }
+                                        : r
+                                    )
                                   )
-                                )
-                              }
-                              className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border ${
-                                has
-                                  ? 'bg-[#0B1F1A] dark:bg-amber-400 text-white dark:text-slate-950 border-transparent'
-                                  : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
-                              }`}
-                            >
-                              {am}
-                            </button>
-                          );
-                        })}
+                                }
+                                className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border ${
+                                  has
+                                    ? 'bg-[#0B1F1A] dark:bg-amber-400 text-white dark:text-slate-950 border-transparent'
+                                    : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
+                                }`}
+                              >
+                                {am}
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
                     </div>
                   ))}
+                </div>
+
+                <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
+                  <button
+                    type="button"
+                    onClick={handlePrevStage}
+                    className="inline-flex items-center gap-2 px-5 py-3 rounded-xl border border-slate-200 dark:border-slate-700 text-xs sm:text-sm font-semibold hover:bg-slate-100 dark:hover:bg-slate-800"
+                  >
+                    <ArrowLeftIcon className="w-4 h-4" />
+                    <span>Back</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleNextStage}
+                    className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-[#0B1F1A] hover:bg-emerald-900 dark:bg-amber-400 dark:hover:bg-amber-300 text-white dark:text-slate-950 text-xs sm:text-sm font-bold transition-colors"
+                  >
+                    <span>Next: Amenities &amp; Services</span>
+                    <ArrowRightIcon className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
             )}
@@ -2652,7 +3298,9 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({ onBack, o
 
                 {/* Section 18: Accessibility */}
                 <div className="space-y-3">
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">Accessibility Features</h3>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                    Accessibility Features <span className="text-rose-600">*</span>
+                  </h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     {ACCESSIBILITY_OPTIONS.map((opt) => {
                       const checked = selectedAccessibility.includes(opt);
@@ -2686,7 +3334,7 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({ onBack, o
                       className="rounded-xl border border-slate-200 dark:border-slate-700 bg-[#FAF8F5] dark:bg-slate-800/50 p-5 space-y-3"
                     >
                       <h3 className="text-sm font-bold font-heading text-slate-900 dark:text-white">
-                        {catName}
+                        {catName} <span className="text-rose-600">*</span>
                       </h3>
                       <div className="flex flex-wrap gap-2">
                         {items.map((item) => {
@@ -2713,6 +3361,25 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({ onBack, o
                       </div>
                     </div>
                   ))}
+                </div>
+
+                <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
+                  <button
+                    type="button"
+                    onClick={handlePrevStage}
+                    className="inline-flex items-center gap-2 px-5 py-3 rounded-xl border border-slate-200 dark:border-slate-700 text-xs sm:text-sm font-semibold hover:bg-slate-100 dark:hover:bg-slate-800"
+                  >
+                    <ArrowLeftIcon className="w-4 h-4" />
+                    <span>Back</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleNextStage}
+                    className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-[#0B1F1A] hover:bg-emerald-900 dark:bg-amber-400 dark:hover:bg-amber-300 text-white dark:text-slate-950 text-xs sm:text-sm font-bold transition-colors"
+                  >
+                    <span>Next: Rates &amp; Policies</span>
+                    <ArrowRightIcon className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
             )}
@@ -3027,6 +3694,25 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({ onBack, o
                     </div>
                   </div>
                 </div>
+
+                <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
+                  <button
+                    type="button"
+                    onClick={handlePrevStage}
+                    className="inline-flex items-center gap-2 px-5 py-3 rounded-xl border border-slate-200 dark:border-slate-700 text-xs sm:text-sm font-semibold hover:bg-slate-100 dark:hover:bg-slate-800"
+                  >
+                    <ArrowLeftIcon className="w-4 h-4" />
+                    <span>Back</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleNextStage}
+                    className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-[#0B1F1A] hover:bg-emerald-900 dark:bg-amber-400 dark:hover:bg-amber-300 text-white dark:text-slate-950 text-xs sm:text-sm font-bold transition-colors"
+                  >
+                    <span>Next: Payments &amp; Taxes</span>
+                    <ArrowRightIcon className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             )}
 
@@ -3199,6 +3885,25 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({ onBack, o
                     </div>
                   )}
                 </div>
+
+                <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
+                  <button
+                    type="button"
+                    onClick={handlePrevStage}
+                    className="inline-flex items-center gap-2 px-5 py-3 rounded-xl border border-slate-200 dark:border-slate-700 text-xs sm:text-sm font-semibold hover:bg-slate-100 dark:hover:bg-slate-800"
+                  >
+                    <ArrowLeftIcon className="w-4 h-4" />
+                    <span>Back</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleNextStage}
+                    className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-[#0B1F1A] hover:bg-emerald-900 dark:bg-amber-400 dark:hover:bg-amber-300 text-white dark:text-slate-950 text-xs sm:text-sm font-bold transition-colors"
+                  >
+                    <span>Next: Verification &amp; Preview</span>
+                    <ArrowRightIcon className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             )}
 
@@ -3336,7 +4041,9 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({ onBack, o
 
                 {/* Section 35: Required Legal Declarations */}
                 <div className="space-y-2.5 pt-2 border-t border-slate-100 dark:border-slate-800 text-xs sm:text-sm">
-                  <h3 className="font-bold text-slate-900 dark:text-white">Required Legal &amp; Compliance Declarations</h3>
+                  <h3 className="font-bold text-slate-900 dark:text-white">
+                    Required Legal &amp; Compliance Declarations <span className="text-rose-600">*</span>
+                  </h3>
                   {[
                     'I confirm that I am authorized to list this property.',
                     'The information provided is accurate.',
@@ -3353,18 +4060,31 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({ onBack, o
                         }
                         className="h-4 w-4 rounded text-emerald-700"
                       />
-                      <span>{text}</span>
+                      <span>
+                        {text} <span className="text-rose-600">*</span>
+                      </span>
                     </label>
                   ))}
                 </div>
 
-                <button
-                  type="button"
-                  onClick={handleSubmitRegistration}
-                  className="w-full py-4 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-sm font-bold transition-colors"
-                >
-                  Submit Hotel Registration for Review →
-                </button>
+                <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
+                  <button
+                    type="button"
+                    onClick={handlePrevStage}
+                    className="inline-flex items-center gap-2 px-5 py-3.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs sm:text-sm font-semibold hover:bg-slate-100 dark:hover:bg-slate-800"
+                  >
+                    <ArrowLeftIcon className="w-4 h-4" />
+                    <span>Back</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSubmitRegistration}
+                    className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs sm:text-sm font-bold transition-colors"
+                  >
+                    <span>Submit Hotel Registration for Review</span>
+                    <ArrowRightIcon className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -3459,7 +4179,7 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({ onBack, o
               onClick={handleNextStage}
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#0B1F1A] hover:bg-emerald-900 dark:bg-amber-400 dark:hover:bg-amber-300 text-white dark:text-slate-950 text-xs sm:text-sm font-bold"
             >
-              <span>{stage === 9 ? 'Submit Registration' : 'Save & Continue'}</span>
+              <span>{stage === 9 ? 'Submit Registration' : 'Next'}</span>
               <ArrowRightIcon className="w-4 h-4" />
             </button>
           </div>

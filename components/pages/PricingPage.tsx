@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useToast } from '../../contexts/ToastContext';
+import { useAdminState } from '../../contexts/AdminStateContext';
 import {
   ArrowLeftIcon,
   ArrowRightIcon,
@@ -223,6 +224,8 @@ const PRICING_FAQS = [
 
 const PricingPage: React.FC<PricingPageProps> = ({ onPlanSelect, onBack }) => {
   const { addToast } = useToast();
+  const { settings } = useAdminState();
+  const rates = settings.commissionRates;
 
   const [categoryFilter, setCategoryFilter] = useState<PlanCategoryFilter>('all');
   const [calcTrack, setCalcTrack] = useState<CalculatorTrack>('accommodation');
@@ -246,28 +249,214 @@ const PricingPage: React.FC<PricingPageProps> = ({ onPlanSelect, onBack }) => {
     organization: '',
     email: '',
     phone: '',
-    planFocus: 'Hotels & Large Operators (From 5%)',
+    planFocus: `Hotels & Large Operators (From ${rates.hotelCommissionPercent}%)`,
     portfolioUnits: '25 - 100 units',
     notes: '',
   });
   const [inquirySubmitted, setInquirySubmitted] = useState(false);
 
+  const dynamicPlans = useMemo<AfriEstatePlan[]>(() => [
+    {
+      id: 'accommodation',
+      index: '01',
+      title: 'For Accommodation Providers',
+      audience: 'Short-Term Stays & Holiday Hosts',
+      category: 'pay_on_success',
+      headlinePrice: 'List Free',
+      rateLine: `${rates.shortStayPercent}% per completed short-term booking`,
+      subNote: 'Zero fixed overhead — AfriEstate only earns when your calendar converts a completed stay.',
+      exclusionsOrGuaranteeTitle: 'No:',
+      exclusionsOrGuaranteeItems: [
+        'Setup fee',
+        'Monthly fee',
+        'Listing fee',
+        'Contract commitment',
+      ],
+      highlights: [
+        'Instant publishing for villas, apartments, and guesthouses',
+        'Verified guest booking protection and calendar sync',
+        'Direct payouts in local African or convertible currency',
+      ],
+      ctaLabel: 'List Accommodation Free',
+      role: 'agent',
+    },
+    {
+      id: 'long_term',
+      index: '02',
+      title: 'For Long-Term Rentals',
+      audience: 'Residential Landlords & Letting Agents',
+      category: 'pay_on_success',
+      headlinePrice: 'List Free',
+      rateLine: `${rates.longTermPlacementPercent}% successful tenant placement`,
+      subNote: 'Performance-aligned residential letting across apartments, townhouses, and family homes.',
+      exclusionsOrGuaranteeTitle: 'Placement Guarantee',
+      exclusionsOrGuaranteeItems: [
+        "No payment if AfriEstate doesn't produce a tenant.",
+      ],
+      highlights: [
+        'Unlimited rental photography, floorplans, and tour scheduling',
+        'Pre-qualified tenant inquiries and lease readiness tracking',
+        'Zero charge while your property is marketed or self-leased',
+      ],
+      ctaLabel: 'List Rental Property Free',
+      role: 'agent',
+    },
+    {
+      id: 'sales',
+      index: '03',
+      title: 'For Property Sales',
+      audience: 'Homeowners, Developers & Agencies',
+      category: 'pay_on_success',
+      headlinePrice: 'List Free',
+      rateLine: `Optional premium visibility from: R${rates.salesBoostZar}`,
+      subNote: 'Publish residential, land, or commercial sales inventory free, with optional spotlight boosts when you want priority reach.',
+      exclusionsOrGuaranteeTitle: 'Transparent Seller Model',
+      exclusionsOrGuaranteeItems: [
+        'R0 core property listing with verified badge eligibility',
+        `Optional R${rates.salesBoostZar} featured search & buyer alert promotion`,
+      ],
+      highlights: [
+        'Direct buyer & diaspora investor lead routing with zero sales commission',
+        'AI listing description enhancement and valuation guidance',
+        `Upgrade individual listings from R${rates.salesBoostZar} whenever extra exposure is needed`,
+      ],
+      ctaLabel: 'List Property for Sale',
+      role: 'agent',
+    },
+    {
+      id: 'managers',
+      index: '04',
+      title: 'For Property Managers',
+      audience: 'Multi-Unit Portfolios & Agencies',
+      category: 'portfolio_enterprise',
+      headlinePrice: `From: R${rates.propertyManagerMonthlyZar}`,
+      rateLine: `R${rates.propertyManagerMonthlyZar}/property/month`,
+      subNote: 'Structured per-door operational software built for agencies, estate managers, and growing rental portfolios.',
+      highlights: [
+        'Centralized portfolio ledger, rent roll tracking, and arrears alerts',
+        'Lead-to-lease pipeline, automated showings, and tenant document vault',
+        'Sub-agent permissions, performance analytics, and owner reporting',
+        'Predictable per-property pricing that scales smoothly with your book',
+      ],
+      ctaLabel: 'Start Property Manager Plan',
+      role: 'agent',
+    },
+    {
+      id: 'hotels',
+      index: '05',
+      title: 'For Hotels & Large Operators',
+      audience: 'Hospitality Groups, Lodges & Multi-Property Brands',
+      category: 'portfolio_enterprise',
+      headlinePrice: `From: ${rates.hotelCommissionPercent}%`,
+      rateLine: `${rates.hotelCommissionPercent}% commission with negotiated enterprise pricing.`,
+      subNote: 'Tailored distribution agreements, volume commission tiers, and dedicated concierge infrastructure for established operators.',
+      highlights: [
+        `Reduced commission floor starting from ${rates.hotelCommissionPercent}% on high-volume room inventory`,
+        'Negotiated enterprise pricing and multi-property billing consolidation',
+        'Dedicated corporate travel, wellness retreat, and group booking desk',
+        'Custom channel/API availability feeds and priority account support',
+      ],
+      ctaLabel: 'Request Enterprise Pricing',
+      featuredDark: true,
+      role: 'investor',
+    },
+  ], [rates]);
+
+  const dynamicComparisonRows = useMemo(() => [
+    {
+      metric: 'Upfront Listing Fee',
+      accommodation: 'Free (R0)',
+      longTerm: 'Free (R0)',
+      sales: 'Free (R0)',
+      managers: 'Included in plan',
+      hotels: 'Negotiated',
+    },
+    {
+      metric: 'Pricing Structure',
+      accommodation: `${rates.shortStayPercent}% / completed booking`,
+      longTerm: `${rates.longTermPlacementPercent}% tenant placement`,
+      sales: `Free + optional R${rates.salesBoostZar} boost`,
+      managers: `From R${rates.propertyManagerMonthlyZar} / property / mo`,
+      hotels: `From ${rates.hotelCommissionPercent}% commission`,
+    },
+    {
+      metric: 'Setup & Monthly Fees',
+      accommodation: 'None',
+      longTerm: 'None',
+      sales: 'None',
+      managers: 'Per active unit only',
+      hotels: 'Custom enterprise SLA',
+    },
+    {
+      metric: 'Risk Protection',
+      accommodation: 'Pay only on completed stays',
+      longTerm: 'No tenant, no payment',
+      sales: `Pay R${rates.salesBoostZar} only if boosting`,
+      managers: 'Cancel or scale units anytime',
+      hotels: 'Volume-tiered agreement',
+    },
+    {
+      metric: 'Contract Commitment',
+      accommodation: 'None',
+      longTerm: 'None',
+      sales: 'None',
+      managers: 'Monthly flexible billing',
+      hotels: 'Enterprise term options',
+    },
+    {
+      metric: 'Dedicated Tools & Support',
+      accommodation: 'Booking calendar & payouts',
+      longTerm: 'Tenant screening & scheduling',
+      sales: 'Direct buyer leads & AI copy',
+      managers: 'Full portfolio & team suite',
+      hotels: 'Account director & API sync',
+    },
+  ], [rates]);
+
+  const dynamicFaqs = useMemo(() => [
+    {
+      question: 'Does listing a stay, rental, or home for sale really cost nothing upfront?',
+      answer:
+        'Yes. Accommodation Providers, Long-Term Rentals, and Property Sales all start with List Free (R0 setup, R0 monthly fee, and R0 listing fee). You can publish verified listings and receive inquiries without entering a paid subscription.',
+    },
+    {
+      question: `When is the ${rates.shortStayPercent}% fee for Accommodation Providers charged?`,
+      answer:
+        `The ${rates.shortStayPercent}% fee applies strictly per completed short-term booking. There is no setup fee, no monthly fee, no listing fee, and no contract commitment — if an inquiry does not convert into a completed stay, you owe nothing.`,
+    },
+    {
+      question: `How does the ${rates.longTermPlacementPercent}% Long-Term Rental guarantee work?`,
+      answer:
+        `Listing a long-term rental is free. You only pay the ${rates.longTermPlacementPercent}% placement fee when AfriEstate successfully produces and places a verified tenant. If AfriEstate does not produce a tenant, no payment is due.`,
+    },
+    {
+      question: `What is included in the optional R${rates.salesBoostZar} premium visibility for Property Sales?`,
+      answer:
+        `Core property sale listings are completely free. Sellers or agencies who want accelerated reach can opt into R${rates.salesBoostZar} premium visibility to pin their listing higher in buyer searches, featured neighbourhood carousels, and diaspora investor alerts.`,
+    },
+    {
+      question: 'How does pricing work for Hotels & Large Operators?',
+      answer:
+        `Hotels, safari lodges, serviced residence groups, and large operators qualify for commission rates starting from ${rates.hotelCommissionPercent}% paired with negotiated enterprise pricing based on room inventory, seasonal volume, and API/PMS integration scope.`,
+    },
+  ], [rates]);
+
   const visiblePlans = useMemo(() => {
-    if (categoryFilter === 'all') return AFRIESTATE_PLANS;
-    return AFRIESTATE_PLANS.filter((plan) => plan.category === categoryFilter);
-  }, [categoryFilter]);
+    if (categoryFilter === 'all') return dynamicPlans;
+    return dynamicPlans.filter((plan) => plan.category === categoryFilter);
+  }, [categoryFilter, dynamicPlans]);
 
   const calcResult = useMemo(() => {
     switch (calcTrack) {
       case 'accommodation': {
         const gross = Math.max(0, nightlyRateZar) * Math.max(0, nightsBookedPerMonth);
-        const fee = Math.round(gross * 0.07);
+        const fee = Math.round(gross * (rates.shortStayPercent / 100));
         const net = gross - fee;
         return {
-          title: 'Accommodation Providers · 7% Completed Booking Model',
+          title: `Accommodation Providers · ${rates.shortStayPercent}% Completed Booking Model`,
           grossLabel: 'Estimated Monthly Booking Revenue',
           grossValue: `R${gross.toLocaleString()}`,
-          feeLabel: 'AfriEstate Fee (7% on completed bookings)',
+          feeLabel: `AfriEstate Fee (${rates.shortStayPercent}% on completed bookings)`,
           feeValue: `R${fee.toLocaleString()}`,
           upfrontValue: 'R0 (No setup, monthly, or listing fee)',
           netLabel: 'Estimated Host Payout',
@@ -277,13 +466,13 @@ const PricingPage: React.FC<PricingPageProps> = ({ onPlanSelect, onBack }) => {
       }
       case 'long_term': {
         const annualContract = Math.max(0, monthlyRentZar) * Math.max(1, leaseMonths);
-        const fee = Math.round(annualContract * 0.025);
+        const fee = Math.round(annualContract * (rates.longTermPlacementPercent / 100));
         const net = annualContract - fee;
         return {
-          title: 'Long-Term Rentals · 2.5% Successful Placement Model',
+          title: `Long-Term Rentals · ${rates.longTermPlacementPercent}% Successful Placement Model`,
           grossLabel: `Total ${leaseMonths}-Month Lease Value`,
           grossValue: `R${annualContract.toLocaleString()}`,
-          feeLabel: 'AfriEstate Fee (2.5% upon tenant placement)',
+          feeLabel: `AfriEstate Fee (${rates.longTermPlacementPercent}% upon tenant placement)`,
           feeValue: `R${fee.toLocaleString()}`,
           upfrontValue: 'R0 (No payment if no tenant is produced)',
           netLabel: 'Net Lease Value to Landlord',
@@ -293,10 +482,10 @@ const PricingPage: React.FC<PricingPageProps> = ({ onPlanSelect, onBack }) => {
       }
       case 'sales': {
         const gross = Math.max(0, salePriceZar);
-        const fee = enableSaleBoost ? 299 : 0;
+        const fee = enableSaleBoost ? rates.salesBoostZar : 0;
         const net = Math.max(0, gross - fee);
         return {
-          title: 'Property Sales · Free Listing + Optional R299 Visibility',
+          title: `Property Sales · Free Listing + Optional R${rates.salesBoostZar} Visibility`,
           grossLabel: 'Property Asking Price',
           grossValue: `R${gross.toLocaleString()}`,
           feeLabel: enableSaleBoost ? 'Optional Premium Visibility Boost' : 'Core Platform Listing Cost',
@@ -304,19 +493,19 @@ const PricingPage: React.FC<PricingPageProps> = ({ onPlanSelect, onBack }) => {
           upfrontValue: 'R0 core listing fee · 0% platform sales commission',
           netLabel: 'Estimated Seller Proceeds (Excl. Optional Boost)',
           netValue: `R${net.toLocaleString()}`,
-          footnote: 'Keep full sale equity. Upgrade with R299 visibility only if and when you want promoted reach.',
+          footnote: `Keep full sale equity. Upgrade with R${rates.salesBoostZar} visibility only if and when you want promoted reach.`,
         };
       }
       case 'managers': {
         const units = Math.max(1, managedUnitCount);
-        const fee = units * 199;
+        const fee = units * rates.propertyManagerMonthlyZar;
         return {
-          title: 'Property Managers · R199 / Property / Month Software',
+          title: `Property Managers · R${rates.propertyManagerMonthlyZar} / Property / Month Software`,
           grossLabel: 'Active Portfolio Size',
           grossValue: `${units} ${units === 1 ? 'property' : 'properties'}`,
-          feeLabel: `Monthly Software Total (${units} x R199)`,
+          feeLabel: `Monthly Software Total (${units} x R${rates.propertyManagerMonthlyZar})`,
           feeValue: `R${fee.toLocaleString()}/mo`,
-          upfrontValue: 'R199 base rate per active property',
+          upfrontValue: `R${rates.propertyManagerMonthlyZar} base rate per active property`,
           netLabel: 'Annual Predictable Platform Spend',
           netValue: `R${(fee * 12).toLocaleString()}/yr`,
           footnote: 'Covers automated rent rolls, tenant screening, agent team permissions, and maintenance tracking.',
@@ -324,16 +513,16 @@ const PricingPage: React.FC<PricingPageProps> = ({ onPlanSelect, onBack }) => {
       }
       case 'hotels': {
         const gross = Math.max(0, hotelMonthlyRevZar);
-        const enterpriseFee = Math.round(gross * 0.05);
-        const standardFee = Math.round(gross * 0.07);
+        const enterpriseFee = Math.round(gross * (rates.hotelCommissionPercent / 100));
+        const standardFee = Math.round(gross * (rates.shortStayPercent / 100));
         const monthlySavings = Math.max(0, standardFee - enterpriseFee);
         return {
-          title: 'Hotels & Large Operators · From 5% Negotiated Commission',
+          title: `Hotels & Large Operators · From ${rates.hotelCommissionPercent}% Negotiated Commission`,
           grossLabel: 'Monthly Room & Package Revenue',
           grossValue: `R${gross.toLocaleString()}`,
-          feeLabel: 'Enterprise Baseline Commission (5%)',
+          feeLabel: `Enterprise Baseline Commission (${rates.hotelCommissionPercent}%)`,
           feeValue: `R${enterpriseFee.toLocaleString()}/mo`,
-          upfrontValue: `Saves R${monthlySavings.toLocaleString()}/mo vs standard 7% rate`,
+          upfrontValue: `Saves R${monthlySavings.toLocaleString()}/mo vs standard ${rates.shortStayPercent}% rate`,
           netLabel: 'Net Hospitality Revenue Retained',
           netValue: `R${(gross - enterpriseFee).toLocaleString()}/mo`,
           footnote: 'Eligible for further volume tier negotiations and custom channel/PMS onboarding.',
@@ -350,6 +539,7 @@ const PricingPage: React.FC<PricingPageProps> = ({ onPlanSelect, onBack }) => {
     enableSaleBoost,
     managedUnitCount,
     hotelMonthlyRevZar,
+    rates,
   ]);
 
   const scrollToElement = (id: string) => {
@@ -443,8 +633,15 @@ const PricingPage: React.FC<PricingPageProps> = ({ onPlanSelect, onBack }) => {
       </div>
 
       {/* Hero Section */}
-      <section className="relative bg-[#0B1F1A] text-white border-b border-emerald-950">
-        <div className="w-full px-4 sm:px-6 lg:px-10 py-14 lg:py-20">
+      <section className="relative bg-[#0B1F1A] text-white border-b border-emerald-950 overflow-hidden">
+        <img
+          src="/images/apartment_block_1779978678706.png"
+          alt="Pan-African Architectural Development"
+          referrerPolicy="no-referrer"
+          className="absolute inset-0 w-full h-full object-cover opacity-25"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#0B1F1A] via-[#0B1F1A]/80 to-[#0B1F1A]/55" />
+        <div className="relative z-10 w-full px-4 sm:px-6 lg:px-10 py-14 lg:py-20">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-end">
             <div className="lg:col-span-7 space-y-5">
               <p className="text-xs font-semibold tracking-widest uppercase text-amber-300">
@@ -497,19 +694,19 @@ const PricingPage: React.FC<PricingPageProps> = ({ onPlanSelect, onBack }) => {
                 </div>
                 <div>
                   <p className="text-xs text-slate-400">Short-Term Booking</p>
-                  <p className="text-2xl font-bold font-mono tabular-nums text-amber-300 mt-0.5">7%</p>
+                  <p className="text-2xl font-bold font-mono tabular-nums text-amber-300 mt-0.5">{rates.shortStayPercent}%</p>
                 </div>
                 <div>
                   <p className="text-xs text-slate-400">Tenant Placement</p>
-                  <p className="text-2xl font-bold font-mono tabular-nums text-white mt-0.5">2.5%</p>
+                  <p className="text-2xl font-bold font-mono tabular-nums text-white mt-0.5">{rates.longTermPlacementPercent}%</p>
                 </div>
                 <div>
                   <p className="text-xs text-slate-400">Hotel Enterprise</p>
-                  <p className="text-2xl font-bold font-mono tabular-nums text-emerald-300 mt-0.5">From 5%</p>
+                  <p className="text-2xl font-bold font-mono tabular-nums text-emerald-300 mt-0.5">From {rates.hotelCommissionPercent}%</p>
                 </div>
               </div>
               <p className="text-xs text-slate-400 leading-relaxed pt-1 border-t border-white/10">
-                Property managers scale from <strong className="text-white font-mono tabular-nums">R199/property/month</strong>; property sales list free with optional visibility from <strong className="text-white font-mono tabular-nums">R299</strong>.
+                Property managers scale from <strong className="text-white font-mono tabular-nums">R{rates.propertyManagerMonthlyZar}/property/month</strong>; property sales list free with optional visibility from <strong className="text-white font-mono tabular-nums">R{rates.salesBoostZar}</strong>.
               </p>
             </div>
           </div>
@@ -680,7 +877,9 @@ const PricingPage: React.FC<PricingPageProps> = ({ onPlanSelect, onBack }) => {
                               {plan.id === 'managers' ? 'From:' : 'From:'}
                             </p>
                             <p className={`text-2xl sm:text-3xl font-bold font-mono tabular-nums mt-0.5 ${isDark ? 'text-amber-300' : 'text-slate-900 dark:text-amber-300'}`}>
-                              {plan.id === 'managers' ? 'R199/property/month' : '5% commission'}
+                              {plan.id === 'managers'
+                                ? `R${rates.propertyManagerMonthlyZar}/property/month`
+                                : `${rates.hotelCommissionPercent}% commission`}
                             </p>
                             {plan.id === 'hotels' && (
                               <p className="text-xs font-medium text-emerald-200 mt-1">
@@ -711,7 +910,7 @@ const PricingPage: React.FC<PricingPageProps> = ({ onPlanSelect, onBack }) => {
                           type="button"
                           onClick={() =>
                             isDark
-                              ? handleOpenEnterpriseForm('Hotels & Large Operators (From 5%)')
+                              ? handleOpenEnterpriseForm(`Hotels & Large Operators (From ${rates.hotelCommissionPercent}%)`)
                               : onPlanSelect('agent')
                           }
                           className={`flex-1 py-3 px-5 rounded-xl text-xs sm:text-sm font-bold transition-colors whitespace-nowrap ${
@@ -803,11 +1002,11 @@ const PricingPage: React.FC<PricingPageProps> = ({ onPlanSelect, onBack }) => {
 
             <div className="flex flex-wrap gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-slate-800">
               {[
-                { id: 'accommodation' as CalculatorTrack, label: 'Accommodation (7%)' },
-                { id: 'long_term' as CalculatorTrack, label: 'Rentals (2.5%)' },
-                { id: 'sales' as CalculatorTrack, label: 'Sales (Free / R299)' },
-                { id: 'managers' as CalculatorTrack, label: 'Managers (R199)' },
-                { id: 'hotels' as CalculatorTrack, label: 'Hotels (From 5%)' },
+                { id: 'accommodation' as CalculatorTrack, label: `Accommodation (${rates.shortStayPercent}%)` },
+                { id: 'long_term' as CalculatorTrack, label: `Rentals (${rates.longTermPlacementPercent}%)` },
+                { id: 'sales' as CalculatorTrack, label: `Sales (Free / R${rates.salesBoostZar})` },
+                { id: 'managers' as CalculatorTrack, label: `Managers (R${rates.propertyManagerMonthlyZar})` },
+                { id: 'hotels' as CalculatorTrack, label: `Hotels (From ${rates.hotelCommissionPercent}%)` },
               ].map((t) => (
                 <button
                   key={t.id}
@@ -925,7 +1124,7 @@ const PricingPage: React.FC<PricingPageProps> = ({ onPlanSelect, onBack }) => {
                   <div className="flex items-center justify-between p-4 rounded-xl bg-[#FAF8F5] dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
                     <div>
                       <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                        Add Optional Premium Visibility (R299)
+                        Add Optional Premium Visibility (R{rates.salesBoostZar})
                       </p>
                       <p className="text-xs text-slate-500 dark:text-slate-400">
                         Boosts listing priority above standard free listings
@@ -940,7 +1139,7 @@ const PricingPage: React.FC<PricingPageProps> = ({ onPlanSelect, onBack }) => {
                           : 'bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200'
                       }`}
                     >
-                      {enableSaleBoost ? 'Included (R299)' : 'Free Only (R0)'}
+                      {enableSaleBoost ? `Included (R${rates.salesBoostZar})` : 'Free Only (R0)'}
                     </button>
                   </div>
                 </>
@@ -962,7 +1161,7 @@ const PricingPage: React.FC<PricingPageProps> = ({ onPlanSelect, onBack }) => {
                     className="w-full accent-emerald-700 dark:accent-amber-400"
                   />
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-3">
-                    Standard unit rate starts at <strong className="text-slate-800 dark:text-white font-mono">R199/property/month</strong>. Portfolios above 75 units also qualify for custom agency tiering.
+                    Standard unit rate starts at <strong className="text-slate-800 dark:text-white font-mono">R{rates.propertyManagerMonthlyZar}/property/month</strong>. Portfolios above 75 units also qualify for custom agency tiering.
                   </p>
                 </div>
               )}
@@ -983,7 +1182,7 @@ const PricingPage: React.FC<PricingPageProps> = ({ onPlanSelect, onBack }) => {
                     className="w-full accent-emerald-700 dark:accent-amber-400"
                   />
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-3">
-                    Hotels and multi-property groups start from a <strong className="text-slate-800 dark:text-white font-mono">5% commission</strong> baseline with negotiated enterprise terms.
+                    Hotels and multi-property groups start from a <strong className="text-slate-800 dark:text-white font-mono">{rates.hotelCommissionPercent}% commission</strong> baseline with negotiated enterprise terms.
                   </p>
                 </div>
               )}
@@ -1028,7 +1227,7 @@ const PricingPage: React.FC<PricingPageProps> = ({ onPlanSelect, onBack }) => {
                   type="button"
                   onClick={() =>
                     calcTrack === 'hotels'
-                      ? handleOpenEnterpriseForm('Hotels & Large Operators (From 5%)')
+                      ? handleOpenEnterpriseForm(`Hotels & Large Operators (From ${rates.hotelCommissionPercent}%)`)
                       : onPlanSelect('agent')
                   }
                   className="px-4 py-2 rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-950 text-xs font-bold whitespace-nowrap shrink-0"
@@ -1064,7 +1263,7 @@ const PricingPage: React.FC<PricingPageProps> = ({ onPlanSelect, onBack }) => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs sm:text-sm">
-                {COMPARISON_ROWS.map((row) => (
+                {dynamicComparisonRows.map((row) => (
                   <tr key={row.metric} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
                     <td className="py-3.5 pr-4 font-semibold text-slate-900 dark:text-white">{row.metric}</td>
                     <td className="py-3.5 px-4 font-mono tabular-nums text-slate-700 dark:text-slate-300">{row.accommodation}</td>
@@ -1094,7 +1293,7 @@ const PricingPage: React.FC<PricingPageProps> = ({ onPlanSelect, onBack }) => {
                 Negotiate Enterprise & Volume Pricing
               </h2>
               <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-                Operating a boutique hotel group, serviced residence portfolio, or agency managing 25+ properties? Request a tailored commission schedule starting from 5% or volume per-property pricing.
+                Operating a boutique hotel group, serviced residence portfolio, or agency managing 25+ properties? Request a tailored commission schedule starting from {rates.hotelCommissionPercent}% or volume per-property pricing.
               </p>
             </div>
 
@@ -1116,7 +1315,7 @@ const PricingPage: React.FC<PricingPageProps> = ({ onPlanSelect, onBack }) => {
                       organization: '',
                       email: '',
                       phone: '',
-                      planFocus: 'Hotels & Large Operators (From 5%)',
+                      planFocus: `Hotels & Large Operators (From ${rates.hotelCommissionPercent}%)`,
                       portfolioUnits: '25 - 100 units',
                       notes: '',
                     });
@@ -1186,10 +1385,10 @@ const PricingPage: React.FC<PricingPageProps> = ({ onPlanSelect, onBack }) => {
                     onChange={(e) => setInquiryForm({ ...inquiryForm, planFocus: e.target.value })}
                     className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-white/15 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-400"
                   >
-                    <option value="Hotels & Large Operators (From 5%)">Hotels & Large Operators (From 5% commission)</option>
-                    <option value="Property Managers (From R199/property/month)">Property Managers (From R199/property/month)</option>
-                    <option value="Developer Bulk Sales + Premium Visibility">Developer Bulk Sales + R299 Visibility</option>
-                    <option value="Multi-Unit Short-Term Portfolio (7% model)">Multi-Unit Short-Term Portfolio</option>
+                    <option value={`Hotels & Large Operators (From ${rates.hotelCommissionPercent}%)`}>Hotels & Large Operators (From {rates.hotelCommissionPercent}% commission)</option>
+                    <option value={`Property Managers (From R${rates.propertyManagerMonthlyZar}/property/month)`}>Property Managers (From R{rates.propertyManagerMonthlyZar}/property/month)</option>
+                    <option value={`Developer Bulk Sales + Premium Visibility`}>Developer Bulk Sales + R{rates.salesBoostZar} Visibility</option>
+                    <option value={`Multi-Unit Short-Term Portfolio (${rates.shortStayPercent}% model)`}>Multi-Unit Short-Term Portfolio ({rates.shortStayPercent}% model)</option>
                   </select>
                 </div>
 
@@ -1215,7 +1414,7 @@ const PricingPage: React.FC<PricingPageProps> = ({ onPlanSelect, onBack }) => {
             </div>
 
             <div className="divide-y divide-slate-200 dark:divide-slate-800">
-              {PRICING_FAQS.map((faq, idx) => {
+              {dynamicFaqs.map((faq, idx) => {
                 const isOpen = openFaqIdx === idx;
                 return (
                   <div key={faq.question} className="py-4">

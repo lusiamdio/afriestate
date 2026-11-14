@@ -1,250 +1,334 @@
 import React, { useState } from 'react';
-import { supabase } from '../lib/supabase';
-import type { User } from '../types';
+import { ShieldCheckIcon } from '@heroicons/react/24/outline';
+import { publishCarRental } from '../lib/data';
+import type { Property, User } from '../types';
+import { useToast } from '../contexts/ToastContext';
+import {
+  assertCanPublish,
+  checkSubmissionThrottle,
+  isValidEmail,
+  isValidPhone,
+  sanitizeSafeUrl,
+  sanitizeText,
+} from '../lib/security';
 
 interface RentACarListingFormProps {
-    currentUser: User;
-    onSuccess: () => void;
-    onBack: () => void;
+  currentUser: User;
+  onSuccess: (publishedProperty?: Property) => void;
+  onBack: () => void;
 }
 
+const FLEET_IMAGES = [
+  { label: 'Luxury SUV Fleet', url: '/images/luxury_suv_fleet.jpg' },
+  { label: 'Executive Sedan', url: '/images/executive_sedan_fleet.jpg' },
+  { label: 'Premier Touring SUV', url: '/images/2a47542b078d54560485a1e72a5373aa9c3a4a48-800x535.avif' },
+];
+
 const RentACarListingForm: React.FC<RentACarListingFormProps> = ({ currentUser, onSuccess, onBack }) => {
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+  const { addToast } = useToast();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedImage, setSelectedImage] = useState(FLEET_IMAGES[0].url);
 
-    const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault();
-        setIsSubmitting(true);
-        setError(null);
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setError(null);
 
-        const formData = new FormData(e.currentTarget);
-        
-        const payload = {
-            user_id: currentUser.id,
-            business_name: formData.get('businessName') as string,
-            trading_name: formData.get('tradingName') as string || null,
-            registration_number: formData.get('registrationNumber') as string || null,
-            vat_number: formData.get('vatNumber') as string || null,
-            business_type: formData.get('businessType') as string,
-            
-            contact_person: formData.get('contactPerson') as string,
-            mobile_number: formData.get('mobileNumber') as string,
-            whatsapp_number: formData.get('whatsappNumber') as string,
-            email_address: formData.get('emailAddress') as string,
-            website: formData.get('website') as string || null,
-            
-            country: formData.get('country') as string,
-            province: formData.get('province') as string,
-            city: formData.get('city') as string,
-            pickup_address: formData.get('pickupAddress') as string,
-            
-            vehicle_title: formData.get('vehicleTitle') as string,
-            vehicle_category: formData.get('vehicleCategory') as string,
-            vehicle_make_model: formData.get('vehicleMakeModel') as string,
-            vehicle_year: parseInt(formData.get('vehicleYear') as string, 10),
-            transmission: formData.get('transmission') as string,
-            
-            daily_rate: parseFloat(formData.get('dailyRate') as string),
-            currency: formData.get('currency') as string,
-            
-            description: formData.get('description') as string,
-            status: 'pending_review'
-        };
+    const perm = assertCanPublish(currentUser, 'Transport Rental');
+    if (!perm.ok) {
+      setError(perm.reason || 'Permission denied.');
+      return;
+    }
 
-        try {
-            const { error: insertError } = await supabase.from('car_rentals').insert([payload]);
-            if (insertError) throw insertError;
-            
-            alert('Listing Submitted Successfully for Review!');
-            onSuccess();
-        } catch (err: any) {
-            console.error('Error submitting car rental:', err);
-            setError(err.message || 'An error occurred while submitting your listing.');
-        } finally {
-            setIsSubmitting(false);
-        }
-    };
+    const throttle = checkSubmissionThrottle(`car_submit_${currentUser.username}`, 2500);
+    if (!throttle.allowed) {
+      setError(`Please wait ${throttle.waitSeconds}s before submitting another vehicle.`);
+      return;
+    }
 
-    return (
-        <form onSubmit={handleSubmit} className="space-y-12">
-            <div className="text-center mb-8">
-                <h3 className="text-2xl font-bold text-gray-900 dark:text-white">AfriEstate – Rent-A-Car Listing Form</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Professional Vehicle Rental Listing</p>
-                {error && <p className="mt-4 p-3 bg-red-100 text-red-700 rounded-lg">{error}</p>}
+    const formData = new FormData(e.currentTarget);
+    const mobileNumber = sanitizeText(String(formData.get('mobileNumber') || ''), 30);
+    const whatsappNumber = sanitizeText(String(formData.get('whatsappNumber') || ''), 30);
+    const emailAddress = sanitizeText(String(formData.get('emailAddress') || ''), 120);
+    const dailyRate = parseFloat(String(formData.get('dailyRate') || '0'));
+    const vehicleYear = parseInt(String(formData.get('vehicleYear') || '2025'), 10);
+
+    if (!isValidPhone(mobileNumber) || !isValidPhone(whatsappNumber)) {
+      setError('Please enter valid international mobile and WhatsApp numbers.');
+      return;
+    }
+    if (!isValidEmail(emailAddress)) {
+      setError('Please enter a valid business email address.');
+      return;
+    }
+    if (!Number.isFinite(dailyRate) || dailyRate <= 0) {
+      setError('Daily rate must be greater than zero.');
+      return;
+    }
+    if (vehicleYear < 1998 || vehicleYear > 2027) {
+      setError('Vehicle year must be between 1998 and 2027.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const customImageUrl = String(formData.get('imageUrl') || '').trim();
+      const published = await publishCarRental(
+        {
+          business_name: sanitizeText(String(formData.get('businessName')), 100),
+          trading_name: sanitizeText(String(formData.get('tradingName')), 100) || null,
+          registration_number: sanitizeText(String(formData.get('registrationNumber')), 60) || null,
+          vat_number: sanitizeText(String(formData.get('vatNumber')), 60) || null,
+          business_type: sanitizeText(String(formData.get('businessType')), 80),
+          contact_person: sanitizeText(String(formData.get('contactPerson')), 80),
+          mobile_number: mobileNumber,
+          whatsapp_number: whatsappNumber,
+          email_address: emailAddress,
+          website: formData.get('website') ? sanitizeSafeUrl(String(formData.get('website')), '') : null,
+          country: sanitizeText(String(formData.get('country')), 60),
+          province: sanitizeText(String(formData.get('province')), 60),
+          city: sanitizeText(String(formData.get('city')), 60),
+          pickup_address: sanitizeText(String(formData.get('pickupAddress')), 140),
+          vehicle_title: sanitizeText(String(formData.get('vehicleTitle')), 120),
+          vehicle_category: sanitizeText(String(formData.get('vehicleCategory')), 40),
+          vehicle_make_model: sanitizeText(String(formData.get('vehicleMakeModel')), 80),
+          vehicle_year: vehicleYear,
+          transmission: sanitizeText(String(formData.get('transmission')), 20),
+          daily_rate: dailyRate,
+          currency: sanitizeText(String(formData.get('currency')), 10) || 'ZAR',
+          description: sanitizeText(String(formData.get('description')), 1500),
+          image_url: sanitizeSafeUrl(customImageUrl, selectedImage),
+        },
+        currentUser
+      );
+
+      addToast(`Vehicle "${published.title}" published live to Transport Rentals!`, 'success');
+      onSuccess(published);
+    } catch (err: any) {
+      setError(err.message || 'An error occurred while publishing your vehicle.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-8">
+      <div className="text-center mb-6">
+        <h3 className="text-2xl font-bold font-heading text-gray-900 dark:text-white">
+          AfriEstate – Rent-A-Car Listing Form
+        </h3>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+          Published vehicles are verified and immediately synced to the Transport Rentals front page
+        </p>
+        {error && (
+          <p role="alert" className="mt-4 p-3 rounded-xl bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs font-semibold">
+            {error}
+          </p>
+        )}
+      </div>
+
+      <section>
+        <h3 className="text-sm font-bold uppercase tracking-wider border-b border-gray-200 dark:border-slate-700 pb-2 mb-5 text-slate-900 dark:text-gray-200">
+          1. Business Information
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div>
+            <label className="block text-xs font-semibold mb-1.5">Business Name *</label>
+            <input type="text" name="businessName" required className="w-full p-3 bg-gray-50 dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 text-sm outline-none focus:ring-2 focus:ring-emerald-700" />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold mb-1.5">Trading Name</label>
+            <input type="text" name="tradingName" className="w-full p-3 bg-gray-50 dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 text-sm outline-none focus:ring-2 focus:ring-emerald-700" />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold mb-1.5">Registration Number</label>
+            <input type="text" name="registrationNumber" className="w-full p-3 bg-gray-50 dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 text-sm outline-none focus:ring-2 focus:ring-emerald-700" />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold mb-1.5">VAT Number (Optional)</label>
+            <input type="text" name="vatNumber" className="w-full p-3 bg-gray-50 dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 text-sm outline-none focus:ring-2 focus:ring-emerald-700" />
+          </div>
+          <div className="md:col-span-2">
+            <label className="block text-xs font-semibold mb-2">Business Type *</label>
+            <div className="flex flex-wrap gap-3 text-xs">
+              {['Car Rental Company', 'Individual Vehicle Owner', 'Fleet Operator', 'Chauffeur Service Provider', 'Corporate Mobility Provider'].map((type) => (
+                <label key={type} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 cursor-pointer">
+                  <input type="radio" name="businessType" value={type} required /> {type}
+                </label>
+              ))}
             </div>
+          </div>
+        </div>
+      </section>
 
-            <section>
-                <h3 className="text-lg font-bold border-b border-gray-200 dark:border-slate-700 pb-2 mb-6 text-brand-dark dark:text-gray-200">1. BUSINESS INFORMATION</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                        <label className="block text-sm font-semibold mb-2">Business Name *</label>
-                        <input type="text" name="businessName" required className="w-full p-3 bg-gray-50 dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 outline-none" />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-semibold mb-2">Trading Name</label>
-                        <input type="text" name="tradingName" className="w-full p-3 bg-gray-50 dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 outline-none" />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-semibold mb-2">Registration Number</label>
-                        <input type="text" name="registrationNumber" className="w-full p-3 bg-gray-50 dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 outline-none" />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-semibold mb-2">VAT Number (Optional)</label>
-                        <input type="text" name="vatNumber" className="w-full p-3 bg-gray-50 dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 outline-none" />
-                    </div>
-                    <div className="md:col-span-2">
-                        <label className="block text-sm font-semibold mb-2">Business Type *</label>
-                        <div className="flex flex-wrap gap-4">
-                            {['Car Rental Company', 'Individual Vehicle Owner', 'Fleet Operator', 'Chauffeur Service Provider', 'Corporate Mobility Provider'].map(type => (
-                                <label key={type} className="flex items-center gap-2">
-                                    <input type="radio" name="businessType" value={type} required /> {type}
-                                </label>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-            </section>
+      <section>
+        <h3 className="text-sm font-bold uppercase tracking-wider border-b border-gray-200 dark:border-slate-700 pb-2 mb-5 text-slate-900 dark:text-gray-200">
+          2. Contact Information
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div>
+            <label className="block text-xs font-semibold mb-1.5">Contact Person *</label>
+            <input type="text" name="contactPerson" required className="w-full p-3 bg-gray-50 dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 text-sm outline-none focus:ring-2 focus:ring-emerald-700" />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold mb-1.5">Mobile Number *</label>
+            <input type="tel" name="mobileNumber" required placeholder="+27 82 555 0199" className="w-full p-3 bg-gray-50 dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 text-sm outline-none focus:ring-2 focus:ring-emerald-700" />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold mb-1.5">WhatsApp Number *</label>
+            <input type="tel" name="whatsappNumber" required placeholder="+27 82 555 0199" className="w-full p-3 bg-gray-50 dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 text-sm outline-none focus:ring-2 focus:ring-emerald-700" />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold mb-1.5">Email Address *</label>
+            <input type="email" name="emailAddress" required className="w-full p-3 bg-gray-50 dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 text-sm outline-none focus:ring-2 focus:ring-emerald-700" />
+          </div>
+          <div className="md:col-span-2">
+            <label className="block text-xs font-semibold mb-1.5">Website (HTTPS optional)</label>
+            <input type="url" name="website" placeholder="https://..." className="w-full p-3 bg-gray-50 dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 text-sm outline-none focus:ring-2 focus:ring-emerald-700" />
+          </div>
+        </div>
+      </section>
 
-            <section>
-                <h3 className="text-lg font-bold border-b border-gray-200 dark:border-slate-700 pb-2 mb-6 text-brand-dark dark:text-gray-200">2. CONTACT INFORMATION</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                        <label className="block text-sm font-semibold mb-2">Contact Person *</label>
-                        <input type="text" name="contactPerson" required className="w-full p-3 bg-gray-50 dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 outline-none" />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-semibold mb-2">Mobile Number *</label>
-                        <input type="tel" name="mobileNumber" required className="w-full p-3 bg-gray-50 dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 outline-none" />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-semibold mb-2">WhatsApp Number *</label>
-                        <input type="tel" name="whatsappNumber" required className="w-full p-3 bg-gray-50 dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 outline-none" />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-semibold mb-2">Email Address *</label>
-                        <input type="email" name="emailAddress" required className="w-full p-3 bg-gray-50 dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 outline-none" />
-                    </div>
-                    <div className="md:col-span-2">
-                        <label className="block text-sm font-semibold mb-2">Website</label>
-                        <input type="url" name="website" className="w-full p-3 bg-gray-50 dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 outline-none" />
-                    </div>
-                </div>
-            </section>
+      <section>
+        <h3 className="text-sm font-bold uppercase tracking-wider border-b border-gray-200 dark:border-slate-700 pb-2 mb-5 text-slate-900 dark:text-gray-200">
+          3. Location Details
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div>
+            <label className="block text-xs font-semibold mb-1.5">Country *</label>
+            <input type="text" name="country" required defaultValue="South Africa" className="w-full p-3 bg-gray-50 dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 text-sm outline-none focus:ring-2 focus:ring-emerald-700" />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold mb-1.5">Province / State *</label>
+            <input type="text" name="province" required className="w-full p-3 bg-gray-50 dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 text-sm outline-none focus:ring-2 focus:ring-emerald-700" />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold mb-1.5">City *</label>
+            <input type="text" name="city" required className="w-full p-3 bg-gray-50 dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 text-sm outline-none focus:ring-2 focus:ring-emerald-700" />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold mb-1.5">Pickup Address *</label>
+            <input type="text" name="pickupAddress" required className="w-full p-3 bg-gray-50 dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 text-sm outline-none focus:ring-2 focus:ring-emerald-700" />
+          </div>
+        </div>
+      </section>
 
-            <section>
-                <h3 className="text-lg font-bold border-b border-gray-200 dark:border-slate-700 pb-2 mb-6 text-brand-dark dark:text-gray-200">3. LOCATION DETAILS</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                        <label className="block text-sm font-semibold mb-2">Country *</label>
-                        <input type="text" name="country" required className="w-full p-3 bg-gray-50 dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 outline-none" />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-semibold mb-2">Province / State *</label>
-                        <input type="text" name="province" required className="w-full p-3 bg-gray-50 dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 outline-none" />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-semibold mb-2">City *</label>
-                        <input type="text" name="city" required className="w-full p-3 bg-gray-50 dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 outline-none" />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-semibold mb-2">Pickup Address *</label>
-                        <input type="text" name="pickupAddress" required className="w-full p-3 bg-gray-50 dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 outline-none" />
-                    </div>
-                </div>
-            </section>
-
-            <section>
-                <h3 className="text-lg font-bold border-b border-gray-200 dark:border-slate-700 pb-2 mb-6 text-brand-dark dark:text-gray-200">4. VEHICLE INFORMATION</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="md:col-span-2">
-                        <label className="block text-sm font-semibold mb-2">Vehicle Title * (e.g., 2024 Toyota Corolla Auto for Rent)</label>
-                        <input type="text" name="vehicleTitle" required className="w-full p-3 bg-gray-50 dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 outline-none" />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-semibold mb-2">Vehicle Category *</label>
-                        <select name="vehicleCategory" required className="w-full p-3 bg-gray-50 dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 outline-none">
-                            <option value="">Select Category</option>
-                            <option value="economy">Economy</option>
-                            <option value="luxury">Luxury</option>
-                            <option value="suv">SUV</option>
-                            <option value="pickup">Pickup</option>
-                            <option value="van">Van</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-semibold mb-2">Vehicle Make & Model *</label>
-                        <input type="text" name="vehicleMakeModel" required className="w-full p-3 bg-gray-50 dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 outline-none" />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-semibold mb-2">Year *</label>
-                        <input type="number" name="vehicleYear" required className="w-full p-3 bg-gray-50 dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 outline-none" />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-semibold mb-2">Transmission *</label>
-                        <div className="flex gap-4">
-                            <label className="flex items-center gap-2"><input type="radio" name="transmission" value="auto" required /> Automatic</label>
-                            <label className="flex items-center gap-2"><input type="radio" name="transmission" value="manual" required /> Manual</label>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <section>
-                <h3 className="text-lg font-bold border-b border-gray-200 dark:border-slate-700 pb-2 mb-6 text-brand-dark dark:text-gray-200">5. RENTAL PRICING</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                        <label className="block text-sm font-semibold mb-2">Daily Rate *</label>
-                        <input type="number" name="dailyRate" required className="w-full p-3 bg-gray-50 dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 outline-none" />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-semibold mb-2">Currency</label>
-                        <select name="currency" className="w-full p-3 bg-gray-50 dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 outline-none">
-                            <option>ZAR</option>
-                            <option>USD</option>
-                            <option>EUR</option>
-                            <option>GBP</option>
-                        </select>
-                    </div>
-                </div>
-            </section>
-
-            <section>
-                <h3 className="text-lg font-bold border-b border-gray-200 dark:border-slate-700 pb-2 mb-6 text-brand-dark dark:text-gray-200">11. VEHICLE DESCRIPTION</h3>
-                <div>
-                    <textarea name="description" required rows={4} placeholder="Tell customers about the vehicle, condition, comfort, fuel efficiency, etc." className="w-full p-3 bg-gray-50 dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 outline-none"></textarea>
-                </div>
-            </section>
-
-            <section>
-                <h3 className="text-lg font-bold border-b border-gray-200 dark:border-slate-700 pb-2 mb-6 text-brand-dark dark:text-gray-200">17. TERMS & CONDITIONS</h3>
-                <div className="space-y-4">
-                    <label className="flex items-center gap-3">
-                        <input type="checkbox" required className="w-5 h-5 rounded border-gray-300 text-brand-primary" />
-                        <span className="text-sm">I confirm that all information provided is accurate.</span>
-                    </label>
-                    <label className="flex items-center gap-3">
-                        <input type="checkbox" required className="w-5 h-5 rounded border-gray-300 text-brand-primary" />
-                        <span className="text-sm">I have legal authority to rent out this vehicle.</span>
-                    </label>
-                    <label className="flex items-center gap-3">
-                        <input type="checkbox" required className="w-5 h-5 rounded border-gray-300 text-brand-primary" />
-                        <span className="text-sm">I agree to AfriEstate Marketplace Terms & Conditions.</span>
-                    </label>
-                    <label className="flex items-center gap-3">
-                        <input type="checkbox" required className="w-5 h-5 rounded border-gray-300 text-brand-primary" />
-                        <span className="text-sm">I agree to AfriEstate Privacy Policy.</span>
-                    </label>
-                </div>
-            </section>
-
-            <div className="p-6 border-t border-gray-100 dark:border-slate-800 bg-gray-50 dark:bg-slate-800/50 flex gap-4 justify-end flex-shrink-0 -mx-6 -mb-6">
-                <button type="button" onClick={onBack} className="px-6 py-3 font-semibold text-gray-500 hover:text-gray-700">Back</button>
-                <button type="submit" disabled={isSubmitting} className="px-8 py-3 bg-brand-primary text-white font-bold rounded-xl shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all w-full sm:w-auto disabled:opacity-50 disabled:transform-none">
-                    {isSubmitting ? 'Submitting...' : 'Submit For Review'}
+      <section>
+        <h3 className="text-sm font-bold uppercase tracking-wider border-b border-gray-200 dark:border-slate-700 pb-2 mb-5 text-slate-900 dark:text-gray-200">
+          4. Vehicle Information &amp; Visuals
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div className="md:col-span-2">
+            <label className="block text-xs font-semibold mb-1.5">Vehicle Title * (e.g., 2025 Range Rover Autobiography)</label>
+            <input type="text" name="vehicleTitle" required className="w-full p-3 bg-gray-50 dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 text-sm outline-none focus:ring-2 focus:ring-emerald-700" />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold mb-1.5">Vehicle Category *</label>
+            <select name="vehicleCategory" required className="w-full p-3 bg-gray-50 dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 text-sm outline-none focus:ring-2 focus:ring-emerald-700">
+              <option value="">Select Category</option>
+              <option value="economy">Executive Sedan</option>
+              <option value="luxury">Luxury</option>
+              <option value="suv">SUV</option>
+              <option value="pickup">Pickup 4x4</option>
+              <option value="van">Chauffeur Van</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold mb-1.5">Vehicle Make &amp; Model *</label>
+            <input type="text" name="vehicleMakeModel" required className="w-full p-3 bg-gray-50 dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 text-sm outline-none focus:ring-2 focus:ring-emerald-700" />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold mb-1.5">Year *</label>
+            <input type="number" min={1998} max={2027} defaultValue={2025} name="vehicleYear" required className="w-full p-3 bg-gray-50 dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 text-sm outline-none focus:ring-2 focus:ring-emerald-700" />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold mb-2">Transmission *</label>
+            <div className="flex gap-4 text-sm">
+              <label className="flex items-center gap-2"><input type="radio" name="transmission" value="auto" defaultChecked required /> Automatic</label>
+              <label className="flex items-center gap-2"><input type="radio" name="transmission" value="manual" required /> Manual</label>
+            </div>
+          </div>
+          <div className="md:col-span-2 space-y-2">
+            <label className="block text-xs font-semibold">Vehicle Photo URL (Optional)</label>
+            <input type="text" name="imageUrl" placeholder={selectedImage} className="w-full p-3 bg-gray-50 dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 text-sm outline-none focus:ring-2 focus:ring-emerald-700" />
+            <div className="flex flex-wrap gap-2">
+              {FLEET_IMAGES.map((img) => (
+                <button
+                  key={img.url}
+                  type="button"
+                  onClick={() => setSelectedImage(img.url)}
+                  className={`px-3 py-1 rounded-lg text-[11px] font-semibold border ${
+                    selectedImage === img.url
+                      ? 'bg-[#0B1F1A] text-white border-[#0B1F1A]'
+                      : 'bg-gray-50 dark:bg-slate-800 border-gray-200 dark:border-slate-700'
+                  }`}
+                >
+                  {img.label}
                 </button>
+              ))}
             </div>
-        </form>
-    );
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h3 className="text-sm font-bold uppercase tracking-wider border-b border-gray-200 dark:border-slate-700 pb-2 mb-5 text-slate-900 dark:text-gray-200">
+          5. Rental Pricing &amp; Description
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-4">
+          <div>
+            <label className="block text-xs font-semibold mb-1.5">Daily Rate *</label>
+            <input type="number" min={50} name="dailyRate" required className="w-full p-3 bg-gray-50 dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 text-sm outline-none focus:ring-2 focus:ring-emerald-700" />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold mb-1.5">Currency</label>
+            <select name="currency" className="w-full p-3 bg-gray-50 dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 text-sm outline-none focus:ring-2 focus:ring-emerald-700">
+              <option>ZAR</option>
+              <option>USD</option>
+              <option>EUR</option>
+              <option>GBP</option>
+            </select>
+          </div>
+        </div>
+        <textarea name="description" required minLength={15} rows={3} placeholder="Tell customers about the vehicle, mileage terms, chauffeur option, fuel policy, and comfort..." className="w-full p-3 bg-gray-50 dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 text-sm outline-none focus:ring-2 focus:ring-emerald-700" />
+      </section>
+
+      <section>
+        <h3 className="text-sm font-bold uppercase tracking-wider border-b border-gray-200 dark:border-slate-700 pb-2 mb-4 text-slate-900 dark:text-gray-200">
+          6. Security &amp; Compliance Declaration
+        </h3>
+        <div className="space-y-3 text-xs sm:text-sm">
+          <label className="flex items-center gap-3 cursor-pointer">
+            <input type="checkbox" required className="w-4 h-4 rounded border-gray-300 text-emerald-700" />
+            <span>I confirm all fleet details, roadworthy status, and insurance coverage are accurate.</span>
+          </label>
+          <label className="flex items-center gap-3 cursor-pointer">
+            <input type="checkbox" required className="w-4 h-4 rounded border-gray-300 text-emerald-700" />
+            <span>I have legal authority to rent out this vehicle under AfriEstate Terms &amp; Privacy Policy.</span>
+          </label>
+        </div>
+      </section>
+
+      <div className="p-5 border-t border-gray-100 dark:border-slate-800 bg-gray-50 dark:bg-slate-800/50 flex flex-wrap gap-3 items-center justify-between -mx-6 -mb-6">
+        <span className="text-[11px] text-slate-500 inline-flex items-center gap-1.5">
+          <ShieldCheckIcon className="w-4 h-4 text-emerald-600" />
+          Protected by AfriEstate Verification Hash
+        </span>
+        <div className="flex gap-3">
+          <button type="button" onClick={onBack} className="px-5 py-2.5 text-xs font-semibold text-gray-600 dark:text-slate-300 hover:text-gray-900">
+            Back
+          </button>
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="px-6 py-3 bg-[#0B1F1A] hover:bg-emerald-900 text-white text-xs font-bold rounded-xl shadow-md transition-colors disabled:opacity-50"
+          >
+            {isSubmitting ? 'Publishing...' : 'Publish Vehicle Listing'}
+          </button>
+        </div>
+      </div>
+    </form>
+  );
 };
 
 export default RentACarListingForm;

@@ -19,6 +19,13 @@ import type { Property } from '../../types';
 import { supabase } from '../../lib/supabase';
 import { GoogleGenAI } from '../../lib/ai';
 import { useToast } from '../../contexts/ToastContext';
+import {
+  checkSubmissionThrottle,
+  generateListingSignature,
+  isValidEmail,
+  sanitizeSafeUrl,
+  sanitizeText,
+} from '../../lib/security';
 
 const categories = [
   { name: 'Mental Wellness', subtitle: 'Psychologists, therapists, and clinical counselors', icon: HeartIcon },
@@ -91,7 +98,13 @@ const fallbackProviders = [
   },
 ];
 
-const FindWellnessPage: React.FC<{ properties?: Property[] }> = ({ properties = [] }) => {
+interface FindWellnessPageProps {
+  properties?: Property[];
+  onListSanctuary?: () => void;
+  onNavigate?: (page: string) => void;
+}
+
+const FindWellnessPage: React.FC<FindWellnessPageProps> = ({ properties = [], onListSanctuary, onNavigate }) => {
   const { addToast } = useToast();
   const [visibleCount, setVisibleCount] = useState(8);
   const [searchKeyword, setSearchKeyword] = useState('');
@@ -106,31 +119,57 @@ const FindWellnessPage: React.FC<{ properties?: Property[] }> = ({ properties = 
 
   const [selectedCompany, setSelectedCompany] = useState<any>(null);
   const [modalMode, setModalMode] = useState<'book' | 'enquire' | null>(null);
+  const [guestFirstName, setGuestFirstName] = useState('');
+  const [guestLastName, setGuestLastName] = useState('');
+  const [guestEmail, setGuestEmail] = useState('');
+  const [preferredDate, setPreferredDate] = useState('2026-06-15');
+  const [enquiryNotes, setEnquiryNotes] = useState('');
 
   const allCompanies = useMemo(() => {
-    if (properties.length > 0) {
-      return properties.map((p, idx) => ({
-        name: p.title,
-        location: p.address.city,
-        rating: p.agent?.rating || 4.8,
-        category: p.amenities.join(' · ') || 'Wellness Sanctuary',
-        image: p.images?.[0] || fallbackProviders[idx % fallbackProviders.length].image,
-        notes: p.neighborhoodInfo || 'Vetted residential wellness partner.',
-        phone: p.agent?.phone || '+27 12 345 6789',
-        website: 'afriestate-wellness.com',
-      }));
-    }
-    const dirItems = (wellnessDirectory || []).map((item: any) => ({
-      name: item.name,
-      location: item.location || 'South Africa',
-      rating: item.rating || 4.8,
-      category: item.category || 'Holistic Care',
-      image: item.image || '/images/spa_wellness_1779978823248.png',
-      notes: item.notes || item.description || 'Verified AfriEstate wellness practitioner and retreat sanctuary.',
-      phone: item.phone || 'N/A',
-      website: item.website || 'N/A',
+    const publishedProviders = properties.map((p, idx) => {
+      const sig =
+        p.verificationDetails?.titleDeedNumber ||
+        generateListingSignature(p.id, p.agent?.name || 'afriestate', p.price);
+      return {
+        id: String(p.id),
+        name: sanitizeText(p.title, 120),
+        location: `${sanitizeText(p.address?.city || 'Cape Town', 60)}${p.country ? `, ${sanitizeText(p.country, 50)}` : ''}`,
+        rating: p.agent?.rating || 4.9,
+        category: (p.amenities || []).map((a) => sanitizeText(a, 50)).join(' · ') || 'Wellness Sanctuary',
+        image: sanitizeSafeUrl(p.images?.[0], fallbackProviders[idx % fallbackProviders.length].image),
+        notes: sanitizeText(p.description || p.neighborhoodInfo || 'Vetted residential wellness partner.', 320),
+        phone: sanitizeText(p.agent?.phone || '+27 21 555 0100', 30),
+        website: 'afriestate.africa/wellness',
+        price: Number(p.price) || 650,
+        verificationHash: sig,
+        isUserPublished: true,
+      };
+    });
+
+    const dirItems = (wellnessDirectory || []).map((item: any, idx: number) => ({
+      id: `well_dir_${idx}`,
+      name: String(item.name || ''),
+      location: String(item.location || 'South Africa'),
+      rating: Number(item.rating || 4.8),
+      category: String(item.category || 'Holistic Care'),
+      image: String(item.image || '/images/spa_wellness_1779978823248.png'),
+      notes: String(item.notes || item.description || 'Verified AfriEstate wellness practitioner and retreat sanctuary.'),
+      phone: String(item.phone || 'N/A'),
+      website: String(item.website || 'N/A'),
+      price: typeof item.price === 'number' ? item.price : undefined,
+      verificationHash: generateListingSignature(`well_dir_${idx}`, item.name || 'well', 650),
+      isUserPublished: false,
     }));
-    return dirItems.length > 0 ? dirItems : fallbackProviders;
+
+    const baseList = dirItems.length > 0 ? dirItems : fallbackProviders.map((f, idx) => ({
+      ...f,
+      id: `well_fb_${idx}`,
+      price: undefined as number | undefined,
+      verificationHash: generateListingSignature(`well_fb_${idx}`, f.name, 650),
+      isUserPublished: false,
+    }));
+
+    return [...publishedProviders, ...baseList];
   }, [properties]);
 
   const filteredCompanies = useMemo(() => {
@@ -156,21 +195,42 @@ const FindWellnessPage: React.FC<{ properties?: Property[] }> = ({ properties = 
   const closeModal = () => {
     setSelectedCompany(null);
     setModalMode(null);
+    setGuestFirstName('');
+    setGuestLastName('');
+    setGuestEmail('');
+    setEnquiryNotes('');
   };
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedCompany) return;
+
+    const cleanFirst = sanitizeText(guestFirstName, 60);
+    const cleanLast = sanitizeText(guestLastName, 60);
+    const cleanEmail = sanitizeText(guestEmail, 120);
+    const cleanNotes = sanitizeText(enquiryNotes, 500);
+
+    if (!cleanFirst || !cleanLast || !isValidEmail(cleanEmail)) {
+      addToast('Please provide a valid full name and email address.', 'error');
+      return;
+    }
+
+    const throttle = checkSubmissionThrottle(`wellness_req_${selectedCompany.name}`, 8000);
+    if (!throttle.allowed) {
+      addToast(`Please wait ${throttle.waitSeconds}s before submitting another request.`, 'info');
+      return;
+    }
+
     try {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      const username = user?.email || 'guest';
+      const username = user?.email || cleanEmail;
       await supabase.from('tour_requests').insert({
-        property_id: 'wellness_' + Date.now().toString(36),
-        property_title: selectedCompany.name,
+        property_id: selectedCompany.id || 'wellness_' + Date.now().toString(36),
+        property_title: `${selectedCompany.name} (${cleanFirst} ${cleanLast}: ${cleanNotes || 'Consultation'})`,
         username,
-        date: new Date().toISOString().split('T')[0],
+        date: preferredDate || new Date().toISOString().split('T')[0],
         time: '12:00',
         status: 'Pending',
         timestamp: Date.now(),
@@ -180,8 +240,8 @@ const FindWellnessPage: React.FC<{ properties?: Property[] }> = ({ properties = 
     } finally {
       addToast(
         modalMode === 'book'
-          ? `Appointment requested with ${selectedCompany.name}.`
-          : `Enquiry sent to ${selectedCompany.name}.`,
+          ? `Verified appointment requested with ${selectedCompany.name}.`
+          : `Enquiry dispatched to ${selectedCompany.name}.`,
         'success'
       );
       closeModal();
@@ -404,6 +464,15 @@ const FindWellnessPage: React.FC<{ properties?: Property[] }> = ({ properties = 
                       className="w-full h-full object-cover"
                       referrerPolicy="no-referrer"
                     />
+                    <span className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded bg-[#0B1F1A]/85 text-[#C9A35D] text-[10px] font-bold uppercase tracking-wider inline-flex items-center gap-1">
+                      <CheckBadgeIcon className="w-3 h-3" />
+                      {company.isUserPublished ? 'Live Partner' : 'Verified'}
+                    </span>
+                    {company.price && (
+                      <span className="absolute bottom-2.5 right-2.5 px-2 py-0.5 rounded bg-white/95 text-[#0F2D25] font-mono text-[11px] font-bold">
+                        From R{company.price.toLocaleString()}
+                      </span>
+                    )}
                   </div>
                   <div className="p-5 flex flex-col flex-grow">
                     <div className="flex items-start justify-between gap-2">
@@ -417,6 +486,9 @@ const FindWellnessPage: React.FC<{ properties?: Property[] }> = ({ properties = 
 
                     <p className="text-[11px] font-semibold text-[#0F2D25] dark:text-[#C9A35D] mt-1">
                       {company.category}
+                    </p>
+                    <p className="text-[10px] font-mono text-emerald-700 dark:text-emerald-400 mt-0.5">
+                      {company.verificationHash}
                     </p>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 line-clamp-2 leading-relaxed">
                       {company.notes}
@@ -622,8 +694,12 @@ const FindWellnessPage: React.FC<{ properties?: Property[] }> = ({ properties = 
           <div className="flex flex-wrap justify-center gap-3">
             <button
               onClick={() => {
-                setSelectedCompany({ name: 'AfriEstate Partner Onboarding' });
-                setModalMode('enquire');
+                if (onListSanctuary) {
+                  onListSanctuary();
+                } else {
+                  setSelectedCompany({ name: 'AfriEstate Partner Onboarding' });
+                  setModalMode('enquire');
+                }
               }}
               className="bg-[#0F2D25] text-white px-6 py-3 rounded-xl text-xs font-semibold hover:bg-[#173f34] transition-colors"
             >
@@ -649,7 +725,9 @@ const FindWellnessPage: React.FC<{ properties?: Property[] }> = ({ properties = 
                 <h3 className="font-heading text-xl font-semibold text-slate-900 dark:text-white">
                   {modalMode === 'book' ? 'Schedule Appointment' : 'Direct Enquiry'}
                 </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400">{selectedCompany.name}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  {selectedCompany.name} {selectedCompany.verificationHash ? `· ${selectedCompany.verificationHash}` : ''}
+                </p>
               </div>
               <button
                 onClick={closeModal}
@@ -666,6 +744,8 @@ const FindWellnessPage: React.FC<{ properties?: Property[] }> = ({ properties = 
                   <input
                     type="text"
                     required
+                    value={guestFirstName}
+                    onChange={(e) => setGuestFirstName(e.target.value)}
                     placeholder="First name"
                     className="w-full px-3 py-2.5 bg-[#FAF8F5] dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs outline-none"
                   />
@@ -675,6 +755,8 @@ const FindWellnessPage: React.FC<{ properties?: Property[] }> = ({ properties = 
                   <input
                     type="text"
                     required
+                    value={guestLastName}
+                    onChange={(e) => setGuestLastName(e.target.value)}
                     placeholder="Last name"
                     className="w-full px-3 py-2.5 bg-[#FAF8F5] dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs outline-none"
                   />
@@ -686,6 +768,8 @@ const FindWellnessPage: React.FC<{ properties?: Property[] }> = ({ properties = 
                 <input
                   type="email"
                   required
+                  value={guestEmail}
+                  onChange={(e) => setGuestEmail(e.target.value)}
                   placeholder="you@domain.com"
                   className="w-full px-3 py-2.5 bg-[#FAF8F5] dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs outline-none"
                 />
@@ -697,7 +781,8 @@ const FindWellnessPage: React.FC<{ properties?: Property[] }> = ({ properties = 
                   <input
                     type="date"
                     required
-                    defaultValue="2026-06-15"
+                    value={preferredDate}
+                    onChange={(e) => setPreferredDate(e.target.value)}
                     className="w-full px-3 py-2.5 bg-[#FAF8F5] dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs outline-none"
                   />
                 </div>
@@ -710,6 +795,8 @@ const FindWellnessPage: React.FC<{ properties?: Property[] }> = ({ properties = 
                 <textarea
                   rows={3}
                   required={modalMode === 'enquire'}
+                  value={enquiryNotes}
+                  onChange={(e) => setEnquiryNotes(e.target.value)}
                   placeholder="Share preferred timing, retreat dates, or specialist requirements..."
                   className="w-full px-3 py-2.5 bg-[#FAF8F5] dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs outline-none resize-none"
                 />

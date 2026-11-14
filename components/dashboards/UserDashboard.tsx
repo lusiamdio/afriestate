@@ -35,7 +35,7 @@ const UserDashboard: React.FC<UserDashboardProps> = (props) => {
     <div className="flex flex-col lg:flex-row h-full">
       <nav className="w-full lg:w-64 p-4 border-b lg:border-b-0 lg:border-r border-slate-200 dark:border-slate-700 glass-panel overflow-x-auto lg:overflow-y-auto flex-shrink-0">
         <div className="hidden lg:flex items-center gap-3 mb-6">
-            <img src={user.profilePicture || `https://i.pravatar.cc/150?u=${user.username}`} alt="Profile" className="w-10 h-10 rounded-full object-cover"/>
+            <img src={user.profilePicture || '/images/tersia-kroonstad.webp'} referrerPolicy="no-referrer" alt="Profile" className="w-10 h-10 rounded-full object-cover"/>
             <div>
                 <p className="font-bold text-slate-800 dark:text-white truncate">{user.fullName}</p>
                 <p className="text-xs text-slate-500 dark:text-slate-400">Property Seeker</p>

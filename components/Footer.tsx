@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { FacebookIcon, TwitterIcon, InstagramIcon } from './icons/SocialIcons';
 import { useTranslations } from '../contexts/LanguageContext';
 import { useCurrency } from '../contexts/CurrencyContext';
+import { useAdminState } from '../contexts/AdminStateContext';
 import { currencyOptions, languageOptions } from '../constants';
 import { Currency, Language } from '../types';
 import {
@@ -23,6 +24,7 @@ interface FooterProps {
   onFindAProClick: () => void;
   onMarketJump?: (location: string) => void;
   onModeJump?: (mode: 'buy' | 'rent' | 'invest') => void;
+  onPageJump?: (page: string) => void;
 }
 
 const FOOTER_HUBS = [
@@ -48,9 +50,16 @@ const Footer: React.FC<FooterProps> = ({
   onFindAProClick,
   onMarketJump,
   onModeJump,
+  onPageJump,
 }) => {
   const { t, language, setLanguage } = useTranslations();
   const { currency, setCurrency } = useCurrency();
+  const { settings, countryConfigs } = useAdminState();
+  const flags = settings.featureFlags;
+  const activeHubs = useMemo(() => {
+    const enabledCountries = new Set(countryConfigs.filter((c) => c.enabled).map((c) => c.name));
+    return FOOTER_HUBS.filter((hub) => enabledCountries.has(hub.country));
+  }, [countryConfigs]);
 
   const [isCurrencyOpen, setIsCurrencyOpen] = useState(false);
   const [currencySearch, setCurrencySearch] = useState('');
@@ -127,7 +136,7 @@ const Footer: React.FC<FooterProps> = ({
             <span>Jump to Active Markets</span>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {FOOTER_HUBS.map((hub) => (
+            {activeHubs.map((hub) => (
               <button
                 key={hub.city}
                 type="button"
@@ -158,10 +167,10 @@ const Footer: React.FC<FooterProps> = ({
                 onClick={scrollToTop}
                 className="text-2xl font-bold text-white font-heading tracking-tight hover:text-amber-300 transition-colors"
               >
-                AfriEstate
+                {settings.siteName || 'AfriEstate'}
               </button>
               <p className="mt-2 text-sm text-slate-400 leading-relaxed max-w-sm">
-                {t.footer.tagline}
+                {settings.tagline || t.footer.tagline}
               </p>
             </div>
 
@@ -272,11 +281,36 @@ const Footer: React.FC<FooterProps> = ({
                   {t.footer.blog}
                 </a>
               </li>
-              <li>
-                <a href="#find-pro" onClick={(e) => handleLinkClick(e, onFindAProClick)} className="text-slate-300 hover:text-amber-300 transition-colors">
-                  {t.footer.findAPro}
-                </a>
-              </li>
+              {flags.professionals && (
+                <li>
+                  <a href="#find-pro" onClick={(e) => handleLinkClick(e, onFindAProClick)} className="text-slate-300 hover:text-amber-300 transition-colors">
+                    {t.footer.findAPro}
+                  </a>
+                </li>
+              )}
+              {onPageJump && (
+                <>
+                  {flags.neighborhoods && (
+                    <li>
+                      <button type="button" onClick={() => onPageJump('neighborhood-explorer')} className="text-slate-300 hover:text-amber-300 transition-colors font-normal">
+                        Neighborhood Explorer
+                      </button>
+                    </li>
+                  )}
+                  <li>
+                    <button type="button" onClick={() => onPageJump('pricing')} className="text-slate-300 hover:text-amber-300 transition-colors font-normal">
+                      Plans &amp; Pricing
+                    </button>
+                  </li>
+                  {flags.hotelRegistration && (
+                    <li>
+                      <button type="button" onClick={() => onPageJump('hotel-registration')} className="text-slate-300 hover:text-amber-300 transition-colors font-normal">
+                        List a Hotel
+                      </button>
+                    </li>
+                  )}
+                </>
+              )}
             </ul>
           </div>
 
@@ -284,16 +318,16 @@ const Footer: React.FC<FooterProps> = ({
           <div className="lg:col-span-2 space-y-6">
             <div>
               <h3 className="text-xs font-semibold uppercase tracking-wider text-white mb-4">
-                Marketplace Modes
+                Front Pages &amp; Modes
               </h3>
-              <ul className="space-y-2.5 text-sm">
+              <ul className="space-y-2 text-sm">
                 <li>
                   <button
                     type="button"
                     onClick={() => onModeJump?.('buy')}
                     className="text-slate-300 hover:text-amber-300 transition-colors font-normal"
                   >
-                    Buy Residential & Estates
+                    Buy Residential &amp; Estates
                   </button>
                 </li>
                 <li>
@@ -311,9 +345,57 @@ const Footer: React.FC<FooterProps> = ({
                     onClick={() => onModeJump?.('invest')}
                     className="text-slate-300 hover:text-amber-300 transition-colors font-normal"
                   >
-                    REITs & Co-Investments
+                    REITs &amp; Co-Investments
                   </button>
                 </li>
+                {onPageJump && (
+                  <>
+                    {flags.shortStays && (
+                      <li>
+                        <button
+                          type="button"
+                          onClick={() => onPageJump('book-a-stay')}
+                          className="text-slate-300 hover:text-amber-300 transition-colors font-normal"
+                        >
+                          Short-Term Stays
+                        </button>
+                      </li>
+                    )}
+                    {flags.longTerm && (
+                      <li>
+                        <button
+                          type="button"
+                          onClick={() => onPageJump('long-term-stays')}
+                          className="text-slate-300 hover:text-amber-300 transition-colors font-normal"
+                        >
+                          Long-Term Accommodation
+                        </button>
+                      </li>
+                    )}
+                    {flags.transport && (
+                      <li>
+                        <button
+                          type="button"
+                          onClick={() => onPageJump('rent-a-car')}
+                          className="text-slate-300 hover:text-amber-300 transition-colors font-normal"
+                        >
+                          Transport Rentals
+                        </button>
+                      </li>
+                    )}
+                    {flags.wellness && (
+                      <li>
+                        <button
+                          type="button"
+                          onClick={() => onPageJump('find-wellness')}
+                          className="text-slate-300 hover:text-amber-300 transition-colors font-normal"
+                        >
+                          Wellness Retreats
+                        </button>
+                      </li>
+                    )}
+                  </>
+                )}
               </ul>
             </div>
 

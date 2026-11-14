@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { GoogleGenAI, Chat } from "../lib/ai";
 import { ChatIcon, CloseIcon, SendIcon } from './icons/NavIcons';
 import { useTranslations } from '../contexts/LanguageContext';
+import { useAdminState } from '../contexts/AdminStateContext';
 
 interface ChatbotMessage {
   sender: 'ai' | 'user';
@@ -33,6 +34,8 @@ Your core instructions are:
 const Chatbot: React.FC = () => {
     const [isOpen, setIsOpen] = useState(false);
     const { t } = useTranslations();
+    const { settings } = useAdminState();
+    const activeAiModel = settings.securityPolicies?.aiModel || 'gemini-2.5-flash';
     const [messages, setMessages] = useState<ChatbotMessage[]>([
         {
             sender: 'ai',
@@ -49,7 +52,7 @@ const Chatbot: React.FC = () => {
             try {
                 const ai = new GoogleGenAI();
                 const newChat = ai.chats.create({
-                    model: 'gemini-2.5-flash',
+                    model: activeAiModel,
                     config: {
                         systemInstruction: systemInstruction,
                     },
@@ -61,7 +64,7 @@ const Chatbot: React.FC = () => {
             }
         };
         initChat();
-    }, []);
+    }, [activeAiModel]);
 
     // Update greeting if language changes while chatbot is closed
     useEffect(() => {
@@ -115,7 +118,7 @@ const Chatbot: React.FC = () => {
             <div className={`fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50 transition-all duration-300 ${isOpen ? 'opacity-0 scale-90 pointer-events-none' : 'opacity-100 scale-100'}`}>
                 <button
                     onClick={() => setIsOpen(true)}
-                    className="bg-brand-primary text-white rounded-full p-4 shadow-lg hover:bg-opacity-90 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2 animate-pulse"
+                    className="bg-brand-primary text-white rounded-full p-4 shadow-lg hover:bg-opacity-90 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2 transition-transform hover:scale-105"
                     aria-label="Open Chat Assistant"
                 >
                     <ChatIcon className="w-8 h-8" />

@@ -1,43 +1,170 @@
 import React, { useState } from 'react';
-import { supabase } from '../lib/supabase';
-import type { User } from '../types';
+import { ShieldCheckIcon } from '@heroicons/react/24/outline';
+import { publishAccommodationService } from '../lib/data';
+import type { Property, User } from '../types';
+import { useToast } from '../contexts/ToastContext';
+import {
+  assertCanPublish,
+  checkSubmissionThrottle,
+  sanitizeSafeUrl,
+  sanitizeText,
+} from '../lib/security';
 
-interface Props { currentUser: User; onSuccess: () => void; onBack: () => void; }
+interface Props {
+  currentUser: User;
+  onSuccess: (publishedProperty?: Property) => void;
+  onBack: () => void;
+}
+
+const STAY_IMAGES = [
+  { label: 'Coastal Mansion', url: '/images/coastal_mansion_1779978805301.png' },
+  { label: 'Loft Interior', url: '/images/loft_interior_1779978697203.png' },
+  { label: 'Apartment Block', url: '/images/apartment_block_1779978678706.png' },
+];
 
 const AccommodationListingForm: React.FC<Props> = ({ currentUser, onSuccess, onBack }) => {
+  const { addToast } = useToast();
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(STAY_IMAGES[0].url);
+
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!currentUser.id) return setError('Please sign in again before submitting a listing.');
-    setIsSubmitting(true); setError(null);
+    setError(null);
+
+    const perm = assertCanPublish(currentUser, 'Short-term Stay');
+    if (!perm.ok) {
+      setError(perm.reason || 'Please sign in before publishing.');
+      return;
+    }
+
+    const throttle = checkSubmissionThrottle(`stay_submit_${currentUser.username}`, 2500);
+    if (!throttle.allowed) {
+      setError(`Please wait ${throttle.waitSeconds}s before submitting again.`);
+      return;
+    }
+
     const form = new FormData(event.currentTarget);
-    const payload = {
-      owner_id: currentUser.id, business_name: String(form.get('businessName') || '').trim(),
-      accommodation_type: String(form.get('type')), country: String(form.get('country') || '').trim(), city: String(form.get('city') || '').trim(),
-      address: String(form.get('address') || '').trim() || null, nightly_rate: Number(form.get('nightlyRate')),
-      currency: String(form.get('currency')), max_guests: Number(form.get('maxGuests')), description: String(form.get('description') || '').trim(),
-      images: String(form.get('imageUrl') || '').trim() ? [String(form.get('imageUrl')).trim()] : [], status: 'pending_review',
-    };
-    const { error: insertError } = await supabase.from('accommodation_services').insert(payload);
-    setIsSubmitting(false);
-    if (insertError) return setError(insertError.message);
-    onSuccess();
+    const nightlyRate = Number(form.get('nightlyRate'));
+    const maxGuests = Number(form.get('maxGuests'));
+
+    if (!Number.isFinite(nightlyRate) || nightlyRate <= 0 || !Number.isFinite(maxGuests) || maxGuests < 1) {
+      setError('Nightly rate and maximum guests must be positive numbers.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const published = await publishAccommodationService(
+        {
+          business_name: sanitizeText(String(form.get('businessName')), 120),
+          accommodation_type: sanitizeText(String(form.get('type')), 40),
+          country: sanitizeText(String(form.get('country')), 60),
+          city: sanitizeText(String(form.get('city')), 60),
+          address: sanitizeText(String(form.get('address')), 140) || null,
+          nightly_rate: nightlyRate,
+          currency: sanitizeText(String(form.get('currency')), 10) || 'ZAR',
+          max_guests: maxGuests,
+          description: sanitizeText(String(form.get('description')), 1500),
+          image_url: sanitizeSafeUrl(String(form.get('imageUrl') || ''), selectedImage),
+        },
+        currentUser
+      );
+
+      addToast(`"${published.title}" published live to Stays & Accommodation!`, 'success');
+      onSuccess(published);
+    } catch (err: any) {
+      setError(err.message || 'Could not publish stay.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
-  return <form onSubmit={submit} className="space-y-5">
-    <div><h3 className="text-2xl font-bold text-gray-900 dark:text-white">Accommodation listing</h3><p className="text-sm text-gray-500">Your stay is submitted for verification before it can be shown publicly.</p></div>
-    {error && <p role="alert" className="rounded-lg bg-red-100 p-3 text-red-700">{error}</p>}
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-      <input required name="businessName" placeholder="Accommodation name" className="input" />
-      <select required name="type" className="input"><option value="">Accommodation type</option><option value="hotel">Hotel</option><option value="resort">Resort</option><option value="guest_house">Guest house</option><option value="apartment">Serviced apartment</option><option value="villa">Villa</option><option value="lodge">Lodge</option></select>
-      <input required name="country" placeholder="Country" className="input" /><input required name="city" placeholder="City" className="input" />
-      <input name="address" placeholder="Address (optional)" className="input" /><input required min="1" type="number" name="maxGuests" placeholder="Maximum guests" className="input" />
-      <input required min="0" step="0.01" type="number" name="nightlyRate" placeholder="Nightly rate" className="input" /><select name="currency" className="input"><option>ZAR</option><option>USD</option><option>EUR</option><option>GBP</option></select>
-    </div>
-    <input name="imageUrl" type="url" placeholder="Primary image URL (optional)" className="input w-full" />
-    <textarea required minLength={20} name="description" rows={5} placeholder="Describe the stay, amenities, and guest experience (at least 20 characters)" className="input w-full" />
-    <div className="flex justify-end gap-3"><button type="button" onClick={onBack} className="px-5 py-2 font-semibold">Back</button><button disabled={isSubmitting} className="rounded-lg bg-brand-primary px-5 py-2 font-bold text-white disabled:opacity-50">{isSubmitting ? 'Submitting…' : 'Submit for review'}</button></div>
-    <style>{`.input { @apply rounded-lg border border-gray-300 bg-white p-3 text-gray-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white; }`}</style>
-  </form>;
+
+  return (
+    <form onSubmit={submit} className="space-y-6">
+      <div>
+        <h3 className="text-2xl font-bold font-heading text-gray-900 dark:text-white">
+          Accommodation &amp; Stay Listing
+        </h3>
+        <p className="text-sm text-gray-500 dark:text-slate-400">
+          Published stays appear immediately on the Short-Term Stays &amp; Long-Term Accommodation front pages.
+        </p>
+      </div>
+      {error && (
+        <p role="alert" className="rounded-xl bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 p-3 text-xs font-semibold text-rose-700 dark:text-rose-300">
+          {error}
+        </p>
+      )}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <input required name="businessName" placeholder="Accommodation or Residence Name" className="input" />
+        <select required name="type" className="input">
+          <option value="">Accommodation type</option>
+          <option value="hotel">Hotel</option>
+          <option value="resort">Resort</option>
+          <option value="guest_house">Guest house</option>
+          <option value="apartment">Serviced apartment (Short &amp; Long-Term)</option>
+          <option value="villa">Villa</option>
+          <option value="lodge">Lodge</option>
+        </select>
+        <input required name="country" defaultValue="South Africa" placeholder="Country" className="input" />
+        <input required name="city" placeholder="City" className="input" />
+        <input name="address" placeholder="Street / District (optional)" className="input" />
+        <input required min="1" type="number" name="maxGuests" placeholder="Maximum guests" className="input" />
+        <input required min="10" step="0.01" type="number" name="nightlyRate" placeholder="Nightly rate" className="input" />
+        <select name="currency" className="input">
+          <option>ZAR</option>
+          <option>USD</option>
+          <option>EUR</option>
+          <option>GBP</option>
+        </select>
+      </div>
+      <div className="space-y-2">
+        <input name="imageUrl" type="text" placeholder={selectedImage} className="input w-full" />
+        <div className="flex flex-wrap gap-2">
+          {STAY_IMAGES.map((img) => (
+            <button
+              key={img.url}
+              type="button"
+              onClick={() => setSelectedImage(img.url)}
+              className={`px-3 py-1 rounded-lg text-[11px] font-semibold border ${
+                selectedImage === img.url
+                  ? 'bg-[#0B1F1A] text-white border-[#0B1F1A]'
+                  : 'bg-gray-50 dark:bg-slate-800 border-gray-200 dark:border-slate-700'
+              }`}
+            >
+              {img.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <textarea
+        required
+        minLength={20}
+        name="description"
+        rows={4}
+        placeholder="Describe the stay, amenities, Wi-Fi/solar resilience, and guest experience (at least 20 characters)"
+        className="input w-full"
+      />
+      <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+        <span className="text-[11px] text-slate-500 inline-flex items-center gap-1.5">
+          <ShieldCheckIcon className="w-4 h-4 text-emerald-600" />
+          Protected by AfriEstate Verification Hash
+        </span>
+        <div className="flex gap-3">
+          <button type="button" onClick={onBack} className="px-5 py-2.5 text-xs font-semibold">
+            Back
+          </button>
+          <button
+            disabled={isSubmitting}
+            className="rounded-xl bg-[#0B1F1A] hover:bg-emerald-900 px-6 py-2.5 text-xs font-bold text-white disabled:opacity-50"
+          >
+            {isSubmitting ? 'Publishing…' : 'Publish Live Stay'}
+          </button>
+        </div>
+      </div>
+      <style>{`.input { @apply rounded-xl border border-gray-300 bg-white p-3 text-sm text-gray-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-700; }`}</style>
+    </form>
+  );
 };
+
 export default AccommodationListingForm;

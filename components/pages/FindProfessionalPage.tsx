@@ -523,8 +523,15 @@ const FindProfessionalPage: React.FC<FindProfessionalPageProps> = ({
       </div>
 
       {/* Hero Header Banner */}
-      <section className="w-full bg-[#0B1F1A] text-white">
-        <div className="w-full px-4 sm:px-6 lg:px-10 py-12 lg:py-16">
+      <section className="relative w-full bg-[#0B1F1A] text-white overflow-hidden">
+        <img
+          src="/images/harbour_house_1779978766107.png"
+          alt="African Real Estate Advisory Architecture"
+          referrerPolicy="no-referrer"
+          className="absolute inset-0 w-full h-full object-cover opacity-25"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#0B1F1A] via-[#0B1F1A]/80 to-[#0B1F1A]/50" />
+        <div className="relative z-10 w-full px-4 sm:px-6 lg:px-10 py-12 lg:py-16">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-end">
             <div className="lg:col-span-7 space-y-4">
               <div className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-amber-300">

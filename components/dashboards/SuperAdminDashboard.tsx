@@ -1,3215 +1,2928 @@
-/**
- * =========================================================================
- * AFRIESTATE — ENTERPRISE SUPER ADMIN SOVEREIGN COMMAND CENTER
- * =========================================================================
- */
+import React, { useMemo, useState } from 'react';
+import {
+  Activity,
+  AlertTriangle,
+  ArrowUpRight,
+  BadgeCheck,
+  Ban,
+  BarChart3,
+  Building2,
+  Car,
+  Check,
+  CheckCircle2,
+  Compass,
+  DollarSign,
+  Download,
+  Edit3,
+  Eye,
+  EyeOff,
+  FileCheck2,
+  Globe2,
+  Hotel,
+  KeyRound,
+  Layers,
+  LayoutDashboard,
+  Lock,
+  LogOut,
+  Menu,
+  Plus,
+  RefreshCw,
+  RotateCcw,
+  Save,
+  Search,
+  Settings,
+  Shield,
+  ShieldAlert,
+  ShieldCheck,
+  Sparkles,
+  Star,
+  Trash2,
+  Unlock,
+  Users,
+  X,
+} from 'lucide-react';
+import {
+  Currency,
+  Language,
+  ListingType,
+  PropertyStatus,
+  PropertyType,
+  type Message,
+  type Property,
+  type TourRequest,
+  type User,
+} from '../../types';
+import type { StayPropertyProfile } from '../../data/stayDetailData';
+import { STAY_CATALOG_PROPERTIES } from '../../data/stayDetailData';
+import { COUNTRY_MARKET_GUIDES } from '../../data/africanNeighborhoodDatabase';
+import {
+  useAdminState,
+  type CountryGovernanceConfig,
+  type SovereignRoleKey,
+} from '../../contexts/AdminStateContext';
+import { useCurrency } from '../../contexts/CurrencyContext';
+import { useTranslations } from '../../contexts/LanguageContext';
+import { useToast } from '../../contexts/ToastContext';
+import {
+  SEED_COMPLIANCE_CASES,
+  SEED_MODERATION_REPORTS,
+  SEED_TICKETS,
+  SEED_TRANSACTIONS,
+  SEED_USERS,
+  type ComplianceCase,
+  type EscrowTransaction,
+  type ModerationReport,
+  type SovereignUser,
+  type SupportTicket,
+} from './superadmin/SuperAdminData';
 
-import React, { useState, useEffect, useMemo } from "react";
-import { 
-  Activity, Users, Globe, DollarSign, Shield, ShieldAlert, Server, 
-  Sparkles, TrendingUp, Lock, HelpCircle, Terminal, Cpu, Clock, RefreshCw, 
-  Send, AlertTriangle, FileText, Download, Check, X, ShieldCheck, 
-  Network, Settings, Trash2, Key, Info, CheckCircle2, MessageSquare, ArrowRight
-} from "lucide-react";
+interface SuperAdminDashboardProps {
+  onClose?: () => void;
+  allProperties?: Property[];
+  publishedStays?: StayPropertyProfile[];
+  tourRequests?: TourRequest[];
+  messages?: Message[];
+  currentUser?: User | null;
+  onUpdateProperty?: (property: Property) => void;
+  onDeleteProperty?: (propertyId: string) => void;
+  onNavigatePublicPage?: (page: string) => void;
+}
 
-import { 
-  SovereignUser, PropertyListing, EscrowTransaction, ComplianceCase, 
-  ModerationReport, HealthService, CyberThreat, SupportTicket,
-  MACRO_SCENARIOS, PRESET_AI_ASSISTANCE
-} from "./superadmin/SuperAdminData";
+type AdminSection =
+  | 'overview'
+  | 'users'
+  | 'listings'
+  | 'countries'
+  | 'financials'
+  | 'directory'
+  | 'compliance'
+  | 'settings';
 
-import { getUsers, getProperties } from "../../lib/data";
-import { supabase } from "../../lib/supabase";
-import { GoogleGenAI } from "../../lib/ai";
-import { useAdminState } from "../../contexts/AdminStateContext";
+type SettingsSubTab = 'general' | 'pricing' | 'features' | 'security' | 'localization';
 
-import UsersTab from "./superadmin/components/UsersTab";
-import ListingsTab from "./superadmin/components/ListingsTab";
-import RevenueTab from "./superadmin/components/RevenueTab";
+interface ManagedAccount extends SovereignUser {
+  roleKey: SovereignRoleKey;
+  country: string;
+  canPublish: boolean;
+}
 
-const mapUserToSovereignUser = (u: any): SovereignUser => {
-  let mappedRole: SovereignUser["role"] = "Normal User";
-  if (u.role === "agent") mappedRole = "Agent";
-  else if (u.role === "investor") mappedRole = "Investor";
-  else if (u.role === "developer") mappedRole = "Developer";
-  else if (u.role === "agency") mappedRole = "Agency";
-  else if (u.role === "admin") mappedRole = "Developer";
+interface UnifiedListingRow {
+  id: string;
+  title: string;
+  city: string;
+  country: string;
+  vertical: 'Residential Sale' | 'Long-Term Rental' | 'Short Stay & Hotel' | 'Transport Fleet' | 'Wellness Retreat' | 'Investment';
+  propertyType: PropertyType | string;
+  listingType: ListingType | string;
+  price: number;
+  status: PropertyStatus | string;
+  verified: boolean;
+  featured: boolean;
+  hidden: boolean;
+  ownerName: string;
+  sourceRef?: Property;
+}
 
-  return {
-    id: u.username || `USR-${Math.floor(Math.random() * 9000 + 1000)}`,
-    name: u.fullName || u.username || "Unknown Name",
-    role: mappedRole,
-    agency: u.companyName || u.officeAddress || "",
-    email: u.email || "",
-    phone: u.phone || "",
-    location: u.officeAddress || "Unknown Location",
-    status: u.isVerified ? "Active" : "Pending Verification",
-    riskScore: 0,
-    walletBalance: 0,
+const ROLE_FILTER_TABS: { key: 'all' | SovereignRoleKey; label: string }[] = [
+  { key: 'all', label: 'All Roles' },
+  { key: 'user', label: 'Seekers & Hosts' },
+  { key: 'agent', label: 'Agents' },
+  { key: 'investor', label: 'Investors' },
+  { key: 'hotel_manager', label: 'Hotel Managers' },
+  { key: 'transport', label: 'Transport Fleet' },
+  { key: 'wellness', label: 'Wellness' },
+  { key: 'developer', label: 'Developers' },
+  { key: 'agency', label: 'Agencies' },
+];
+
+const EXTRA_PARTNER_USERS: Omit<ManagedAccount, 'id'>[] = [
+  {
+    name: 'Cape Grand Hospitality Group',
+    role: 'Agency',
+    roleKey: 'hotel_manager',
+    agency: 'The African Grand Hotel',
+    email: 'reservations@africangrand.co.za',
+    phone: '+27 21 438 9920',
+    location: 'Camps Bay, Cape Town, South Africa',
+    country: 'South Africa',
+    status: 'Active',
+    riskScore: 6,
+    walletBalance: 482000,
     investments: 0,
-    listings: 0,
-    kycStatus: u.isVerified ? "Approved" : "Pending",
-    fingerprint: `sys_fp_${Math.random().toString(36).substring(2, 10)}`,
-    lastActive: "Just now",
-    geoHistory: [u.officeAddress || "GPS Node"],
+    listings: 6,
+    kycStatus: 'Approved',
+    fingerprint: 'htl_cpt_8901',
+    lastActive: '4 mins ago',
+    geoHistory: ['Cape Town Atlantic Seaboard'],
     isWalletFrozen: false,
-    notesHistory: ["Directly synced from production database profiles."]
-  };
-};
+    canPublish: true,
+    notesHistory: ['Hospitality enterprise partner verified under 5% hotel agreement.'],
+  },
+  {
+    name: 'Kigali Executive Fleet Ltd',
+    role: 'Agency',
+    roleKey: 'transport',
+    agency: 'Kigali Executive Mobility',
+    email: 'dispatch@kigalifleet.rw',
+    phone: '+250 788 301 440',
+    location: 'Nyarutarama, Kigali, Rwanda',
+    country: 'Rwanda',
+    status: 'Active',
+    riskScore: 11,
+    walletBalance: 145000,
+    investments: 0,
+    listings: 8,
+    kycStatus: 'Approved',
+    fingerprint: 'trn_kgl_4402',
+    lastActive: '18 mins ago',
+    geoHistory: ['Kigali Airport Desk', 'Nyarutarama Depot'],
+    isWalletFrozen: false,
+    canPublish: true,
+    notesHistory: ['Commercial fleet insurance & driver vetting approved for 2026.'],
+  },
+  {
+    name: 'Dr. Wanjiku Wellness Sanctuary',
+    role: 'Agency',
+    roleKey: 'wellness',
+    agency: 'Rift Valley Longevity Retreat',
+    email: 'care@riftvalleywellness.ke',
+    phone: '+254 722 814 900',
+    location: 'Karen, Nairobi, Kenya',
+    country: 'Kenya',
+    status: 'Active',
+    riskScore: 9,
+    walletBalance: 218000,
+    investments: 0,
+    listings: 4,
+    kycStatus: 'Approved',
+    fingerprint: 'wln_nbo_7120',
+    lastActive: '27 mins ago',
+    geoHistory: ['Nairobi Karen Node'],
+    isWalletFrozen: false,
+    canPublish: true,
+    notesHistory: ['Medical & holistic sanctuary accreditation verified.'],
+  },
+];
 
-const mapPropertyToPropertyListing = (p: any): PropertyListing => {
-  let mappedStatus: PropertyListing["status"] = "Verified Active";
-  if (p.status === "Pending" || p.status === "Pending Approval") {
-    mappedStatus = "Pending Approval";
-  } else if (p.status === "Flagged" || p.status === "Flagged Listings") {
-    mappedStatus = "Flagged Listings";
-  } else if (p.status === "Expired") {
-    mappedStatus = "Expired";
+function inferCountryFromLocation(locationText?: string, explicitCountry?: string): string {
+  if (explicitCountry && explicitCountry.trim()) return explicitCountry.trim();
+  const hay = (locationText || '').toLowerCase();
+  if (hay.includes('cape town') || hay.includes('johannesburg') || hay.includes('sandton') || hay.includes('pretoria') || hay.includes('durban') || hay.includes('soweto') || hay.includes('south africa') || hay.includes('durbanville') || hay.includes('gqeberha')) {
+    return 'South Africa';
   }
+  if (hay.includes('lagos') || hay.includes('lekki') || hay.includes('abuja') || hay.includes('ibadan') || hay.includes('nigeria')) {
+    return 'Nigeria';
+  }
+  if (hay.includes('nairobi') || hay.includes('mombasa') || hay.includes('kilimani') || hay.includes('westlands') || hay.includes('kenya')) {
+    return 'Kenya';
+  }
+  if (hay.includes('accra') || hay.includes('kumasi') || hay.includes('osu') || hay.includes('ghana')) {
+    return 'Ghana';
+  }
+  if (hay.includes('kigali') || hay.includes('nyarutarama') || hay.includes('rwanda')) {
+    return 'Rwanda';
+  }
+  if (hay.includes('cairo') || hay.includes('alexandria') || hay.includes('egypt')) {
+    return 'Egypt';
+  }
+  if (hay.includes('casablanca') || hay.includes('marrakech') || hay.includes('rabat') || hay.includes('morocco')) {
+    return 'Morocco';
+  }
+  if (hay.includes('serengeti') || hay.includes('dar es salaam') || hay.includes('zanzibar') || hay.includes('tanzania')) {
+    return 'Tanzania';
+  }
+  if (hay.includes('luanda') || hay.includes('kilamba') || hay.includes('angola')) {
+    return 'Angola';
+  }
+  if (hay.includes('dakar') || hay.includes('senegal')) {
+    return 'Senegal';
+  }
+  if (hay.includes('gaborone') || hay.includes('botswana')) {
+    return 'Botswana';
+  }
+  if (hay.includes('windhoek') || hay.includes('namibia')) {
+    return 'Namibia';
+  }
+  return 'South Africa';
+}
 
-  return {
-    id: p.id || `PRP-${Math.floor(Math.random() * 9000 + 1000)}`,
-    title: p.title || "Untitled Property",
-    location: typeof p.address === "string" ? p.address : (p.address?.city || p.location || "Unknown"),
-    region: "Southern Africa",
-    price: p.price || 0,
-    status: mappedStatus,
-    authenticityScore: 100,
-    occupancyPrediction: "95%",
-    reitEligible: p.reitEligible ?? false,
-    investmentPotential: p.marketROI || 85,
-    size: p.size || "Unknown",
-    type: p.propertyType === "Commercial" ? "Commercial Retail" : "Luxury Portfolio",
-    ownerId: p.agent?.name || "Agent",
-    valuationTrend: "+10% YoY"
-  };
-};
+function mapRoleLabelToKey(role: SovereignUser['role']): SovereignRoleKey {
+  switch (role) {
+    case 'Agent':
+      return 'agent';
+    case 'Investor':
+      return 'investor';
+    case 'Developer':
+      return 'developer';
+    case 'Agency':
+      return 'agency';
+    case 'Normal User':
+    default:
+      return 'user';
+  }
+}
 
-const generateRealTimeDetections = (
-  realUsers: SovereignUser[],
-  realProperties: PropertyListing[]
-) => {
-  const fallbackUserList = realUsers.length > 0 ? realUsers : [
-    { id: "admin", name: "Super Admin", role: "Developer" as const, email: "admin@afriestate.com", phone: "", location: "", status: "Active", riskScore: 10, walletBalance: 100000, investments: 0, listings: 0, kycStatus: "Approved", fingerprint: "fp_1", lastActive: "Just now", geoHistory: ["JHB"], isWalletFrozen: false, notesHistory: [] }
-  ];
+function mapKeyToSovereignRoleLabel(roleKey: SovereignRoleKey): SovereignUser['role'] {
+  switch (roleKey) {
+    case 'agent':
+      return 'Agent';
+    case 'investor':
+      return 'Investor';
+    case 'developer':
+      return 'Developer';
+    case 'hotel_manager':
+    case 'transport':
+    case 'wellness':
+    case 'agency':
+      return 'Agency';
+    case 'user':
+    default:
+      return 'Normal User';
+  }
+}
 
-  const fallbackPropertyList = realProperties.length > 0 ? realProperties : [
-    { id: "prop_1", title: "Standard Penthouse JHB", location: "Johannesburg", region: "Southern Africa", price: 1500000, status: "Verified Active" as const, authenticityScore: 100, occupancyPrediction: "95%", reitEligible: true, investmentPotential: 12, size: "120m²", type: "Commercial Retail" as const, ownerId: "Agent", valuationTrend: "+10% YoY" }
-  ];
+export default function SuperAdminDashboard({
+  onClose,
+  allProperties = [],
+  publishedStays = [],
+  tourRequests = [],
+  messages = [],
+  currentUser,
+  onUpdateProperty,
+  onDeleteProperty,
+  onNavigatePublicPage,
+}: SuperAdminDashboardProps) {
+  const {
+    settings,
+    roleControls,
+    countryConfigs,
+    userOverrides,
+    listingOverrides,
+    auditFeed,
+    updateSettings,
+    resetAllGovernance,
+    updateRolePermission,
+    updateCountryConfig,
+    upsertUserOverride,
+    upsertListingOverride,
+    recordAuditEvent,
+    broadcastAdminAction,
+  } = useAdminState();
 
-  const txs: EscrowTransaction[] = [];
-  fallbackUserList.forEach((user, idx) => {
-    const property = fallbackPropertyList[idx % fallbackPropertyList.length];
-    const receiver = fallbackUserList[(idx + 1) % fallbackUserList.length];
-    txs.push({
-      id: `TX-${user.id.substring(0, 4).toUpperCase()}-${idx}`,
-      senderName: user.name,
-      senderRole: user.role,
-      receiverName: receiver.name,
-      receiverRole: receiver.role,
-      assetName: property.title,
-      amount: Math.floor((property.price * 0.15) || 75000),
-      type: idx % 2 === 0 ? "REIT Dividend" : "Broker Commission",
-      status: idx % 3 === 0 ? "Pending Escrow" : "Completed Clear",
-      timestamp: new Date(Date.now() - idx * 3600000).toISOString().substring(11, 19) + " UTC"
-    });
+  const { setCurrency: setAppCurrency } = useCurrency();
+  const { setLanguage: setAppLanguage } = useTranslations();
+  const { addToast } = useToast();
+
+  const [activeSection, setActiveSection] = useState<AdminSection>('overview');
+  const [settingsSubTab, setSettingsSubTab] = useState<SettingsSubTab>('general');
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  // Local display currency multiplier (1 ZAR baseline)
+  const [displayCurrency, setDisplayCurrency] = useState<'ZAR' | 'USD' | 'NGN' | 'KES' | 'GHS'>('ZAR');
+
+  // Users workspace state
+  const [customUsers, setCustomUsers] = useState<ManagedAccount[]>([]);
+  const [roleFilter, setRoleFilter] = useState<'all' | SovereignRoleKey>('all');
+  const [userSearch, setUserSearch] = useState('');
+  const [selectedUserId, setSelectedUserId] = useState<string>('USR-0941');
+  const [newAccountForm, setNewAccountForm] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    country: 'South Africa',
+    roleKey: 'agent' as SovereignRoleKey,
+    agency: '',
   });
+  const [isAddUserOpen, setIsAddUserOpen] = useState(false);
 
-  const cases: ComplianceCase[] = [];
-  fallbackUserList.forEach((user, idx) => {
-    if (idx < 5) {
-      cases.push({
-        id: `CASE-0${idx + 1}`,
-        userName: user.name,
-        userRole: user.role,
-        riskMetric: Math.floor(user.riskScore || (idx * 15 + 20)),
-        flagReason: idx % 2 === 0 ? "High Frequency Cross-Border Remittance" : "PEP Identity Discrepancy Lock",
-        status: idx % 3 === 0 ? "Under Review" : "Flagged High Risk",
-        timeline: [
-          "Case opened via real-time risk scan.",
-          "Verification hash match: checking biometrics."
+  // Listings workspace state
+  const [listingSearch, setListingSearch] = useState('');
+  const [verticalFilter, setVerticalFilter] = useState<string>('All');
+  const [listingStatusFilter, setListingStatusFilter] = useState<string>('All');
+  const [listingCountryFilter, setListingCountryFilter] = useState<string>('All');
+  const [selectedListingId, setSelectedListingId] = useState<string | null>(null);
+  const [editingPriceValue, setEditingPriceValue] = useState<string>('');
+
+  // Country governance state
+  const [selectedCountryCode, setSelectedCountryCode] = useState<string>('ZA');
+
+  // Financials & Escrow state
+  const [transactions, setTransactions] = useState<EscrowTransaction[]>(SEED_TRANSACTIONS);
+
+  // Compliance & Support state
+  const [complianceCases, setComplianceCases] = useState<ComplianceCase[]>(SEED_COMPLIANCE_CASES);
+  const [moderationReports, setModerationReports] = useState<ModerationReport[]>(SEED_MODERATION_REPORTS);
+  const [tickets, setTickets] = useState<SupportTicket[]>(SEED_TICKETS);
+  const [ticketReplyDraft, setTicketReplyDraft] = useState<Record<string, string>>({});
+
+  // Settings draft form (syncs cleanly + persists via updateSettings)
+  const [draftSettings, setDraftSettings] = useState(settings);
+  React.useEffect(() => {
+    setDraftSettings(settings);
+  }, [settings]);
+
+  const formatMoney = (amountInZar: number) => {
+    const safe = Number(amountInZar) || 0;
+    const rateMap: Record<typeof displayCurrency, { rate: number; symbol: string }> = {
+      ZAR: { rate: 1, symbol: 'R' },
+      USD: { rate: 0.055, symbol: '$' },
+      NGN: { rate: 84.5, symbol: '₦' },
+      KES: { rate: 7.1, symbol: 'KSh ' },
+      GHS: { rate: 0.84, symbol: 'GH₵' },
+    };
+    const cfg = rateMap[displayCurrency];
+    const converted = safe * cfg.rate;
+    if (converted >= 1_000_000_000) {
+      return `${cfg.symbol}${(converted / 1_000_000_000).toFixed(2)}B`;
+    }
+    if (converted >= 1_000_000) {
+      return `${cfg.symbol}${(converted / 1_000_000).toFixed(2)}M`;
+    }
+    return `${cfg.symbol}${Math.round(converted).toLocaleString()}`;
+  };
+
+  // Unified Managed Accounts list (Seed + Partner Roles + Currently signed-in user if any + Custom added + Admin overrides)
+  const managedAccounts = useMemo<ManagedAccount[]>(() => {
+    const baseSeed: ManagedAccount[] = SEED_USERS.map((u) => ({
+      ...u,
+      roleKey: mapRoleLabelToKey(u.role),
+      country: inferCountryFromLocation(u.location),
+      canPublish: u.status !== 'Suspended',
+    }));
+
+    const partnerSeed: ManagedAccount[] = EXTRA_PARTNER_USERS.map((p, idx) => ({
+      ...p,
+      id: `PRT-${301 + idx}`,
+    }));
+
+    const liveUserList: ManagedAccount[] = currentUser
+      ? [
+          {
+            id: currentUser.id || currentUser.username,
+            name: currentUser.fullName || currentUser.username,
+            role: mapKeyToSovereignRoleLabel(currentUser.role as SovereignRoleKey),
+            roleKey: (currentUser.role as SovereignRoleKey) || 'user',
+            agency: currentUser.agencyName || currentUser.companyName || '',
+            email: currentUser.email || currentUser.username,
+            phone: currentUser.phone || 'Not provided',
+            location: currentUser.officeAddress || currentUser.country || 'South Africa',
+            country: inferCountryFromLocation(currentUser.officeAddress, currentUser.country),
+            status: (currentUser.status as SovereignUser['status']) || 'Active',
+            riskScore: 5,
+            walletBalance: 0,
+            investments: 0,
+            listings: allProperties.filter((p) => p.agent?.name === currentUser.username).length,
+            kycStatus: currentUser.kycStatus === 'Approved' ? 'Approved' : currentUser.isVerified ? 'Approved' : 'Pending',
+            fingerprint: 'live_session_user',
+            lastActive: 'Online now',
+            geoHistory: [currentUser.country || 'Verified Web Session'],
+            isWalletFrozen: Boolean(currentUser.isWalletFrozen),
+            canPublish: true,
+            notesHistory: ['Active signed-in session user'],
+          },
         ]
-      });
-    }
-  });
+      : [];
 
-  const reports: ModerationReport[] = [];
-  fallbackPropertyList.forEach((prop, idx) => {
-    if (idx < 4) {
-      reports.push({
-        id: `REP-0${idx + 1}`,
-        reporterName: fallbackUserList[(idx + 1) % fallbackUserList.length].name,
-        targetAsset: prop.title,
-        reason: idx % 2 === 0 ? "Duplicate CAD coordinates submitted" : "Suspected underpriced asset token evasion",
-        status: idx % 2 === 0 ? "Unresolved Alert" : "Resolved Archive",
-        timestamp: "Just now"
-      });
-    }
-  });
+    const combined = [...liveUserList, ...customUsers, ...partnerSeed, ...baseSeed];
+    const dedupedMap = new Map<string, ManagedAccount>();
+    combined.forEach((acc) => {
+      const key = (acc.email || acc.id).toLowerCase();
+      if (!dedupedMap.has(key)) dedupedMap.set(key, acc);
+    });
 
-  const servicesList: HealthService[] = [
-    { id: "node-jhb", name: "Sovereign JHB Main Database Node", endpoint: "/api/properties", latency: "14ms", status: "ONLINE", type: "Core RPC" },
-    { id: "node-cpt", name: "Cape Town Cadastral Verification API", endpoint: "/api/kyc", latency: "22ms", status: "ONLINE", type: "Identity Provider" },
-    { id: "node-los", name: "Lagos Smart Contract Ledger Sync", endpoint: "/api/escrow", latency: "48ms", status: "ONLINE", type: "Smart Contract Router" },
-    { id: "node-nbo", name: "Nairobi Escrow Settlement Validator", endpoint: "/api/settlement", latency: "31ms", status: "ONLINE", type: "Payment Processor" }
-  ];
+    return Array.from(dedupedMap.values()).map((acc) => {
+      const ov =
+        userOverrides[acc.id.toLowerCase()] ||
+        (acc.email ? userOverrides[acc.email.toLowerCase()] : undefined);
+      if (!ov) return acc;
+      const effectiveRoleKey = ov.role || acc.roleKey;
+      const rolePolicy = roleControls[effectiveRoleKey];
+      return {
+        ...acc,
+        roleKey: effectiveRoleKey,
+        role: mapKeyToSovereignRoleLabel(effectiveRoleKey),
+        status: ov.status || acc.status,
+        kycStatus: ov.kycStatus || acc.kycStatus,
+        isWalletFrozen: ov.isWalletFrozen !== undefined ? ov.isWalletFrozen : acc.isWalletFrozen,
+        canPublish:
+          ov.canPublish !== undefined
+            ? ov.canPublish
+            : rolePolicy
+              ? rolePolicy.canPublishListings
+              : acc.canPublish,
+        notesHistory: ov.adminNote ? [ov.adminNote, ...acc.notesHistory] : acc.notesHistory,
+      };
+    });
+  }, [currentUser, customUsers, userOverrides, roleControls, allProperties]);
 
-  const threatsList: CyberThreat[] = [
-    { id: "THR-01", type: "Brute-force Admin Probe", sourceIp: "192.168.12.84", severity: "HIGH", status: "Mitigated Isolate", timestamp: "10 mins ago" },
-    { id: "THR-02", type: "SQL Injection Cadastral Route", sourceIp: "203.0.113.195", severity: "CRITICAL", status: "Mitigated Isolate", timestamp: "Just now" }
-  ];
+  const filteredAccounts = useMemo(() => {
+    const q = userSearch.trim().toLowerCase();
+    return managedAccounts.filter((acc) => {
+      if (roleFilter !== 'all' && acc.roleKey !== roleFilter) return false;
+      if (!q) return true;
+      return (
+        acc.name.toLowerCase().includes(q) ||
+        acc.email.toLowerCase().includes(q) ||
+        acc.id.toLowerCase().includes(q) ||
+        acc.country.toLowerCase().includes(q) ||
+        (acc.agency || '').toLowerCase().includes(q)
+      );
+    });
+  }, [managedAccounts, roleFilter, userSearch]);
 
-  const ticketsList: SupportTicket[] = [];
-  fallbackUserList.forEach((user, idx) => {
-    if (idx < 5) {
-      ticketsList.push({
-        id: `TKT-4${idx + 1}2`,
-        senderEmail: user.email || "support@afriestate.co.za",
-        subject: idx % 2 === 0 ? "KYC Facial Upload Error" : "Escrow payout verification link expired",
-        category: "System Core",
-        status: idx % 2 === 0 ? "OPEN" : "RESOLVED"
-      });
-    }
-  });
-
-  const disputesList: { id: string; details: string; buyer: string; developer: string; amount: number; status: string }[] = [];
-  fallbackUserList.forEach((user, idx) => {
-    if (idx < 3) {
-      const prop = fallbackPropertyList[idx % fallbackPropertyList.length];
-      disputesList.push({
-        id: `DSP-0${idx + 1}`,
-        details: `Deed transfer clearance latency mismatch on ${prop.title}`,
-        buyer: user.name,
-        developer: fallbackUserList[(idx + 2) % fallbackUserList.length].name,
-        amount: Math.floor(prop.price * 0.1),
-        status: idx % 2 === 0 ? "Arbiter Review" : "Resolved"
-      });
-    }
-  });
-
-  const escalationsListTemp: { id: string; title: string; level: string; origin: string; duration: string; status: string }[] = [];
-  fallbackUserList.forEach((user, idx) => {
-    if (idx < 3) {
-      escalationsListTemp.push({
-        id: `ESC-0${idx + 1}`,
-        title: `PEP Identity verification mismatch: ${user.name}`,
-        level: idx === 0 ? "L3 - Crisis Sovereign" : "L2 - High Compliance",
-        origin: "AML PEP Scanner Module",
-        duration: "14m",
-        status: idx === 0 ? "Active Alert" : "Mitigated"
-      });
-    }
-  });
-
-  return {
-    transactions: txs,
-    complianceCases: cases,
-    moderationReports: reports,
-    services: servicesList,
-    threats: threatsList,
-    tickets: ticketsList,
-    disputes: disputesList,
-    escalationsList: escalationsListTemp
-  };
-};
-
-export default function AfriEstateAdmin({ onClose }: { onClose?: () => void }) {
-  const { broadcastAdminAction } = useAdminState();
-  // --- CORE SELECTION AND TABS ---
-  const [activeCategory, setActiveCategory] = useState("Dashboard");
-  const [activeSub, setActiveSub] = useState("Executive Overview");
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
-    new Set(["Dashboard", "Users & Access Operations", "Listings Operations", "Revenue Operations"])
+  const selectedAccount = useMemo(
+    () => managedAccounts.find((a) => a.id === selectedUserId) || filteredAccounts[0] || managedAccounts[0],
+    [managedAccounts, filteredAccounts, selectedUserId]
   );
 
-  // --- LIVE TELEMETRY COEFFICIENTS ---
-  const [platformValuation, setPlatformValuation] = useState(0);
-  const [activeListingsCount, setActiveListingsCount] = useState(0);
-  const [grossGTV, setGrossGTV] = useState(0);
-  const [escrowPool, setEscrowPool] = useState(0);
-  const [activeInvestors, setActiveInvestors] = useState(0);
-  const [fraudRisk, setFraudRisk] = useState(0);
-  const [investorConfidence, setInvestorConfidence] = useState(100);
-  const [currentTime, setCurrentTime] = useState("");
-
-  // --- STATE LIST REGISTRIES ---
-  const [users, setUsers] = useState<SovereignUser[]>([]);
-  const [listings, setListings] = useState<PropertyListing[]>([]);
-  const [transactions, setTransactions] = useState<EscrowTransaction[]>([]);
-  const [complianceCases, setComplianceCases] = useState<ComplianceCase[]>([]);
-  const [moderationReports, setModerationReports] = useState<ModerationReport[]>([]);
-  const [services, setServices] = useState<HealthService[]>([]);
-  const [threats, setThreats] = useState<CyberThreat[]>([]);
-  const [tickets, setTickets] = useState<SupportTicket[]>([]);
-  const [auditLogs, setAuditLogs] = useState<string[]>([
-    "Sovereign operations dashboard initialized. Real-time secure monitoring active."
-  ]);
-
-  // --- INTERACTION FLOWS SECRETS AND STATES ---
-  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
-  const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
-  const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(null);
-  const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
-  const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
-  
-  // --- CHRONOLOGICAL TIMELINE CHANNELS ---
-  const [liveEvents, setLiveEvents] = useState<{ id: number; time: string; category: string; desc: string; type: string }[]>([]);
-
-  const [currencyCode, setCurrencyCode] = useState<"ZAR" | "USD" | "NGN" | "KES" | "GHS">("ZAR");
-  const [selectedMapRegion, setSelectedMapRegion] = useState("Southern Africa");
-  const [mapLayer, setMapLayer] = useState<"Appreciation" | "Investor Density" | "Fraud Hotspots">("Appreciation");
-  const [chartRegionFilter, setChartRegionFilter] = useState("All Africa");
-
-  // --- MODAL POPUPS TRIGGERS ---
-  const [activeModal, setActiveModal] = useState<{ type: string; data: any; reason?: string; pin?: string } | null>(null);
-  
-  // --- GLOBAL TOAST / NOTIFICATION STATUS ---
-  const [notification, setNotification] = useState<{ msg: string; type: "success" | "warn" | "info" } | null>(null);
-
-  // --- AI CO-PILOT ASSISTANT ---
-  const [aiInput, setAiInput] = useState("");
-  const [aiHistory, setAiHistory] = useState<{ query: string; answer: string }[]>([]);
-  const [isAiComputing, setIsAiComputing] = useState(false);
-
-  // --- SCENARIO STRATEGIC PLANNER ---
-  const [simulatingScenarioId, setSimulatingScenarioId] = useState<string | null>(null);
-  const [simStep, setSimStep] = useState("");
-  const [simResult, setSimResult] = useState<any>(null);
-
-  // --- SUPPORT LIVE CHAT STATE ---
-  const [supportChat, setSupportChat] = useState<{ sender: string; msg: string; time: string }[]>([]);
-  const [chatInput, setChatInput] = useState("");
-
-  // --- ADDITIONAL INTERACTIVE SYSTEM STATES ---
-  const [amlSearchTerm, setAmlSearchTerm] = useState("");
-  const [amlScreenHistory, setAmlScreenHistory] = useState<{ name: string; type: string; risk: string; timestamp: string }[]>([]);
-  const [isAmlSearching, setIsAmlSearching] = useState(false);
-
-  const [disputes, setDisputes] = useState<{ id: string; details: string; buyer: string; developer: string; amount: number; status: string }[]>([]);
-
-  const [autoWorkflows, setAutoWorkflows] = useState([
-    { id: "WF-01", name: "Auto-Scrutinize Off-Platform Keywords", desc: "Flag communications attempting to bypass escrows", enabled: true, frequency: "Real-time" },
-    { id: "WF-02", name: "PEP Database Hash Co-Sourcing", desc: "Sync regional registries to GopherML screening indexes", enabled: true, frequency: "Hourly" },
-    { id: "WF-03", name: "Underpriced Tax Evasion Predictor", desc: "Detect properties listed 40% below regional cadastral valuation", enabled: false, frequency: "On Listing Uploaded" }
-  ]);
-
-  const [escalationsList, setEscalationsList] = useState<{ id: string; title: string; level: string; origin: string; duration: string; status: string }[]>([]);
-
-  const [apiPingResult, setApiPingResult] = useState<string | null>(null);
-  const [isTestingApi, setIsTestingApi] = useState(false);
-
-  // --- RECURRING SYSTEM CLOCKS & REAL DATA LOADING ---
-  useEffect(() => {
-    const updateTime = () => {
-      const now = new Date();
-      setCurrentTime(now.getUTCHours().toString().padStart(2, "0") + ":" + 
-                     now.getUTCMinutes().toString().padStart(2, "0") + ":" + 
-                     now.getUTCSeconds().toString().padStart(2, "0") + " UTC");
-    };
-    updateTime();
-    const clockInterval = setInterval(updateTime, 1000);
-
-    const fetchRealData = async () => {
-      try {
-        const [realUsers, realProperties] = await Promise.all([
-          getUsers(),
-          getProperties(true)
-        ]);
-
-        const mappedUsers = realUsers.map(mapUserToSovereignUser);
-        const mappedListings = realProperties.map(mapPropertyToPropertyListing);
-
-        mappedUsers.forEach(u => {
-          u.listings = mappedListings.filter(l => l.ownerId === u.name || l.ownerId === u.id).length;
-        });
-
-        // Calculate dynamic risk metrics, wallet balance and investments based on actual db profiles
-        mappedUsers.forEach((u, i) => {
-          u.riskScore = u.kycStatus === "Approved" ? Math.floor(Math.sin(i) * 10 + 15) : Math.floor(Math.cos(i) * 20 + 75);
-          u.walletBalance = Math.floor(Math.abs(Math.sin(i) * 500000) + 12000);
-          u.investments = Math.floor(Math.abs(Math.cos(i) * 4) + (u.role === "Investor" ? 1 : 0));
-        });
-
-        setUsers(mappedUsers);
-        setListings(mappedListings);
-
-        if (mappedUsers.length > 0) {
-          setSelectedUserId(mappedUsers[0].id);
-        }
-        if (mappedListings.length > 0) {
-          setSelectedPropertyId(mappedListings[0].id);
-        }
-
-        const totalVal = mappedListings.reduce((sum, item) => sum + (item.price || 0), 0);
-        setPlatformValuation(totalVal);
-        setActiveListingsCount(mappedListings.length);
-        setActiveInvestors(mappedUsers.filter(u => u.role === "Investor").length);
-
-        // Compute dynamic macro indicators in real-time
-        setGrossGTV(totalVal * 0.12);
-        setEscrowPool(totalVal * 0.08);
-
-        // Generate derived compliance & operational data from real-time records
-        const dynamicDetections = generateRealTimeDetections(mappedUsers, mappedListings);
-        setTransactions(dynamicDetections.transactions);
-        setComplianceCases(dynamicDetections.complianceCases);
-        setModerationReports(dynamicDetections.moderationReports);
-        setServices(dynamicDetections.services);
-        setThreats(dynamicDetections.threats);
-        setTickets(dynamicDetections.tickets);
-        setDisputes(dynamicDetections.disputes);
-        setEscalationsList(dynamicDetections.escalationsList);
-
-        if (dynamicDetections.transactions.length > 0) {
-          setSelectedTransactionId(dynamicDetections.transactions[0].id);
-        }
-        if (dynamicDetections.complianceCases.length > 0) {
-          setSelectedCaseId(dynamicDetections.complianceCases[0].id);
-        }
-        if (dynamicDetections.moderationReports.length > 0) {
-          setSelectedReportId(dynamicDetections.moderationReports[0].id);
-        }
-      } catch (err) {
-        console.error("Error fetching real dashboard data:", err);
+  // Unified Listings combining live properties + published hotels/stays
+  const unifiedListings = useMemo<UnifiedListingRow[]>(() => {
+    const propRows: UnifiedListingRow[] = allProperties.map((p) => {
+      const ov = listingOverrides[p.id];
+      let vertical: UnifiedListingRow['vertical'] = 'Residential Sale';
+      if (p.propertyType === PropertyType.TRANSPORT) vertical = 'Transport Fleet';
+      else if (p.propertyType === PropertyType.WELLNESS) vertical = 'Wellness Retreat';
+      else if (p.propertyType === PropertyType.HOTEL || p.propertyType === PropertyType.SHORT_TERM_RENTAL || p.perNightPrice) {
+        vertical = 'Short Stay & Hotel';
+      } else if (p.listingType === ListingType.FOR_INVESTMENT) {
+        vertical = 'Investment';
+      } else if (p.listingType === ListingType.RENT) {
+        vertical = 'Long-Term Rental';
       }
-    };
 
-    fetchRealData();
+      const city = p.address?.city || 'Cape Town';
+      const country = inferCountryFromLocation(`${city} ${p.address?.street || ''}`, p.country);
 
-    // Setup real-time postgres subscriptions for properties, profiles, tour requests and messages
-    const propertiesChannel = supabase
-      .channel("admin-properties-changes")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "properties" },
-        () => {
-          pushLog("REAL-TIME: Received updates on properties table. Recalculating metrics...");
-          fetchRealData();
-        }
-      )
-      .subscribe();
-
-    const profilesChannel = supabase
-      .channel("admin-profiles-changes")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "profiles" },
-        () => {
-          pushLog("REAL-TIME: Received updates on profiles table. Synchronizing operators...");
-          fetchRealData();
-        }
-      )
-      .subscribe();
-
-    const tourRequestsChannel = supabase
-      .channel("admin-tours-changes")
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "tour_requests" },
-        (payload) => {
-          const info = payload.new as any;
-          pushLog(`REAL-TIME TOUR: New tour request registered for property ID ${info.property_id || info.propertyId}`);
-          setLiveEvents(prev => [
-            {
-              id: Date.now(),
-              time: new Date().toISOString().substring(11, 19) + " UTC",
-              category: "TOUR_REQUEST",
-              desc: `New tour request submitted for asset ID: ${info.property_id || info.propertyId}`,
-              type: "INFO"
-            },
-            ...prev.slice(0, 10)
-          ]);
-        }
-      )
-      .subscribe();
-
-    const messagesChannel = supabase
-      .channel("admin-messages-changes")
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "messages" },
-        (payload) => {
-          const info = payload.new as any;
-          pushLog(`REAL-TIME MSG: Message dispatched from '${info.sender_username || info.senderUsername}'`);
-          setLiveEvents(prev => [
-            {
-              id: Date.now(),
-              time: new Date().toISOString().substring(11, 19) + " UTC",
-              category: "MESSAGE",
-              desc: `Secure message sent by user: ${info.sender_username || info.senderUsername}`,
-              type: "ALERT"
-            },
-            ...prev.slice(0, 10)
-          ]);
-        }
-      )
-      .subscribe();
-
-    return () => {
-      clearInterval(clockInterval);
-      supabase.removeChannel(propertiesChannel);
-      supabase.removeChannel(profilesChannel);
-      supabase.removeChannel(tourRequestsChannel);
-      supabase.removeChannel(messagesChannel);
-    };
-  }, []);
-
-  const toast = (msg: string, type: "success" | "warn" | "info" = "success") => {
-    setNotification({ msg, type });
-    setTimeout(() => setNotification(null), 4000);
-  };
-
-  const pushLog = (msg: string) => {
-    const ts = new Date().toISOString().substring(11, 19);
-    setAuditLogs(prev => [`[${ts}] ${msg}`, ...prev.slice(0, 40)]);
-  };
-
-  const toggleCategory = (cat: string) => {
-    setExpandedCategories(prev => {
-      const copy = new Set(prev);
-      if (copy.has(cat)) copy.delete(cat);
-      else copy.add(cat);
-      return copy;
-    });
-  };
-
-  const handleSubSelect = (cat: string, sub: string) => {
-    setActiveCategory(cat);
-    setActiveSub(sub);
-  };
-
-  // --- CURRENCY RENDER ENGINE ---
-  const renderCurrency = (randValue: number) => {
-    switch (currencyCode) {
-      case "USD":
-        return "$" + new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(randValue / 18.2);
-      case "NGN":
-        return "₦" + new Intl.NumberFormat("en-NG", { maximumFractionDigits: 0 }).format(randValue * 82);
-      case "KES":
-        return "KSh " + new Intl.NumberFormat("en-KE", { maximumFractionDigits: 0 }).format(randValue * 7.1);
-      case "ZAR":
-      default:
-        return "R " + new Intl.NumberFormat("en-ZA", { maximumFractionDigits: 0 }).format(randValue);
-    }
-  };
-
-  // --- SCENARIO SIMULATOR DIRECTIVES ---
-  const runMacroScenarioStress = (scenId: string) => {
-    const matched = MACRO_SCENARIOS.find(s => s.id === scenId);
-    if (!matched) return;
-
-    setSimulatingScenarioId(scenId);
-    setSimResult(null);
-    setSimStep("Locking cross-border escrow tunnels...");
-    
-    setTimeout(() => {
-      setSimStep("Sensing macro coefficients across JHB & Lagos nodes...");
-      setTimeout(() => {
-        setSimStep("GopherML predictive tensor evaluations completed. Generating reports.");
-        
-        // Calculate the dynamic revenue outcome based on actual real-time database values
-        let dynamicOutcomeVal = 0;
-        let outcomeString = "";
-        
-        if (scenId === "scen_1") {
-          dynamicOutcomeVal = -Math.floor(platformValuation * 0.12 * 0.05);
-          outcomeString = renderCurrency(dynamicOutcomeVal);
-        } else if (scenId === "scen_2") {
-          dynamicOutcomeVal = -Math.floor(platformValuation * 0.015 * 0.15);
-          outcomeString = renderCurrency(dynamicOutcomeVal);
-        } else if (scenId === "scen_3") {
-          dynamicOutcomeVal = -Math.floor(escrowPool * 0.15);
-          outcomeString = renderCurrency(dynamicOutcomeVal);
-        } else if (scenId === "scen_4") {
-          dynamicOutcomeVal = Math.floor(platformValuation * 0.04);
-          outcomeString = "+" + renderCurrency(dynamicOutcomeVal);
-        } else {
-          outcomeString = matched.revenueOutcome;
-        }
-
-        const dynamicResult = {
-          ...matched,
-          revenueOutcome: outcomeString,
-          description: `${matched.description} (Dynamically calculated based on current active asset pool of ${renderCurrency(platformValuation)})`
-        };
-
-        setSimResult(dynamicResult);
-        setSimulatingScenarioId(null);
-        pushLog(`SCENARIO: Real-time dynamic stress test for '${matched.title}' finished with impact: ${outcomeString}`);
-        toast(`Simulation result compiled. Confidence: ${matched.confidence}`, "info");
-      }, 1200);
-    }, 1000);
-  };
-
-  // --- CO-PILOT CHAT DIRECTIVES ---
-  const handleCoPilotSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!aiInput.trim()) return;
-
-    const query = aiInput;
-    setAiInput("");
-    setIsAiComputing(true);
-
-    try {
-      const ai = new GoogleGenAI();
-      const statsContext = `
-You are the AfriEstate Super Admin Sovereign AI Advisor (GopherML v3).
-Here is the real-time database state:
-- Total Properties: ${listings.length}
-- Total Platform Valuation: ${renderCurrency(platformValuation)}
-- Active Investors: ${activeInvestors}
-- Gross GTV (Gross Transaction Volume): ${renderCurrency(grossGTV)}
-- Escrow Pool Liquidity: ${renderCurrency(escrowPool)}
-- List of registered users: ${JSON.stringify(users.map(u => ({ name: u.name, role: u.role, status: u.status, risk: u.riskScore })))}
-- List of properties: ${JSON.stringify(listings.map(l => ({ title: l.title, price: l.price, status: l.status, potential: l.investmentPotential })))}
-
-Use this live context to answer the operator's query accurately. Speak professionally, keep it relatively brief, and write in the voice of a high-tech sovereign real estate oracle.
-      `;
-
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: query,
-        config: {
-          systemInstruction: statsContext,
-        }
-      });
-
-      const reply = response.text || "No analysis details generated.";
-      setAiHistory(prev => [...prev, { query, answer: reply }]);
-      pushLog(`CO_PILOT: Executed live AI analysis on production data.`);
-    } catch (error: any) {
-      console.warn("Falling back to local heuristic GopherML analysis due to API configuration:", error.message || error);
-      const match = PRESET_AI_ASSISTANCE.find(q => query.toLowerCase().includes(q.text.toLowerCase().split(".")[0]) || q.text.toLowerCase().includes(query.toLowerCase()));
-      const reply = match ? match.response : `AI ADVISOR [LOCAL GopherML]: Deep analysis computed. Confirmed zero compliance risk warnings on query terms '${query}'. Recommend standard dual-actor notary checking in high-vol corridors based on current local cache of ${listings.length} properties.`;
-      
-      setAiHistory(prev => [...prev, { query, answer: reply }]);
-      pushLog(`CO_PILOT: Executed local GopherML heuristic on query: "${query}"`);
-    } finally {
-      setIsAiComputing(false);
-    }
-  };
-
-  // --- SUPPORT CHAT DIRECTIVE ---
-  const handleSendSupportMessage = () => {
-    if (!chatInput.trim()) return;
-    const msg = chatInput;
-    setChatInput("");
-    setSupportChat(prev => [...prev, { sender: "SuperAdmin Operator", msg, time: currentTime.substring(0, 5) }]);
-    
-    setTimeout(() => {
-      setSupportChat(prev => [...prev, { sender: "User", msg: "Understood. Thank you for validating my FFC license file. I will notify my local branch office.", time: currentTime.substring(0, 5) }]);
-      pushLog("SUPPORT: Dynamic chat response sent.");
-    }, 1500);
-  };
-
-  // --- INTERACTIVE BUSINESS SUITES COMPLIANCE/MODERATORS/SETTINGS ---
-  const handleRunAmlScreening = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!amlSearchTerm.trim()) return;
-    setIsAmlSearching(true);
-    pushLog(`AML screening check initiated for: "${amlSearchTerm}"`);
-    setTimeout(() => {
-      setIsAmlSearching(false);
-      const isSuspect = ["trump", "putin", "bin laden", "cartel", "hacker", "scam"].some(name => amlSearchTerm.toLowerCase().includes(name));
-      const entry = {
-        name: amlSearchTerm,
-        type: "Interactive PEP & OFAC SDN Scan",
-        risk: isSuspect ? "HIGH RISK (SDN List Match Definite)" : "None (Approved Clear)",
-        timestamp: "Just now"
+      return {
+        id: p.id,
+        title: p.title,
+        city,
+        country,
+        vertical,
+        propertyType: p.propertyType,
+        listingType: p.listingType,
+        price: ov?.priceOverride !== undefined ? ov.priceOverride : p.price,
+        status: ov?.status !== undefined ? ov.status : p.status,
+        verified: ov?.verified !== undefined ? ov.verified : p.verified,
+        featured: ov?.featured !== undefined ? ov.featured : p.featured,
+        hidden: Boolean(ov?.hidden),
+        ownerName: p.agent?.name || 'Partner',
+        sourceRef: p,
       };
-      setAmlScreenHistory(prev => [entry, ...prev]);
-      if (isSuspect) {
-        toast(`CRITICAL SANCTIONS MATCH FOR "${amlSearchTerm}". Escalating report.`, "warn");
-        pushLog(`SDN List definite mismatch matched for subject entity: "${amlSearchTerm}"`);
-      } else {
-        toast(`AML Screener: entity clean. Hash registry issued.`, "success");
-      }
-      setAmlSearchTerm("");
-    }, 1000);
-  };
-
-  const handleResolveDispute = (dispId: string, action: string) => {
-    setDisputes(prev => prev.map(d => {
-      if (d.id === dispId) {
-        pushLog(`DISPUTE RESOLUTION: Dispute ${dispId} resolved: Escrow distributed via ${action}.`);
-        toast(`Dispute settled via ${action}. Escrow final ledger updated.`, "success");
-        return { ...d, status: "RESOLVED" };
-      }
-      return d;
-    }));
-  };
-
-  const handleToggleWorkflow = (wfId: string) => {
-    setAutoWorkflows(prev => prev.map(wf => {
-      if (wf.id === wfId) {
-        const nextState = !wf.enabled;
-        pushLog(`WORKFLOW MODIFIED: '${wf.name}' state set to ${nextState ? "ACTIVE" : "DISABLED"}`);
-        toast(`Workflow ${nextState ? "activated" : "deactivated"}.`, "info");
-        return { ...wf, enabled: nextState };
-      }
-      return wf;
-    }));
-  };
-
-  const handleExecuteApiDiagnostics = () => {
-    setIsTestingApi(true);
-    setApiPingResult("Sending test pings from Cape Town hub to SARS escrows, Lagos Notarys, KES land registries...");
-    pushLog("API DIAGNOSTICS: Initiating end-to-end integration loop probes.");
-    setTimeout(() => {
-      setIsTestingApi(false);
-      setApiPingResult("Diagnostics clean: SARS Notary API OK (12ms), Lagos Multi-Sig OK (22ms), Nairobi Cadastran Mesh OK (48ms). GopherML Core Model Sync OK.");
-      toast("API Network Diagnostics completed successfully.", "success");
-    }, 1200);
-  };
-
-  // --- COMPLIANCE QUEUE ACTIONS ---
-  const handleModerateComplianceCase = (caseId: string, action: "approve" | "edd" | "escalate") => {
-    setComplianceCases(prev => prev.map(c => {
-      if (c.id === caseId) {
-        let newStatus: any = "Approved Secure";
-        if (action === "edd") newStatus = "Under EDD Review";
-        if (action === "escalate") newStatus = "Escalated to Counsel";
-        const updatedLog = [...c.caselog, `[SuperAdmin] Updated case status to: ${newStatus}`];
-        return { ...c, status: newStatus, caselog: updatedLog };
-      }
-      return c;
-    }));
-    pushLog(`COMPLIANCE: Evaluated case ID ${caseId} → ${action.toUpperCase()}`);
-    toast(`Case status shifted to ${action.toUpperCase()}`, "success");
-  };
-
-  // --- MODERATION ACTIONS ---
-  const handleApplyModerationAction = (repId: string, action: "remove" | "warn" | "dismiss") => {
-    setModerationReports(prev => prev.map(m => {
-      if (m.id === repId) {
-        let newStatus: any = "Dismissed";
-        if (action === "remove") newStatus = "Content Removed";
-        if (action === "warn") newStatus = "Warning Issued";
-        return { ...m, status: newStatus };
-      }
-      return m;
-    }));
-    pushLog(`MODERATION: Content moderation action applied to ID ${repId} → ${action.toUpperCase()}`);
-    toast(`Content dispatch: ${action.toUpperCase()}`, "success");
-  };
-
-  // --- GLOBAL STATE MUTATION (CONFIRMED VIA MODAL) ---
-  const handleExecuteModalAction = () => {
-    if (!activeModal) return;
-    const { type, data, reason, pin } = activeModal;
-
-    pushLog(`MODAL_CLEAR: Signing override hash key ${pin || "AES-91"} // Reason: "${reason || "No reason given"}"`);
-
-    switch (type) {
-      case "suspend": {
-        const uId = data.id;
-        setUsers(prev => prev.map(u => {
-          if (u.id === uId) {
-            const isSusp = u.status === "Suspended";
-            return { 
-              ...u, 
-              status: isSusp ? "Active" : "Suspended",
-              riskScore: isSusp ? 14 : 95
-            };
-          }
-          return u;
-        }));
-        toast(`User status overridden for ${data.name}.`, "success");
-        break;
-      }
-      case "freeze_wallet": {
-        const uId = data.id;
-        setUsers(prev => prev.map(u => {
-          if (u.id === uId) {
-            return { ...u, isWalletFrozen: !u.isWalletFrozen };
-          }
-          return u;
-        }));
-        toast(`Wallet locks modified for ${data.name}.`, "success");
-        break;
-      }
-      case "kyc_audit": {
-        setUsers(prev => prev.map(u => {
-          if (u.id === data.id) {
-            return { ...u, kycStatus: "Flagged", status: "Restricted" };
-          }
-          return u;
-        }));
-        toast(`KYC audits scheduled. Biometrics restricted.`, "warn");
-        break;
-      }
-      case "approve_verification": {
-        setUsers(prev => prev.map(u => {
-          if (u.id === data.id) {
-            return { ...u, status: "Active", kycStatus: "Approved" };
-          }
-          return u;
-        }));
-        toast(`KYC biometrics cleared for ${data.name}.`, "success");
-        break;
-      }
-      case "approve_listing_asset": {
-        setListings(prev => prev.map(l => {
-          if (l.id === data.id) {
-            return { ...l, status: "Verified Active", authenticityScore: 98 };
-          }
-          return l;
-        }));
-        toast(`Property listing published. Token allocation verified.`, "success");
-        break;
-      }
-      case "ai_reanalyze_property": {
-        setListings(prev => prev.map(l => {
-          if (l.id === data.id) {
-            return { ...l, authenticityScore: 99 };
-          }
-          return l;
-        }));
-        toast(`Neural scans completed. Property index matched.`, "success");
-        break;
-      }
-      case "verify_geo_property": {
-        setListings(prev => prev.map(l => {
-          if (l.id === data.id) {
-            return { ...l, authenticityScore: 100, status: "Verified Active" };
-          }
-          return l;
-        }));
-        toast(`Geospatial overlays matched with satellite coordinates.`, "success");
-        break;
-      }
-      case "send_listing_warning": {
-        setListings(prev => prev.map(l => {
-          if (l.id === data.id) {
-            return { ...l, status: "Flagged Listings", authenticityScore: 24 };
-          }
-          return l;
-        }));
-        toast(`Flagged warning dispatched to property agent FFC ledger.`, "warn");
-        break;
-      }
-      case "push_to_investors": {
-        toast(`Pushed luxury asset portfolio directly to matched high-net-worth buyers.`, "success");
-        break;
-      }
-      case "approve_payout_escrow": {
-        setTransactions(prev => prev.map(t => {
-          if (t.id === data.id) {
-            return { ...t, status: "Completed" };
-          }
-          return t;
-        }));
-        setEscrowPool(p => p - data.amount);
-        toast(`Escrow payout authorized. Funds transferred.`, "success");
-        break;
-      }
-      case "freeze_escrow_pool": {
-        setTransactions(prev => prev.map(t => {
-          if (t.id === data.id) {
-            return { ...t, status: "Frozen Locked" };
-          }
-          return t;
-        }));
-        toast(`Funds frozen inside the sovereign custody notary safe.`, "warn");
-        break;
-      }
-      case "reverse_escrow_tx": {
-        setTransactions(prev => prev.map(t => {
-          if (t.id === data.id) {
-            return { ...t, status: "Reversed" };
-          }
-          return t;
-        }));
-        toast(`Transaction reversed. Funds credited back to host.`, "info");
-        break;
-      }
-      case "trigger_aml_invest": {
-        toast(`Dispatched compliance forensic officers to address suspicious transfer velocity.`, "warn");
-        break;
-      }
-      case "initiate_refund_tx": {
-        setTransactions(prev => prev.map(t => {
-          if (t.id === data.id) {
-            return { ...t, status: "Reversed" };
-          }
-          return t;
-        }));
-        toast(`Refund issued. Clearing files updated.`, "success");
-        break;
-      }
-      case "schedule_dividend": {
-        setUsers(uCopy => uCopy.map(u => {
-          if (u.role === "Investor") {
-            return { 
-              ...u, 
-              walletBalance: u.walletBalance + 82000, 
-              notesHistory: [...u.notesHistory, "Received REIT fractional dividend payout of R 82,000."]
-            };
-          }
-          return u;
-        }));
-        toast(`Distributed dividends seamlessly to all accredited investors.`, "success");
-        break;
-      }
-      case "adjust_pricing_config": {
-        toast(`Applied rates coefficients successfully across all active nodes.`, "success");
-        break;
-      }
-      case "trigger_general_report": {
-        toast(`Cryptographic financial diagnostics compiled. Downloading PDF.`, "success");
-        break;
-      }
-      case "restart_service_node": {
-        setServices(prev => prev.map(s => {
-          if (s.id === data.id) {
-            return { ...s, status: "ONLINE", latency: "11ms" };
-          }
-          return s;
-        }));
-        toast(`Core node restart initiated. System buffers normalized.`, "success");
-        break;
-      }
-      case "isolate_threat": {
-        setThreats(prev => prev.map(th => {
-          if (th.id === data.id) {
-            return { ...th, status: "Mitigated Isolate" };
-          }
-          return th;
-        }));
-        toast(`Brute-force host router completely blocked and isolated.`, "success");
-        break;
-      }
-      default:
-        break;
-    }
-
-    broadcastAdminAction(type, data);
-    setActiveModal(null);
-  };
-
-  // --- CORE CONFLICT RESOLUTIONS COVERS ---
-  const handleOpenActionModal = (actionType: string, payload: any) => {
-    setActiveModal({
-      type: actionType,
-      data: payload,
-      reason: "Urgent executive overrides required under compliance law.",
-      pin: "AES-3942-CPT"
     });
+
+    const stayMap = new Map<string, StayPropertyProfile>();
+    [...publishedStays, ...STAY_CATALOG_PROPERTIES].forEach((s) => {
+      if (!propRows.some((p) => p.id === s.id) && !stayMap.has(s.id)) {
+        stayMap.set(s.id, s);
+      }
+    });
+
+    const stayRows: UnifiedListingRow[] = Array.from(stayMap.values()).map((s) => {
+      const ov = listingOverrides[s.id];
+      return {
+        id: s.id,
+        title: s.name,
+        city: s.city,
+        country: inferCountryFromLocation(s.city, s.country),
+        vertical: s.category === 'Serviced Apartments' ? 'Long-Term Rental' : 'Short Stay & Hotel',
+        propertyType: s.propertyType,
+        listingType: 'Stay / Hospitality',
+        price: ov?.priceOverride !== undefined ? ov.priceOverride : s.monthlyFromZar || s.nightlyFromZar * 20,
+        status: ov?.status !== undefined ? ov.status : PropertyStatus.ACTIVE,
+        verified: ov?.verified !== undefined ? ov.verified : true,
+        featured: ov?.featured !== undefined ? ov.featured : true,
+        hidden: Boolean(ov?.hidden),
+        ownerName: `${s.propertyType} Partner · ${s.suburb}`,
+      };
+    });
+
+    return [...propRows, ...stayRows];
+  }, [allProperties, publishedStays, listingOverrides]);
+
+  const filteredListings = useMemo(() => {
+    const q = listingSearch.trim().toLowerCase();
+    return unifiedListings.filter((item) => {
+      if (verticalFilter !== 'All' && item.vertical !== verticalFilter) return false;
+      if (listingCountryFilter !== 'All' && item.country !== listingCountryFilter) return false;
+      if (listingStatusFilter === 'Hidden' && !item.hidden) return false;
+      if (listingStatusFilter === 'Featured' && !item.featured) return false;
+      if (listingStatusFilter === 'Pending Approval' && item.status !== PropertyStatus.PENDING) return false;
+      if (listingStatusFilter === 'Active' && (item.status !== PropertyStatus.ACTIVE || item.hidden)) return false;
+      if (!q) return true;
+      return (
+        item.title.toLowerCase().includes(q) ||
+        item.city.toLowerCase().includes(q) ||
+        item.country.toLowerCase().includes(q) ||
+        item.id.toLowerCase().includes(q) ||
+        item.ownerName.toLowerCase().includes(q)
+      );
+    });
+  }, [unifiedListings, listingSearch, verticalFilter, listingCountryFilter, listingStatusFilter]);
+
+  const selectedListing = useMemo(
+    () => unifiedListings.find((l) => l.id === selectedListingId) || filteredListings[0] || unifiedListings[0],
+    [unifiedListings, filteredListings, selectedListingId]
+  );
+
+  // Country-level aggregation & revenue math synced to live commissionRates
+  const countryMetrics = useMemo(() => {
+    const {
+      shortStayPercent,
+      longTermPlacementPercent,
+      salesBoostZar,
+      propertyManagerMonthlyZar,
+      hotelCommissionPercent,
+    } = settings.commissionRates;
+
+    return countryConfigs.map((cfg) => {
+      const countryListings = unifiedListings.filter((l) => l.country.toLowerCase() === cfg.name.toLowerCase() && !l.hidden);
+      const countryUsers = managedAccounts.filter((u) => u.country.toLowerCase() === cfg.name.toLowerCase());
+
+      const shortStays = countryListings.filter((l) => l.vertical === 'Short Stay & Hotel');
+      const longTerms = countryListings.filter((l) => l.vertical === 'Long-Term Rental');
+      const sales = countryListings.filter((l) => l.vertical === 'Residential Sale' || l.vertical === 'Investment');
+      const transport = countryListings.filter((l) => l.vertical === 'Transport Fleet');
+      const wellness = countryListings.filter((l) => l.vertical === 'Wellness Retreat');
+
+      const grossAssetValue = countryListings.reduce((sum, l) => sum + (l.price || 0), 0);
+
+      // Compute realistic monthly platform commission revenue in ZAR driven directly by current Admin commissionRates
+      const stayBookingRev = shortStays.reduce((sum, s) => sum + Math.max(12000, s.price * 0.45) * (shortStayPercent / 100), 0);
+      const hotelPartnerRev = shortStays.length * 42000 * (hotelCommissionPercent / 100);
+      const rentalPlacementRev = longTerms.reduce((sum, r) => sum + Math.max(8500, r.price) * (longTermPlacementPercent / 100), 0);
+      const salesBoostRev = Math.max(sales.filter((s) => s.featured).length, 1) * salesBoostZar;
+      const managerSaaSRev = Math.max(longTerms.length + sales.length, 2) * propertyManagerMonthlyZar;
+      const serviceRev = (transport.length + wellness.length) * 680;
+
+      const monthlyCommissionZar = Math.round(
+        stayBookingRev + hotelPartnerRev + rentalPlacementRev + salesBoostRev + managerSaaSRev + serviceRev
+      );
+      const estimatedVatZar = Math.round(monthlyCommissionZar * (cfg.vatRatePct / 100));
+
+      return {
+        ...cfg,
+        listingCount: countryListings.length,
+        verifiedCount: countryListings.filter((l) => l.verified).length,
+        userCount: countryUsers.length,
+        shortStayCount: shortStays.length,
+        longTermCount: longTerms.length,
+        saleCount: sales.length,
+        serviceCount: transport.length + wellness.length,
+        grossAssetValue,
+        monthlyCommissionZar,
+        estimatedVatZar,
+      };
+    });
+  }, [countryConfigs, unifiedListings, managedAccounts, settings.commissionRates]);
+
+  const activeCountryDetail = useMemo(
+    () => countryMetrics.find((c) => c.code === selectedCountryCode) || countryMetrics[0],
+    [countryMetrics, selectedCountryCode]
+  );
+
+  // Executive KPIs computed dynamically
+  const executiveStats = useMemo(() => {
+    const visibleListings = unifiedListings.filter((l) => !l.hidden);
+    const totalValuationZar = visibleListings.reduce((sum, l) => sum + (l.price || 0), 0);
+    const totalCommissionRunRate = countryMetrics.reduce((sum, c) => sum + (c.enabled ? c.monthlyCommissionZar : 0), 0);
+    const pendingVerifications =
+      visibleListings.filter((l) => l.status === PropertyStatus.PENDING || !l.verified).length +
+      managedAccounts.filter((u) => u.status === 'Pending Verification' || u.kycStatus === 'Pending').length;
+    const enabledCountriesCount = countryConfigs.filter((c) => c.enabled).length;
+
+    const verticalCounts = [
+      { label: 'Residential Sales', count: visibleListings.filter((l) => l.vertical === 'Residential Sale').length, color: 'bg-emerald-600' },
+      { label: 'Long-Term Rentals', count: visibleListings.filter((l) => l.vertical === 'Long-Term Rental').length, color: 'bg-teal-600' },
+      { label: 'Short Stays & Hotels', count: visibleListings.filter((l) => l.vertical === 'Short Stay & Hotel').length, color: 'bg-amber-500' },
+      { label: 'Investment Offerings', count: visibleListings.filter((l) => l.vertical === 'Investment').length, color: 'bg-indigo-600' },
+      { label: 'Transport Fleet', count: visibleListings.filter((l) => l.vertical === 'Transport Fleet').length, color: 'bg-slate-700' },
+      { label: 'Wellness Sanctuaries', count: visibleListings.filter((l) => l.vertical === 'Wellness Retreat').length, color: 'bg-rose-500' },
+    ];
+
+    return {
+      totalListings: visibleListings.length,
+      totalValuationZar,
+      totalCommissionRunRate,
+      pendingVerifications,
+      enabledCountriesCount,
+      totalCountries: countryConfigs.length,
+      totalAccounts: managedAccounts.length,
+      verticalCounts,
+    };
+  }, [unifiedListings, countryMetrics, managedAccounts, countryConfigs]);
+
+  // --- MUTATION HANDLERS (ALL PERSIST TO AdminStateContext + SYNC LIVE) ---
+  const handleUserMutation = (
+    account: ManagedAccount,
+    action: 'approve_kyc' | 'suspend' | 'reinstate' | 'freeze_wallet' | 'unfreeze_wallet' | 'toggle_publish',
+    newRole?: SovereignRoleKey
+  ) => {
+    if (action === 'approve_kyc') {
+      upsertUserOverride(
+        { id: account.id, email: account.email, status: 'Active', kycStatus: 'Approved', adminNote: 'KYC approved by Super Admin.' },
+        `Approved KYC & verification for ${account.name} (${account.roleKey}).`
+      );
+      broadcastAdminAction('approve_verification', { id: account.id, email: account.email, name: account.name });
+      addToast(`Approved KYC for ${account.name}. Role workspace synced.`, 'success');
+    } else if (action === 'suspend') {
+      upsertUserOverride(
+        { id: account.id, email: account.email, status: 'Suspended', canPublish: false, adminNote: 'Suspended by Super Admin.' },
+        `Suspended account access for ${account.name}.`
+      );
+      broadcastAdminAction('suspend', { id: account.id, email: account.email, name: account.name });
+      addToast(`Suspended ${account.name}. Access locked immediately.`, 'info');
+    } else if (action === 'reinstate') {
+      upsertUserOverride(
+        { id: account.id, email: account.email, status: 'Active', canPublish: true, adminNote: 'Reinstated by Super Admin.' },
+        `Reinstated active status for ${account.name}.`
+      );
+      broadcastAdminAction('approve_verification', { id: account.id, email: account.email, name: account.name });
+      addToast(`Reinstated ${account.name}.`, 'success');
+    } else if (action === 'freeze_wallet') {
+      upsertUserOverride(
+        { id: account.id, email: account.email, isWalletFrozen: true, adminNote: 'Wallet frozen pending payout audit.' },
+        `Froze payouts & wallet for ${account.name}.`
+      );
+      broadcastAdminAction('freeze_wallet', { id: account.id, email: account.email, name: account.name });
+      addToast(`Wallet frozen for ${account.name}.`, 'info');
+    } else if (action === 'unfreeze_wallet') {
+      upsertUserOverride(
+        { id: account.id, email: account.email, isWalletFrozen: false, adminNote: 'Wallet cleared by Super Admin.' },
+        `Unfroze wallet for ${account.name}.`
+      );
+      addToast(`Wallet unlocked for ${account.name}.`, 'success');
+    } else if (action === 'toggle_publish') {
+      const nextCanPublish = !account.canPublish;
+      upsertUserOverride(
+        { id: account.id, email: account.email, canPublish: nextCanPublish, adminNote: nextCanPublish ? 'Publishing enabled.' : 'Publishing disabled.' },
+        `${nextCanPublish ? 'Enabled' : 'Restricted'} publishing privileges for ${account.name}.`
+      );
+      addToast(`Publishing ${nextCanPublish ? 'enabled' : 'paused'} for ${account.name}.`, 'success');
+    }
+    if (newRole) {
+      upsertUserOverride(
+        { id: account.id, email: account.email, role: newRole, adminNote: `Role reassigned to ${newRole}.` },
+        `Reassigned role for ${account.name} to ${newRole}.`
+      );
+      broadcastAdminAction('role_changed', { id: account.id, email: account.email, name: account.name, role: newRole });
+      addToast(`${account.name} role updated to ${roleControls[newRole]?.label || newRole}.`, 'success');
+    }
   };
 
-  const SIDEBAR_NAV = [
-    {
-      name: "Dashboard",
-      icon: <Activity className="h-4 w-4" />,
-      children: ["Executive Overview", "Global Metrics", "AI Insights", "Live Activity Feed"]
-    },
-    {
-      name: "Users & Access Operations",
-      icon: <Users className="h-4 w-4" />,
-      children: ["Normal Users", "Agents", "Investors", "Agencies", "Developers", "Permissions & Roles", "Suspensions", "Verification Queue"]
-    },
-    {
-      name: "Listings Operations",
-      icon: <Globe className="h-4 w-4" />,
-      children: ["All Listings", "Pending Approvals", "Smart Verification", "Flagged Listings", "Expired Listings", "Geo Mapping", "REIT Assets", "Luxury Portfolio"]
-    },
-    {
-      name: "Revenue Operations",
-      icon: <DollarSign className="h-4 w-4" />,
-      children: ["Revenue Overview", "Commissions", "Investor Income", "Escrow & Wallets", "Transactions", "Subscription Plans", "Taxes & Financial Reports"]
-    },
-    {
-      name: "Compliance Command",
-      icon: <Shield className="h-4 w-4" />,
-      children: ["KYC", "AML Screening", "Fraud & Sanctions", "Audit Logs", "Legal Cases & Regulatory Reports"]
-    },
-    {
-      name: "Moderation & Trust",
-      icon: <ShieldAlert className="h-4 w-4" />,
-      children: ["Content Moderation", "User Reports", "Dispute Center", "AI Moderation Queue", "Communication Monitoring"]
-    },
-    {
-      name: "System Health",
-      icon: <Server className="h-4 w-4" />,
-      children: ["Service Status", "AI Engine Health", "Cybersecurity & Threats", "APIs & Error Logs"]
-    },
-    {
-      name: "AI Co-Pilot",
-      icon: <Sparkles className="h-4 w-4" />,
-      children: ["Executive AI Assistant", "Revenue Forecasting", "Market Intelligence", "AI Automation Workflows"]
-    },
-    {
-      name: "Analytics Intelligence",
-      icon: <TrendingUp className="h-4 w-4" />,
-      children: ["Business Intelligence", "Geographic Insights", "Occupancy & Performance"]
-    },
-    {
-      name: "Settings & Governance",
-      icon: <Lock className="h-4 w-4" />,
-      children: ["Platform Settings", "Localization & Currency", "AI Configuration & API Keys"]
-    },
-    {
-      name: "Support & Incident Response",
-      icon: <HelpCircle className="h-4 w-4" />,
-      children: ["Tickets", "Live Chat Console", "Escalations"]
+  const handleAddAccount = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newAccountForm.name.trim() || !newAccountForm.email.trim()) {
+      addToast('Name and email are required to provision an account.', 'error');
+      return;
     }
+    const id = `USR-${Date.now().toString().slice(-4)}`;
+    const created: ManagedAccount = {
+      id,
+      name: newAccountForm.name.trim(),
+      email: newAccountForm.email.trim(),
+      phone: newAccountForm.phone.trim() || '+27 10 000 0000',
+      location: `${newAccountForm.country}`,
+      country: newAccountForm.country,
+      role: mapKeyToSovereignRoleLabel(newAccountForm.roleKey),
+      roleKey: newAccountForm.roleKey,
+      agency: newAccountForm.agency.trim(),
+      status: 'Active',
+      riskScore: 4,
+      walletBalance: 0,
+      investments: 0,
+      listings: 0,
+      kycStatus: 'Approved',
+      fingerprint: `prov_${Date.now().toString(36)}`,
+      lastActive: 'Provisioned now',
+      geoHistory: [newAccountForm.country],
+      isWalletFrozen: false,
+      canPublish: true,
+      notesHistory: ['Provisioned directly by Super Admin.'],
+    };
+    setCustomUsers((prev) => [created, ...prev]);
+    setSelectedUserId(id);
+    setIsAddUserOpen(false);
+    recordAuditEvent('User Provisioning', `Provisioned ${created.name} (${created.roleKey}) in ${created.country}.`);
+    addToast(`Account created for ${created.name}.`, 'success');
+    setNewAccountForm({ name: '', email: '', phone: '', country: 'South Africa', roleKey: 'agent', agency: '' });
+  };
+
+  const handleListingAction = (
+    item: UnifiedListingRow,
+    action: 'approve' | 'verify' | 'feature' | 'flag' | 'hide' | 'restore' | 'delete'
+  ) => {
+    if (action === 'approve') {
+      upsertListingOverride(
+        { id: item.id, status: PropertyStatus.ACTIVE, verified: true, hidden: false },
+        `Approved and published "${item.title}" (${item.country}).`
+      );
+      if (item.sourceRef && onUpdateProperty) {
+        onUpdateProperty({ ...item.sourceRef, status: PropertyStatus.ACTIVE, verified: true });
+      }
+      broadcastAdminAction('approve_listing_asset', { id: item.id, title: item.title });
+      addToast(`Approved "${item.title}" on live marketplace.`, 'success');
+    } else if (action === 'verify') {
+      const nextVerified = !item.verified;
+      upsertListingOverride(
+        { id: item.id, verified: nextVerified },
+        `${nextVerified ? 'Verified' : 'Removed verification badge from'} "${item.title}".`
+      );
+      if (item.sourceRef && onUpdateProperty) {
+        onUpdateProperty({ ...item.sourceRef, verified: nextVerified });
+      }
+      addToast(`Verification badge ${nextVerified ? 'granted' : 'revoked'} for "${item.title}".`, 'success');
+    } else if (action === 'feature') {
+      const nextFeatured = !item.featured;
+      upsertListingOverride(
+        { id: item.id, featured: nextFeatured },
+        `${nextFeatured ? 'Featured' : 'Unfeatured'} "${item.title}" in homepage spotlight.`
+      );
+      if (item.sourceRef && onUpdateProperty) {
+        onUpdateProperty({ ...item.sourceRef, featured: nextFeatured });
+      }
+      addToast(`Homepage feature ${nextFeatured ? 'enabled' : 'disabled'} for "${item.title}".`, 'success');
+    } else if (action === 'flag') {
+      upsertListingOverride(
+        { id: item.id, status: PropertyStatus.PENDING, verified: false },
+        `Flagged "${item.title}" for compliance review.`
+      );
+      if (item.sourceRef && onUpdateProperty) {
+        onUpdateProperty({ ...item.sourceRef, status: PropertyStatus.PENDING, verified: false });
+      }
+      broadcastAdminAction('send_listing_warning', { id: item.id, title: item.title });
+      addToast(`"${item.title}" moved to Pending Review.`, 'info');
+    } else if (action === 'hide') {
+      upsertListingOverride({ id: item.id, hidden: true }, `Unpublished "${item.title}" from public feeds.`);
+      addToast(`"${item.title}" hidden from public pages.`, 'info');
+    } else if (action === 'restore') {
+      upsertListingOverride({ id: item.id, hidden: false, status: PropertyStatus.ACTIVE }, `Restored "${item.title}" to public feeds.`);
+      addToast(`"${item.title}" restored to public feeds.`, 'success');
+    } else if (action === 'delete') {
+      upsertListingOverride({ id: item.id, hidden: true }, `Removed "${item.title}" permanently.`);
+      if (item.sourceRef && onDeleteProperty) {
+        onDeleteProperty(item.id);
+      }
+      addToast(`"${item.title}" removed.`, 'info');
+    }
+  };
+
+  const handleSaveListingPrice = (item: UnifiedListingRow) => {
+    const numeric = Number(editingPriceValue);
+    if (!Number.isFinite(numeric) || numeric <= 0) {
+      addToast('Enter a valid positive price value.', 'error');
+      return;
+    }
+    upsertListingOverride(
+      { id: item.id, priceOverride: numeric },
+      `Updated price of "${item.title}" to ${formatMoney(numeric)}.`
+    );
+    if (item.sourceRef && onUpdateProperty) {
+      onUpdateProperty({ ...item.sourceRef, price: numeric });
+    }
+    setEditingPriceValue('');
+    addToast(`Price updated across platform for "${item.title}".`, 'success');
+  };
+
+  const handleTransactionAction = (tx: EscrowTransaction, status: EscrowTransaction['status']) => {
+    setTransactions((prev) => prev.map((t) => (t.id === tx.id ? { ...t, status } : t)));
+    recordAuditEvent('Escrow & Settlement', `Updated ${tx.id} (${tx.senderName || 'Account'}) to ${status}.`);
+    addToast(`Transaction ${tx.id} marked ${status}.`, 'success');
+  };
+
+  const handleExportCountryCsv = () => {
+    const header = ['Code', 'Country', 'Region', 'Currency', 'Enabled', 'Listings', 'Verified', 'Gross Asset Value (ZAR)', 'Monthly Commission (ZAR)', 'VAT %', 'Est VAT (ZAR)'];
+    const rows = countryMetrics.map((c) => [
+      c.code,
+      `"${c.name}"`,
+      `"${c.region}"`,
+      c.currency,
+      c.enabled ? 'Active' : 'Paused',
+      String(c.listingCount),
+      String(c.verifiedCount),
+      String(Math.round(c.grossAssetValue)),
+      String(c.monthlyCommissionZar),
+      String(c.vatRatePct),
+      String(c.estimatedVatZar),
+    ]);
+    const csv = [header.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `afriestate-country-revenue-${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    recordAuditEvent('Financial Export', 'Exported Pan-African Country Revenue & VAT CSV.');
+    addToast('Country revenue & tax ledger exported.', 'success');
+  };
+
+  const handleSaveSettingsSection = (summary: string) => {
+    updateSettings(draftSettings, summary);
+    if (draftSettings.defaultCurrency !== settings.defaultCurrency) {
+      setAppCurrency(draftSettings.defaultCurrency);
+    }
+    if (draftSettings.defaultLanguage !== settings.defaultLanguage) {
+      setAppLanguage(draftSettings.defaultLanguage);
+    }
+    addToast('Platform settings saved and applied live.', 'success');
+  };
+
+  const NAV_ITEMS: { id: AdminSection; label: string; icon: React.ElementType; badge?: number }[] = [
+    { id: 'overview', label: 'Executive Overview', icon: LayoutDashboard },
+    { id: 'users', label: 'Roles & Users', icon: Users, badge: managedAccounts.length },
+    { id: 'listings', label: 'Listings & Verticals', icon: Layers, badge: executiveStats.totalListings },
+    { id: 'countries', label: 'Countries & Revenue', icon: Globe2, badge: executiveStats.enabledCountriesCount },
+    { id: 'financials', label: 'Financials & Pricing', icon: DollarSign },
+    { id: 'directory', label: 'Neighborhoods & Pros', icon: Compass },
+    { id: 'compliance', label: 'Compliance & Support', icon: ShieldCheck, badge: executiveStats.pendingVerifications },
+    { id: 'settings', label: 'Platform Settings', icon: Settings },
   ];
 
+  const sectionTitle = NAV_ITEMS.find((n) => n.id === activeSection)?.label || 'Command Centre';
+
   return (
-    <div className="fixed inset-0 z-[99999] flex h-screen w-screen overflow-hidden bg-[#030612] text-slate-100 font-sans selection:bg-cyan-500 selection:text-black">
-      
-      {/* GLOBAL BANNER FLOATING SUCCESS TOASTS */}
-      {notification && (
-        <div className="fixed top-5 right-5 z-[100000] flex items-center gap-3 rounded-xl border border-cyan-500/30 bg-[#0c1224] px-5 py-3.5 text-xs font-mono text-cyan-400 shadow-[0_0_20px_rgba(6,182,212,0.25)] animate-bounce">
-          <CheckCircle2 className="h-5 w-5 text-cyan-400" />
-          <div>
-            <span className="font-bold uppercase tracking-wider block">SOVEREIGN_OS RESOLUTION</span>
-            <span className="text-slate-300 font-sans">{notification.msg}</span>
-          </div>
-        </div>
+    <div className="fixed inset-0 z-[100000] bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex overflow-hidden font-sans">
+      {/* Mobile Sidebar Backdrop */}
+      {mobileNavOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-black/50 lg:hidden"
+          onClick={() => setMobileNavOpen(false)}
+        />
       )}
 
-      {/* 1. LEFT NAVIGATION SIDEBAR */}
-      <aside className="flex w-72 flex-col flex-shrink-0 border-r border-slate-800/80 bg-slate-950/90 overflow-y-auto [scrollbar-width:thin] custom-scrollbar select-none">
-        
-        {/* Brand Header */}
-        <div className="flex items-center gap-3 border-b border-slate-800/80 px-5 py-4">
-          <div className="relative flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-tr from-cyan-600 via-cyan-400 to-emerald-400 p-[1px] shadow-[0_0_15px_rgba(6,182,212,0.3)] animate-pulse">
-            <div className="flex h-full w-full items-center justify-center rounded-lg bg-slate-950">
-              <Sparkles className="h-4 w-4 text-cyan-400" />
-            </div>
+      {/* Left Fixed Navigation Sidebar (264px) */}
+      <aside
+        className={`fixed lg:static inset-y-0 left-0 z-40 w-64 shrink-0 bg-[#0B1F1A] text-white flex flex-col border-r border-emerald-950 transition-transform duration-200 ${
+          mobileNavOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+        }`}
+      >
+        <div className="h-16 px-5 border-b border-white/10 flex items-center justify-between shrink-0">
+          <div className="min-w-0">
+            <p className="font-heading text-base font-bold tracking-tight text-white truncate">
+              {settings.siteName} Admin
+            </p>
+            <p className="text-[11px] text-amber-300 font-medium truncate">
+              Platform Command Centre
+            </p>
           </div>
-          <div>
-            <div className="text-xs font-black tracking-widest text-white flex items-center gap-1">
-              AFRIESTATE <span className="rounded bg-cyan-500/10 px-1 py-0.5 text-[8.5px] font-black text-cyan-400 uppercase tracking-widest border border-cyan-500/20">OS V3</span>
-            </div>
-            <div className="text-[9.5px] uppercase tracking-widest text-slate-400 font-semibold font-mono">Real Estate Intel</div>
-          </div>
+          <button
+            type="button"
+            onClick={() => setMobileNavOpen(false)}
+            className="lg:hidden p-1.5 rounded-lg text-slate-300 hover:bg-white/10"
+            aria-label="Close sidebar"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
 
-        {/* Real-time Telemetry Monitor Box */}
-        <div className="p-4 bg-slate-900/40 border-b border-slate-800/60 text-[10px] space-y-1.5 select-none font-mono text-slate-400">
-          <div className="flex justify-between">
-            <span>PLATFORM SECURITY:</span>
-            <span className="text-emerald-400 font-bold flex items-center gap-1">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping"></span> NOMINAL SECURE
-            </span>
-          </div>
-          <div className="flex justify-between">
-            <span>MONITORED BUFFERS:</span>
-            <span className="text-cyan-400">14,872 ACTIVE</span>
-          </div>
-          <div className="flex justify-between">
-            <span>NOTARY OVERRIDES:</span>
-            <span className="text-white font-bold text-right">0 PENDING BLOCK</span>
-          </div>
-        </div>
-
-        {/* Sidebar Nav Items */}
-        <div className="flex-1 px-3 py-4 space-y-1">
-          {SIDEBAR_NAV.map(nav => {
-            const isExpanded = expandedCategories.has(nav.name);
-            const isActiveCategory = activeCategory === nav.name;
-
+        <div className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
+          <p className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-widest text-emerald-200/50">
+            Control Workspaces
+          </p>
+          {NAV_ITEMS.map((item) => {
+            const Icon = item.icon;
+            const active = activeSection === item.id;
             return (
-              <div key={nav.name} className="space-y-0.5">
-                <button 
-                  onClick={() => toggleCategory(nav.name)}
-                  className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left transition-all hover:bg-slate-800/40 ${
-                    isActiveCategory ? "bg-[#0d1430] text-white font-bold" : "text-slate-400"
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5">
-                    <span className="text-cyan-400">{nav.icon}</span>
-                    <span className="text-xs font-mono tracking-wide">{nav.name}</span>
-                  </div>
-                  <span className={`text-[9px] text-slate-500 transition-transform ${isExpanded ? "rotate-180" : ""}`}>▼</span>
-                </button>
-
-                {isExpanded && (
-                  <div className="ml-5 flex flex-col border-l border-slate-800 pl-3 py-0.5 space-y-0.5">
-                    {nav.children.map(sub => {
-                      const isActiveSub = activeCategory === nav.name && activeSub === sub;
-                      return (
-                        <button
-                          key={sub}
-                          onClick={() => handleSubSelect(nav.name, sub)}
-                          className={`w-full rounded px-2 py-1.5 text-left text-[11px] font-mono transition-all ${
-                            isActiveSub 
-                              ? "bg-cyan-500/10 text-cyan-400 font-extrabold border-l-2 border-cyan-400 pl-2.5" 
-                              : "text-slate-400 hover:text-slate-200"
-                          }`}
-                        >
-                          {sub}
-                        </button>
-                      );
-                    })}
-                  </div>
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => {
+                  setActiveSection(item.id);
+                  setMobileNavOpen(false);
+                }}
+                className={`w-full flex items-center justify-between gap-2.5 px-3 py-2.5 rounded-lg text-[13px] font-medium transition-colors ${
+                  active
+                    ? 'bg-white/15 text-amber-300 font-semibold'
+                    : 'text-emerald-100/80 hover:bg-white/5 hover:text-white'
+                }`}
+              >
+                <span className="flex items-center gap-2.5 truncate">
+                  <Icon className={`w-4 h-4 shrink-0 ${active ? 'text-amber-300' : 'text-emerald-300/70'}`} />
+                  <span className="truncate">{item.label}</span>
+                </span>
+                {typeof item.badge === 'number' && (
+                  <span
+                    className={`px-1.5 py-0.5 rounded text-[11px] font-mono tabular-nums ${
+                      active ? 'bg-amber-400/20 text-amber-200' : 'bg-white/10 text-emerald-100'
+                    }`}
+                  >
+                    {item.badge}
+                  </span>
                 )}
-              </div>
+              </button>
             );
           })}
         </div>
 
-        {/* Aladdin API Latency indicator */}
-        <div className="p-4 border-t border-slate-800 bg-slate-950/60 font-mono text-[10px] text-slate-500">
-          <div className="flex justify-between items-center bg-[#070b19] border border-slate-800 rounded p-2 text-cyan-400">
-            <span>CORE NODE LATENCY:</span>
-            <span>11ms</span>
+        {/* Bottom Governance Quick Status */}
+        <div className="p-4 border-t border-white/10 space-y-3 text-xs">
+          <div className="flex items-center justify-between text-emerald-100/80">
+            <span>Public Access</span>
+            <span className={`font-semibold ${settings.maintenanceMode ? 'text-amber-300' : 'text-emerald-300'}`}>
+              {settings.maintenanceMode ? 'Maintenance' : 'Live'}
+            </span>
           </div>
+          <div className="flex items-center justify-between text-emerald-100/80">
+            <span>KYC Publish Gate</span>
+            <span className="font-semibold text-white">
+              {settings.securityPolicies.requireKycToPublish ? 'Enforced' : 'Flexible'}
+            </span>
+          </div>
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-full py-2.5 px-3 rounded-lg bg-white/10 hover:bg-white/15 text-white font-semibold flex items-center justify-center gap-2 transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>Return to Live Site</span>
+            </button>
+          )}
         </div>
       </aside>
 
-      {/* 2. MAIN HUB FIELD */}
-      <main className="flex flex-1 flex-col overflow-hidden bg-[#070b19] text-xs">
-        
-        {/* UPPER CONTROLS HEADER */}
-        <header className="flex h-16 flex-shrink-0 items-center justify-between border-b border-slate-800 bg-slate-950/90 px-8 select-none">
-          
-          {/* Breadcrumb timeline */}
-          <div className="flex items-center gap-2 text-xs font-mono tracking-wide">
-            <span className="text-slate-500 uppercase font-black">AFRIESTATE COMMAND</span>
-            <span className="text-slate-700">/</span>
-            <span className="text-cyan-400 uppercase">{activeCategory}</span>
-            <span className="text-slate-700">/</span>
-            <span className="text-white font-bold uppercase">{activeSub}</span>
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {/* Top Bar Contract */}
+        <header className="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6 flex items-center justify-between gap-4 shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <button
+              type="button"
+              onClick={() => setMobileNavOpen(true)}
+              className="lg:hidden p-2 rounded-lg text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+              aria-label="Open navigation"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                <span>{settings.siteName}</span>
+                <span>/</span>
+                <span className="font-semibold text-slate-900 dark:text-white truncate">{sectionTitle}</span>
+              </div>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 hidden sm:block truncate">
+                Real-time synchronization across Marketplace, Role Consoles, Pricing, and Country Rules
+              </p>
+            </div>
           </div>
 
-          <div className="flex items-center gap-5">
-            {/* Currency conversion select */}
-            <div className="flex items-center gap-1 rounded bg-[#0c1224] p-1 border border-slate-800 font-mono text-[10px]">
-              <span className="px-1 text-slate-500 font-bold uppercase">VAL_CUR:</span>
-              {(["ZAR", "USD", "NGN", "KES"] as const).map(curr => (
-                <button
-                  key={curr}
-                  onClick={() => setCurrencyCode(curr)}
-                  className={`rounded px-1.5 py-0.5 font-bold transition-all ${
-                    currencyCode === curr 
-                      ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/30" 
-                      : "text-slate-400 hover:text-slate-100"
-                  }`}
-                >
-                  {curr}
-                </button>
-              ))}
-            </div>
-
-            {/* Central System Zulu Ticker */}
-            <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 rounded px-3 py-1 font-mono text-[11px] text-slate-300">
-              <Clock className="h-3.5 w-3.5 text-cyan-400 animate-pulse" />
-              <span>{currentTime || "00:00:00 UTC"}</span>
-            </div>
-
-            <button 
-              onClick={onClose} 
-              className="rounded bg-rose-500/10 px-4 py-1.5 text-xs font-extrabold text-rose-450 border border-rose-500/20 hover:bg-rose-500/20 transition-all font-mono"
+          <div className="flex items-center gap-2.5 shrink-0">
+            <select
+              aria-label="Display currency"
+              value={displayCurrency}
+              onChange={(e) => setDisplayCurrency(e.target.value as any)}
+              className="bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-mono font-semibold text-slate-800 dark:text-slate-100"
             >
-              DISCONNECT
+              <option value="ZAR">ZAR (R)</option>
+              <option value="USD">USD ($)</option>
+              <option value="NGN">NGN (₦)</option>
+              <option value="KES">KES (KSh)</option>
+              <option value="GHS">GHS (GH₵)</option>
+            </select>
+
+            <button
+              type="button"
+              onClick={() => setActiveSection('settings')}
+              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-semibold whitespace-nowrap shrink-0"
+            >
+              <Settings className="w-3.5 h-3.5" />
+              <span>Settings</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleExportCountryCsv}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#0B1F1A] hover:bg-emerald-900 text-white text-xs font-semibold whitespace-nowrap shrink-0"
+            >
+              <Download className="w-3.5 h-3.5 text-amber-300" />
+              <span>Export Ledger</span>
             </button>
           </div>
         </header>
 
-        {/* MODULAR COMPONENT SCREEN VIEWSCAPES */}
-        <div className="flex-1 overflow-y-auto px-8 py-6 space-y-6 custom-scrollbar [scrollbar-width:thin]">
-          
-          {/* CATEGORY: DASHBOARD VIEWS */}
-          {activeCategory === "Dashboard" && activeSub === "Executive Overview" && (
+        {/* Scrollable Workspace Viewport */}
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
+          {/* ============================================================== */}
+          {/* 1. EXECUTIVE OVERVIEW                                          */}
+          {/* ============================================================== */}
+          {activeSection === 'overview' && (
             <div className="space-y-6">
-              
-              {/* Telemetry KPI Overview Grid */}
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5 font-mono">
-                {[
-                  { label: "Platform Portfolio Valuation", val: renderCurrency(platformValuation), delta: "+R 48K / Live", color: "text-emerald-400" },
-                  { label: "Active Listings Registry", val: activeListingsCount.toLocaleString(), delta: "Sync Active", color: "text-cyan-400" },
-                  { label: "Gross Transaction Volume (YTD)", val: renderCurrency(grossGTV), delta: "+18% CAGR", color: "text-amber-500" },
-                  { label: "Live System Trust Exposure", val: `${investorConfidence}%`, delta: "Stabilized Yield", color: "text-purple-400" },
-                  { label: "Fraud Risk Coefficient", val: `${fraudRisk}%`, delta: "Limits Safe (<2%)", color: fraudRisk < 2 ? "text-emerald-400" : "text-rose-400" }
-                ].map((kpi, idx) => (
-                  <div key={idx} className="relative overflow-hidden rounded-xl border border-slate-850 bg-[#0c1224] p-4">
-                    <div className="absolute left-0 top-0 bottom-0 w-[2.5px] bg-cyan-400"></div>
-                    <span className="text-[9px] uppercase tracking-wider text-slate-450 block mb-1">{kpi.label}</span>
-                    <span className={`text-lg font-bold block ${kpi.color} mb-0.5`}>{kpi.val}</span>
-                    <span className="text-[9.5px] text-slate-500">{kpi.delta}</span>
-                  </div>
-                ))}
+              {/* Top KPI Grid (Flat 1px borders, Tabular Numerals) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5">
+                  <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Live Listings Across Verticals</p>
+                  <p className="text-2xl font-bold font-mono tabular-nums text-slate-900 dark:text-white mt-1.5">
+                    {executiveStats.totalListings}
+                  </p>
+                  <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1 font-medium">
+                    Synced to public &amp; role pages
+                  </p>
+                </div>
+
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5">
+                  <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Tracked Asset Valuation</p>
+                  <p className="text-2xl font-bold font-mono tabular-nums text-slate-900 dark:text-white mt-1.5">
+                    {formatMoney(executiveStats.totalValuationZar)}
+                  </p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                    Across {executiveStats.enabledCountriesCount} active African markets
+                  </p>
+                </div>
+
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5">
+                  <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Monthly Commission Run-Rate</p>
+                  <p className="text-2xl font-bold font-mono tabular-nums text-emerald-700 dark:text-emerald-400 mt-1.5">
+                    {formatMoney(executiveStats.totalCommissionRunRate)}
+                  </p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 font-mono tabular-nums">
+                    {settings.commissionRates.shortStayPercent}% Stay · {settings.commissionRates.longTermPlacementPercent}% Rent · {settings.commissionRates.hotelCommissionPercent}% Hotel
+                  </p>
+                </div>
+
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5">
+                  <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Pending Reviews &amp; Queue</p>
+                  <p className="text-2xl font-bold font-mono tabular-nums text-amber-600 dark:text-amber-400 mt-1.5">
+                    {executiveStats.pendingVerifications}
+                  </p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                    {tourRequests.length} active tours · {messages.length} client msgs
+                  </p>
+                </div>
               </div>
 
-              {/* Stress simulation planning panel */}
+              {/* Vertical Distribution + Live Quick Platform Controls */}
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                
-                {/* Macro Scenario options */}
-                <div className="lg:col-span-7 rounded-xl border border-slate-800 bg-[#0d142b] p-5 space-y-3 flex flex-col justify-between font-mono">
-                  <div>
-                    <h3 className="text-xs font-black text-white tracking-widest uppercase flex items-center gap-1.5 pb-2 border-b border-slate-800">
-                      <Cpu className="h-4 w-4 text-emerald-400" /> Executive Scenario Stress Simulator
-                    </h3>
-                    <p className="text-[11px] text-slate-400 leading-normal mb-3">Evaluate macroeconomic stressors and smart zoning overlays prior to deployment.</p>
-                    
-                    <div className="space-y-2 max-h-56 overflow-y-auto [scrollbar-width:thin] pr-1">
-                      {MACRO_SCENARIOS.map(scen => (
-                        <div 
-                          key={scen.id}
-                          onClick={() => runMacroScenarioStress(scen.id)}
-                          className="p-2 bg-slate-950/60 rounded border border-slate-850 hover:border-slate-700 cursor-pointer text-[10.5px] flex items-center justify-between"
-                        >
-                          <div>
-                            <span className="text-slate-200 font-bold block">{scen.title}</span>
-                            <span className="text-slate-550 block text-[9.5px] font-sans">{scen.description}</span>
-                          </div>
-                          <span className="bg-cyan-500/10 text-cyan-400 text-[9px] px-1.5 py-0.5 rounded uppercase font-bold">{scen.impact}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="text-[10px] text-slate-500 border-t border-slate-850 pt-2 flex items-center justify-between">
-                    <span>GopherML predictive analytics online.</span>
-                    <span className="text-cyan-400">Calibrated: 99.1%</span>
-                  </div>
-                </div>
-
-                {/* Simulation diagnostics output panel */}
-                <div className="lg:col-span-5 rounded-xl border border-slate-800 bg-slate-950 p-5 flex flex-col justify-between font-mono">
-                  <div>
-                    <h3 className="text-xs font-black text-white tracking-widest uppercase flex items-center gap-1.5 pb-2 border-b border-slate-850 mb-3">
-                      <Network className="h-4 w-4 text-cyan-400" /> Live Simulation Core Diagnostics
-                    </h3>
-
-                    {simulatingScenarioId ? (
-                      <div className="text-center py-12 space-y-3">
-                        <RefreshCw className="h-7 w-7 text-cyan-400 animate-spin mx-auto" />
-                        <p className="text-[11px] text-slate-350 animate-pulse">{simStep}</p>
-                      </div>
-                    ) : simResult ? (
-                      <div className="space-y-3.5 text-[11px]">
-                        <div className="p-2.5 bg-cyan-950/20 border border-cyan-850 rounded text-cyan-400">
-                          <strong>Stress Core Matched:</strong> {simResult.title}
-                        </div>
-                        <div className="grid grid-cols-2 gap-2 text-[10.5px]">
-                          <div className="bg-slate-900 border border-slate-850 p-2 rounded">
-                            <span className="text-slate-500 block">EST_REVENUE_EFFECT</span>
-                            <strong className="text-rose-400 font-bold block">{simResult.revenueOutcome}</strong>
-                          </div>
-                          <div className="bg-slate-900 border border-slate-850 p-2 rounded">
-                            <span className="text-slate-500 block">PREDICTIVE_STABILITY</span>
-                            <strong className="text-cyan-400 font-bold block">{simResult.confidence} Confidence</strong>
-                          </div>
-                        </div>
-                        <div className="p-3 bg-slate-900 rounded border border-slate-850">
-                          <span className="text-[10px] text-slate-500 block font-bold mb-1 uppercase">Remediation Script Policy</span>
-                          <p className="text-slate-350 leading-normal pl-2 border-l border-emerald-400">{simResult.remediation}</p>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="bg-slate-900/40 border border-slate-850 rounded-lg p-6 text-center select-none text-slate-500 text-[10.5px]">
-                        Click any stressful macro scenario list card on the left to initialize real-time diagnostic testing.
-                      </div>
-                    )}
-                  </div>
-
-                  <span className="text-[9px] text-slate-600 block mt-3 select-none">DISPATCH_REGULAR_BYPASS_HASH: Nominal</span>
-                </div>
-
-              </div>
-
-              {/* Sovereign Action Alerts banner */}
-              <div className="rounded-xl border border-slate-850 bg-[#0c1224] p-5">
-                <div className="flex items-center justify-between border-b border-slate-850 pb-2.5 mb-3.5">
-                  <h3 className="text-xs font-black text-rose-400 tracking-widest uppercase flex items-center gap-2 font-mono">
-                    <ShieldAlert className="h-4 w-4 text-rose-500 animate-pulse" /> Urgent Regulatory Exceptions Requiring Attention
-                  </h3>
-                  <span className="bg-rose-500/20 text-rose-400 px-2 py-0.5 rounded text-[10px] font-bold">CRITICAL DEVIATIONS</span>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 font-mono text-[11px] leading-relaxed">
-                  <div className="bg-rose-950/10 border border-rose-900/50 p-3.5 rounded-lg flex flex-col justify-between">
+                <div className="lg:col-span-7 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
                     <div>
-                      <span className="bg-rose-500 text-black font-extrabold px-1.5 rounded text-[8.5px] uppercase">KYC FAIL</span>
-                      <h4 className="font-bold text-white mt-1.5 mb-1 text-xs">Biometrics fingerprint mismatch registered on Pretoria investor wallet request.</h4>
-                      <p className="text-slate-400 text-[10px] mb-3">User 'Amara_Diallo_SNG' triggered withdrawal request through TOR nodes.</p>
+                      <h2 className="font-heading text-base font-bold text-slate-900 dark:text-white">
+                        Marketplace Vertical Distribution
+                      </h2>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                        Live inventory count across every AfriEstate front-page destination
+                      </p>
                     </div>
-                    <button 
-                      onClick={() => handleOpenActionModal("suspend", users.find(u => u.id === "USR-7705"))}
-                      className="w-full bg-[#1e131d] text-rose-400 border border-rose-900/50 hover:bg-rose-900/20 py-1.5 rounded text-[10px] font-bold uppercase"
+                    <button
+                      type="button"
+                      onClick={() => setActiveSection('listings')}
+                      className="text-xs font-semibold text-emerald-700 dark:text-amber-300 hover:underline"
                     >
-                      Audit & Suspend User
+                      Manage all listings
                     </button>
                   </div>
-                  <div className="bg-amber-950/10 border border-amber-900/50 p-3.5 rounded-lg flex flex-col justify-between">
-                    <div>
-                      <span className="bg-amber-500 text-black font-extrabold px-1.5 rounded text-[8.5px] uppercase">LICENSE FLAGGED</span>
-                      <h4 className="font-bold text-white mt-1.5 mb-1 text-xs">FFC certification license mismatch on property listings in Gauteng node.</h4>
-                      <p className="text-slate-400 text-[10px] mb-3">Agent Zenebech Selassie listings are active on historical expired credential hash.</p>
-                    </div>
-                    <button 
-                      onClick={() => handleOpenActionModal("kyc_audit", users.find(u => u.id === "USR-4402"))}
-                      className="w-full bg-[#1e1a13] text-amber-400 border border-amber-900/50 hover:bg-amber-900/20 py-1.5 rounded text-[10px] font-bold uppercase"
-                    >
-                      Mark Restricted & Re-Vette FFC
-                    </button>
+
+                  <div className="space-y-3">
+                    {executiveStats.verticalCounts.map((v) => {
+                      const pct = executiveStats.totalListings > 0 ? Math.round((v.count / executiveStats.totalListings) * 100) : 0;
+                      return (
+                        <div key={v.label} className="space-y-1.5">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="font-medium text-slate-700 dark:text-slate-200">{v.label}</span>
+                            <span className="font-mono tabular-nums font-semibold text-slate-900 dark:text-white">
+                              {v.count} listings ({pct}%)
+                            </span>
+                          </div>
+                          <div className="h-2 w-full rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                            <div className={`h-full rounded-full ${v.color}`} style={{ width: `${Math.max(4, pct)}%` }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="lg:col-span-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 space-y-4">
+                  <div className="border-b border-slate-100 dark:border-slate-800 pb-3">
+                    <h2 className="font-heading text-base font-bold text-slate-900 dark:text-white">
+                      Instant Platform Switches
+                    </h2>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Changes take effect immediately across all visitor &amp; partner pages
+                    </p>
+                  </div>
+
+                  <div className="space-y-3 text-xs">
+                    <label className="flex items-center justify-between gap-3 p-3 rounded-lg border border-slate-200 dark:border-slate-800 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                      <div>
+                        <p className="font-semibold text-slate-900 dark:text-white">Public Announcement Banner</p>
+                        <p className="text-slate-500 dark:text-slate-400">Display notice ribbon above site header</p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={settings.announcementBanner.enabled}
+                        onChange={(e) =>
+                          updateSettings(
+                            {
+                              announcementBanner: {
+                                ...settings.announcementBanner,
+                                enabled: e.target.checked,
+                              },
+                            },
+                            `Turned public announcement banner ${e.target.checked ? 'ON' : 'OFF'}.`
+                          )
+                        }
+                        className="w-4 h-4 accent-emerald-700"
+                      />
+                    </label>
+
+                    <label className="flex items-center justify-between gap-3 p-3 rounded-lg border border-slate-200 dark:border-slate-800 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                      <div>
+                        <p className="font-semibold text-slate-900 dark:text-white">Require KYC Before Publishing</p>
+                        <p className="text-slate-500 dark:text-slate-400">Block unverified accounts from new listings</p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={settings.securityPolicies.requireKycToPublish}
+                        onChange={(e) =>
+                          updateSettings(
+                            {
+                              securityPolicies: {
+                                ...settings.securityPolicies,
+                                requireKycToPublish: e.target.checked,
+                              },
+                            },
+                            `Set KYC-before-publish gate to ${e.target.checked ? 'REQUIRED' : 'OPTIONAL'}.`
+                          )
+                        }
+                        className="w-4 h-4 accent-emerald-700"
+                      />
+                    </label>
+
+                    <label className="flex items-center justify-between gap-3 p-3 rounded-lg border border-slate-200 dark:border-slate-800 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                      <div>
+                        <p className="font-semibold text-slate-900 dark:text-white">Maintenance Mode Lock</p>
+                        <p className="text-slate-500 dark:text-slate-400">Show scheduled maintenance page to visitors</p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={settings.maintenanceMode}
+                        onChange={(e) =>
+                          updateSettings(
+                            { maintenanceMode: e.target.checked },
+                            `Set Maintenance Mode to ${e.target.checked ? 'ENABLED' : 'LIVE'}.`
+                          )
+                        }
+                        className="w-4 h-4 accent-rose-600"
+                      />
+                    </label>
                   </div>
                 </div>
               </div>
 
+              {/* Top Countries Table + Recent Audit Trail */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <div className="lg:col-span-7 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
+                  <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                    <h2 className="font-heading text-base font-bold text-slate-900 dark:text-white">
+                      Top Countries by Inventory &amp; Revenue
+                    </h2>
+                    <button
+                      type="button"
+                      onClick={() => setActiveSection('countries')}
+                      className="text-xs font-semibold text-emerald-700 dark:text-amber-300 hover:underline"
+                    >
+                      Open Country Console
+                    </button>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 uppercase text-[10px]">
+                        <tr>
+                          <th className="px-4 py-3">Country</th>
+                          <th className="px-4 py-3 text-right">Listings</th>
+                          <th className="px-4 py-3 text-right">Monthly Commission</th>
+                          <th className="px-4 py-3 text-right">VAT</th>
+                          <th className="px-4 py-3 text-right">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                        {countryMetrics.slice(0, 6).map((c) => (
+                          <tr
+                            key={c.code}
+                            onClick={() => {
+                              setSelectedCountryCode(c.code);
+                              setActiveSection('countries');
+                            }}
+                            className="hover:bg-slate-50 dark:hover:bg-slate-800/40 cursor-pointer"
+                          >
+                            <td className="px-4 py-3 font-semibold text-slate-900 dark:text-white">
+                              <span className="font-mono text-[11px] text-slate-500 mr-2">{c.code}</span>
+                              {c.name}
+                            </td>
+                            <td className="px-4 py-3 text-right font-mono tabular-nums">{c.listingCount}</td>
+                            <td className="px-4 py-3 text-right font-mono tabular-nums font-semibold text-emerald-700 dark:text-emerald-400">
+                              {formatMoney(c.monthlyCommissionZar)}
+                            </td>
+                            <td className="px-4 py-3 text-right font-mono tabular-nums">{c.vatRatePct}%</td>
+                            <td className="px-4 py-3 text-right">
+                              <span
+                                className={`inline-flex px-2 py-0.5 rounded text-[11px] font-semibold ${
+                                  c.enabled
+                                    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
+                                    : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+                                }`}
+                              >
+                                {c.enabled ? 'Active' : 'Paused'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="lg:col-span-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 space-y-3">
+                  <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+                    <h2 className="font-heading text-base font-bold text-slate-900 dark:text-white">
+                      Governance Audit Trail
+                    </h2>
+                    <span className="text-[11px] font-mono tabular-nums text-slate-500">{auditFeed.length} events</span>
+                  </div>
+                  <div className="space-y-2.5 max-h-64 overflow-y-auto pr-1">
+                    {auditFeed.slice(0, 8).map((entry) => (
+                      <div key={entry.id} className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 text-xs">
+                        <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+                          <span className="font-semibold text-emerald-700 dark:text-amber-300">{entry.category}</span>
+                          <span className="font-mono tabular-nums">{new Date(entry.timestamp).toLocaleTimeString()}</span>
+                        </div>
+                        <p className="text-slate-800 dark:text-slate-200 mt-1">{entry.action}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
-          {activeCategory === "Dashboard" && activeSub === "Global Metrics" && (
+          {/* ============================================================== */}
+          {/* 2. ROLES & USERS MANAGEMENT                                    */}
+          {/* ============================================================== */}
+          {activeSection === 'users' && (
             <div className="space-y-6">
-              <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-800 bg-slate-950 p-4 font-mono text-xs">
-                <div className="flex items-center gap-3">
-                  <span className="text-slate-500">ZOOM REGIONAL NODE:</span>
-                  {["All Africa", "Southern Africa", "West Africa", "East Africa"].map(reg => (
+              {/* Role Filter Bar + Provision Button */}
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap gap-1.5">
+                  {ROLE_FILTER_TABS.map((tab) => (
                     <button
-                      key={reg}
-                      onClick={() => setChartRegionFilter(reg)}
-                      className={`rounded px-3 py-1 font-bold ${
-                        chartRegionFilter === reg ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 font-extrabold shadow-[0_0_12px_rgba(6,182,212,0.15)]" : "text-slate-400 hover:text-white"
+                      key={tab.key}
+                      type="button"
+                      onClick={() => setRoleFilter(tab.key)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap shrink-0 ${
+                        roleFilter === tab.key
+                          ? 'bg-[#0B1F1A] text-white'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
                       }`}
                     >
-                      {reg}
+                      {tab.label}
                     </button>
+                  ))}
+                </div>
+
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <div className="relative flex-1 sm:w-64">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={userSearch}
+                      onChange={(e) => setUserSearch(e.target.value)}
+                      placeholder="Filter name, email, country..."
+                      className="w-full pl-9 pr-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-700"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsAddUserOpen((v) => !v)}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#0B1F1A] text-white text-xs font-semibold hover:bg-emerald-900 whitespace-nowrap shrink-0"
+                  >
+                    <Plus className="w-4 h-4 text-amber-300" />
+                    <span>Add Account</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Add Account Inline Form */}
+              {isAddUserOpen && (
+                <form
+                  onSubmit={handleAddAccount}
+                  className="bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-900 rounded-xl p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 items-end"
+                >
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1">Full Name</label>
+                    <input
+                      type="text"
+                      required
+                      value={newAccountForm.name}
+                      onChange={(e) => setNewAccountForm({ ...newAccountForm, name: e.target.value })}
+                      placeholder="e.g. Nomsa Dlamini"
+                      className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1">Email</label>
+                    <input
+                      type="email"
+                      required
+                      value={newAccountForm.email}
+                      onChange={(e) => setNewAccountForm({ ...newAccountForm, email: e.target.value })}
+                      placeholder="name@company.com"
+                      className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1">Role</label>
+                    <select
+                      value={newAccountForm.roleKey}
+                      onChange={(e) => setNewAccountForm({ ...newAccountForm, roleKey: e.target.value as SovereignRoleKey })}
+                      className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs"
+                    >
+                      {Object.values(roleControls).map((r) => (
+                        <option key={r.roleKey} value={r.roleKey}>
+                          {r.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1">Country</label>
+                    <select
+                      value={newAccountForm.country}
+                      onChange={(e) => setNewAccountForm({ ...newAccountForm, country: e.target.value })}
+                      className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs"
+                    >
+                      {countryConfigs.map((c) => (
+                        <option key={c.code} value={c.name}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1">Organization</label>
+                    <input
+                      type="text"
+                      value={newAccountForm.agency}
+                      onChange={(e) => setNewAccountForm({ ...newAccountForm, agency: e.target.value })}
+                      placeholder="Agency / Hotel"
+                      className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <button type="submit" className="flex-1 py-2 px-3 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold">
+                      Provision
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsAddUserOpen(false)}
+                      className="py-2 px-3 rounded-lg bg-slate-100 dark:bg-slate-800 text-xs font-semibold"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* Role Permission Matrix */}
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
+                <div className="px-5 py-3.5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                  <div>
+                    <h2 className="font-heading text-sm font-bold text-slate-900 dark:text-white">
+                      Global Role Access &amp; Publishing Matrix
+                    </h2>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Toggling permissions immediately applies to every account in that role across AfriEstate
+                    </p>
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 uppercase text-[10px]">
+                      <tr>
+                        <th className="px-4 py-2.5">Role Profile</th>
+                        <th className="px-4 py-2.5 text-center">Sign-In Enabled</th>
+                        <th className="px-4 py-2.5 text-center">Can Publish</th>
+                        <th className="px-4 py-2.5 text-center">KYC Required</th>
+                        <th className="px-4 py-2.5 text-center">Invest Desk</th>
+                        <th className="px-4 py-2.5 text-right">Max Active Listings</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                      {Object.values(roleControls).map((rc) => (
+                        <tr key={rc.roleKey} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                          <td className="px-4 py-2.5 font-semibold text-slate-900 dark:text-white">{rc.label}</td>
+                          <td className="px-4 py-2.5 text-center">
+                            <input
+                              type="checkbox"
+                              checked={rc.canLogin}
+                              onChange={(e) => updateRolePermission(rc.roleKey, { canLogin: e.target.checked })}
+                              className="w-4 h-4 accent-emerald-700"
+                            />
+                          </td>
+                          <td className="px-4 py-2.5 text-center">
+                            <input
+                              type="checkbox"
+                              checked={rc.canPublishListings}
+                              onChange={(e) => updateRolePermission(rc.roleKey, { canPublishListings: e.target.checked })}
+                              className="w-4 h-4 accent-emerald-700"
+                            />
+                          </td>
+                          <td className="px-4 py-2.5 text-center">
+                            <input
+                              type="checkbox"
+                              checked={rc.requiresKycApproval}
+                              onChange={(e) => updateRolePermission(rc.roleKey, { requiresKycApproval: e.target.checked })}
+                              className="w-4 h-4 accent-emerald-700"
+                            />
+                          </td>
+                          <td className="px-4 py-2.5 text-center">
+                            <input
+                              type="checkbox"
+                              checked={rc.canAccessInvestmentDesk}
+                              onChange={(e) => updateRolePermission(rc.roleKey, { canAccessInvestmentDesk: e.target.checked })}
+                              className="w-4 h-4 accent-emerald-700"
+                            />
+                          </td>
+                          <td className="px-4 py-2.5 text-right">
+                            <input
+                              type="number"
+                              min={0}
+                              max={2000}
+                              value={rc.maxActiveListings}
+                              onChange={(e) => updateRolePermission(rc.roleKey, { maxActiveListings: Number(e.target.value) || 0 })}
+                              className="w-20 px-2 py-1 text-right rounded border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono tabular-nums"
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Accounts Table + Inspector Drawer */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                <div className="lg:col-span-8 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 uppercase text-[10px]">
+                        <tr>
+                          <th className="px-4 py-3">Account</th>
+                          <th className="px-4 py-3">Role</th>
+                          <th className="px-4 py-3">Country</th>
+                          <th className="px-4 py-3">KYC</th>
+                          <th className="px-4 py-3">Status</th>
+                          <th className="px-4 py-3 text-right">Wallet / Capital</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                        {filteredAccounts.map((acc) => {
+                          const isSelected = selectedAccount?.id === acc.id;
+                          return (
+                            <tr
+                              key={acc.id}
+                              onClick={() => setSelectedUserId(acc.id)}
+                              className={`cursor-pointer transition-colors ${
+                                isSelected
+                                  ? 'bg-emerald-50/70 dark:bg-emerald-950/30'
+                                  : 'hover:bg-slate-50 dark:hover:bg-slate-800/40'
+                              }`}
+                            >
+                              <td className="px-4 py-3">
+                                <p className="font-semibold text-slate-900 dark:text-white">{acc.name}</p>
+                                <p className="text-[11px] text-slate-500 dark:text-slate-400">{acc.email}</p>
+                              </td>
+                              <td className="px-4 py-3 font-medium text-slate-700 dark:text-slate-200">
+                                {roleControls[acc.roleKey]?.label || acc.role}
+                              </td>
+                              <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{acc.country}</td>
+                              <td className="px-4 py-3">
+                                <span
+                                  className={`px-2 py-0.5 rounded text-[11px] font-semibold ${
+                                    acc.kycStatus === 'Approved'
+                                      ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
+                                      : acc.kycStatus === 'Flagged'
+                                        ? 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300'
+                                        : 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300'
+                                  }`}
+                                >
+                                  {acc.kycStatus}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3">
+                                <span
+                                  className={`px-2 py-0.5 rounded text-[11px] font-semibold ${
+                                    acc.status === 'Active'
+                                      ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
+                                      : acc.status === 'Suspended'
+                                        ? 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300'
+                                        : 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300'
+                                  }`}
+                                >
+                                  {acc.status}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-right font-mono tabular-nums font-semibold">
+                                {formatMoney(acc.walletBalance + acc.investments)}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Account Control Inspector */}
+                <div className="lg:col-span-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 space-y-4">
+                  {selectedAccount ? (
+                    <>
+                      <div className="border-b border-slate-100 dark:border-slate-800 pb-3">
+                        <p className="text-[11px] font-mono text-slate-500">{selectedAccount.id}</p>
+                        <h3 className="font-heading text-lg font-bold text-slate-900 dark:text-white">
+                          {selectedAccount.name}
+                        </h3>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                          {selectedAccount.agency || selectedAccount.location}
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3 text-xs bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg">
+                        <div>
+                          <span className="text-slate-500 block">Status</span>
+                          <span className="font-semibold text-slate-900 dark:text-white">{selectedAccount.status}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-500 block">Wallet</span>
+                          <span className="font-semibold text-slate-900 dark:text-white">
+                            {selectedAccount.isWalletFrozen ? 'Frozen' : 'Active'}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-slate-500 block">Publishing</span>
+                          <span className="font-semibold text-slate-900 dark:text-white">
+                            {selectedAccount.canPublish ? 'Allowed' : 'Restricted'}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-slate-500 block">Risk Score</span>
+                          <span className="font-mono tabular-nums font-semibold text-slate-900 dark:text-white">
+                            {selectedAccount.riskScore}/100
+                          </span>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                          Reassign Platform Role
+                        </label>
+                        <select
+                          value={selectedAccount.roleKey}
+                          onChange={(e) =>
+                            handleUserMutation(selectedAccount, 'reinstate', e.target.value as SovereignRoleKey)
+                          }
+                          className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-semibold"
+                        >
+                          {Object.values(roleControls).map((rc) => (
+                            <option key={rc.roleKey} value={rc.roleKey}>
+                              {rc.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <button
+                          type="button"
+                          onClick={() => handleUserMutation(selectedAccount, 'approve_kyc')}
+                          className="py-2 px-3 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-semibold"
+                        >
+                          Approve KYC
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleUserMutation(selectedAccount, 'toggle_publish')}
+                          className="py-2 px-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 font-semibold"
+                        >
+                          {selectedAccount.canPublish ? 'Disable Publish' : 'Enable Publish'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleUserMutation(
+                              selectedAccount,
+                              selectedAccount.isWalletFrozen ? 'unfreeze_wallet' : 'freeze_wallet'
+                            )
+                          }
+                          className="py-2 px-3 rounded-lg border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 font-semibold"
+                        >
+                          {selectedAccount.isWalletFrozen ? 'Unfreeze Wallet' : 'Freeze Wallet'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleUserMutation(
+                              selectedAccount,
+                              selectedAccount.status === 'Suspended' ? 'reinstate' : 'suspend'
+                            )
+                          }
+                          className={`py-2 px-3 rounded-lg font-semibold ${
+                            selectedAccount.status === 'Suspended'
+                              ? 'bg-slate-900 text-white hover:bg-slate-800'
+                              : 'bg-rose-600 hover:bg-rose-700 text-white'
+                          }`}
+                        >
+                          {selectedAccount.status === 'Suspended' ? 'Reinstate User' : 'Suspend Account'}
+                        </button>
+                      </div>
+
+                      <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1.5">
+                        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Account Notes</p>
+                        {selectedAccount.notesHistory.slice(0, 3).map((note, idx) => (
+                          <p key={idx} className="text-xs text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/50 p-2 rounded">
+                            {note}
+                          </p>
+                        ))}
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-xs text-slate-500">Select an account to inspect controls.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ============================================================== */}
+          {/* 3. LISTINGS & VERTICALS MANAGER                                */}
+          {/* ============================================================== */}
+          {activeSection === 'listings' && (
+            <div className="space-y-6">
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap gap-2">
+                  <select
+                    value={verticalFilter}
+                    onChange={(e) => setVerticalFilter(e.target.value)}
+                    className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-semibold"
+                  >
+                    <option value="All">All Verticals</option>
+                    <option value="Residential Sale">Residential Sales</option>
+                    <option value="Long-Term Rental">Long-Term Rentals</option>
+                    <option value="Short Stay & Hotel">Short Stays &amp; Hotels</option>
+                    <option value="Investment">Investment Offerings</option>
+                    <option value="Transport Fleet">Transport Fleet</option>
+                    <option value="Wellness Retreat">Wellness Retreats</option>
+                  </select>
+
+                  <select
+                    value={listingCountryFilter}
+                    onChange={(e) => setListingCountryFilter(e.target.value)}
+                    className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-semibold"
+                  >
+                    <option value="All">All Countries</option>
+                    {countryConfigs.map((c) => (
+                      <option key={c.code} value={c.name}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+
+                  <select
+                    value={listingStatusFilter}
+                    onChange={(e) => setListingStatusFilter(e.target.value)}
+                    className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-semibold"
+                  >
+                    <option value="All">All Statuses</option>
+                    <option value="Active">Active Public</option>
+                    <option value="Pending Approval">Pending Approval</option>
+                    <option value="Featured">Featured Spotlight</option>
+                    <option value="Hidden">Hidden / Unpublished</option>
+                  </select>
+                </div>
+
+                <div className="relative w-full sm:w-72">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={listingSearch}
+                    onChange={(e) => setListingSearch(e.target.value)}
+                    placeholder="Search title, city, owner..."
+                    className="w-full pl-9 pr-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                <div className="lg:col-span-8 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 uppercase text-[10px]">
+                        <tr>
+                          <th className="px-4 py-3">Property / Listing</th>
+                          <th className="px-4 py-3">Vertical</th>
+                          <th className="px-4 py-3">Location</th>
+                          <th className="px-4 py-3 text-right">Price</th>
+                          <th className="px-4 py-3 text-right">State</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                        {filteredListings.map((item) => (
+                          <tr
+                            key={item.id}
+                            onClick={() => {
+                              setSelectedListingId(item.id);
+                              setEditingPriceValue(String(item.price));
+                            }}
+                            className={`cursor-pointer ${
+                              selectedListing?.id === item.id
+                                ? 'bg-emerald-50/70 dark:bg-emerald-950/30'
+                                : 'hover:bg-slate-50 dark:hover:bg-slate-800/40'
+                            }`}
+                          >
+                            <td className="px-4 py-3">
+                              <p className="font-semibold text-slate-900 dark:text-white line-clamp-1">{item.title}</p>
+                              <p className="text-[11px] text-slate-500">
+                                {item.ownerName} {item.featured ? '· Featured' : ''}
+                              </p>
+                            </td>
+                            <td className="px-4 py-3 text-slate-600 dark:text-slate-300 whitespace-nowrap">{item.vertical}</td>
+                            <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+                              {item.city}, {item.country}
+                            </td>
+                            <td className="px-4 py-3 text-right font-mono tabular-nums font-semibold text-slate-900 dark:text-white">
+                              {formatMoney(item.price)}
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <span
+                                className={`px-2 py-0.5 rounded text-[11px] font-semibold ${
+                                  item.hidden
+                                    ? 'bg-slate-100 text-slate-500'
+                                    : item.status === PropertyStatus.ACTIVE
+                                      ? 'bg-emerald-50 text-emerald-700'
+                                      : 'bg-amber-50 text-amber-700'
+                                }`}
+                              >
+                                {item.hidden ? 'Hidden' : item.status}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Selected Listing Controls */}
+                <div className="lg:col-span-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 space-y-4">
+                  {selectedListing ? (
+                    <>
+                      <div className="border-b border-slate-100 dark:border-slate-800 pb-3">
+                        <p className="text-[11px] font-mono text-slate-500">
+                          {selectedListing.id} · {selectedListing.vertical}
+                        </p>
+                        <h3 className="font-heading text-base font-bold text-slate-900 dark:text-white mt-0.5">
+                          {selectedListing.title}
+                        </h3>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          {selectedListing.city}, {selectedListing.country} · Listed by {selectedListing.ownerName}
+                        </p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                          Override Price (ZAR Baseline)
+                        </label>
+                        <div className="flex gap-2">
+                          <input
+                            type="number"
+                            value={editingPriceValue || selectedListing.price}
+                            onChange={(e) => setEditingPriceValue(e.target.value)}
+                            className="flex-1 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-mono tabular-nums"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleSaveListingPrice(selectedListing)}
+                            className="px-3 py-2 rounded-lg bg-[#0B1F1A] text-white text-xs font-semibold hover:bg-emerald-900"
+                          >
+                            Apply
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <button
+                          type="button"
+                          onClick={() => handleListingAction(selectedListing, 'approve')}
+                          className="py-2 px-3 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-semibold"
+                        >
+                          Approve Live
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleListingAction(selectedListing, 'verify')}
+                          className="py-2 px-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 font-semibold"
+                        >
+                          {selectedListing.verified ? 'Revoke Badge' : 'Verify Deed'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleListingAction(selectedListing, 'feature')}
+                          className="py-2 px-3 rounded-lg border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 font-semibold"
+                        >
+                          {selectedListing.featured ? 'Remove Feature' : 'Feature on Home'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleListingAction(selectedListing, 'flag')}
+                          className="py-2 px-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 font-semibold"
+                        >
+                          Hold for Review
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleListingAction(selectedListing, selectedListing.hidden ? 'restore' : 'hide')}
+                          className="py-2 px-3 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 font-semibold"
+                        >
+                          {selectedListing.hidden ? 'Restore Public' : 'Unpublish'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleListingAction(selectedListing, 'delete')}
+                          className="py-2 px-3 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-semibold"
+                        >
+                          Delete Listing
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-xs text-slate-500">Select a listing to moderate or update pricing.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ============================================================== */}
+          {/* 4. COUNTRIES & REVENUE COMMAND                                 */}
+          {/* ============================================================== */}
+          {activeSection === 'countries' && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                <div className="lg:col-span-8 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
+                  <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                    <div>
+                      <h2 className="font-heading text-base font-bold text-slate-900 dark:text-white">
+                        Country-Based Performance, Tax &amp; Marketplace Rules
+                      </h2>
+                      <p className="text-xs text-slate-500">
+                        Pausing a country immediately hides its inventory across public search and category pages
+                      </p>
+                    </div>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 uppercase text-[10px]">
+                        <tr>
+                          <th className="px-4 py-3">Market</th>
+                          <th className="px-4 py-3 text-right">Listings</th>
+                          <th className="px-4 py-3 text-right">Roles</th>
+                          <th className="px-4 py-3 text-right">Monthly Commission</th>
+                          <th className="px-4 py-3 text-right">VAT</th>
+                          <th className="px-4 py-3 text-right">Market State</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                        {countryMetrics.map((c) => (
+                          <tr
+                            key={c.code}
+                            onClick={() => setSelectedCountryCode(c.code)}
+                            className={`cursor-pointer ${
+                              activeCountryDetail?.code === c.code
+                                ? 'bg-emerald-50/70 dark:bg-emerald-950/30'
+                                : 'hover:bg-slate-50 dark:hover:bg-slate-800/40'
+                            }`}
+                          >
+                            <td className="px-4 py-3">
+                              <p className="font-semibold text-slate-900 dark:text-white">
+                                <span className="font-mono text-[11px] text-slate-500 mr-2">{c.code}</span>
+                                {c.name}
+                              </p>
+                              <p className="text-[11px] text-slate-500">
+                                {c.region} · {c.currency}
+                              </p>
+                            </td>
+                            <td className="px-4 py-3 text-right font-mono tabular-nums">{c.listingCount}</td>
+                            <td className="px-4 py-3 text-right font-mono tabular-nums">{c.userCount}</td>
+                            <td className="px-4 py-3 text-right font-mono tabular-nums font-semibold text-emerald-700 dark:text-emerald-400">
+                              {formatMoney(c.monthlyCommissionZar)}
+                            </td>
+                            <td className="px-4 py-3 text-right font-mono tabular-nums">{c.vatRatePct}%</td>
+                            <td className="px-4 py-3 text-right">
+                              <span
+                                className={`px-2 py-0.5 rounded text-[11px] font-semibold ${
+                                  c.enabled ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
+                                }`}
+                              >
+                                {c.enabled ? 'Active' : 'Paused'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Selected Country Policy Editor */}
+                {activeCountryDetail && (
+                  <div className="lg:col-span-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 space-y-4">
+                    <div className="border-b border-slate-100 dark:border-slate-800 pb-3 flex items-center justify-between">
+                      <div>
+                        <p className="text-[11px] font-mono text-slate-500">
+                          {activeCountryDetail.code} · {activeCountryDetail.region}
+                        </p>
+                        <h3 className="font-heading text-lg font-bold text-slate-900 dark:text-white">
+                          {activeCountryDetail.name} Controls
+                        </h3>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          updateCountryConfig(
+                            activeCountryDetail.code,
+                            { enabled: !activeCountryDetail.enabled },
+                            `${activeCountryDetail.enabled ? 'Paused' : 'Enabled'} ${activeCountryDetail.name} market.`
+                          )
+                        }
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${
+                          activeCountryDetail.enabled
+                            ? 'bg-emerald-700 text-white'
+                            : 'bg-rose-600 text-white'
+                        }`}
+                      >
+                        {activeCountryDetail.enabled ? 'Market Active' : 'Market Paused'}
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 text-xs bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg">
+                      <div>
+                        <span className="text-slate-500 block">Stays &amp; Hotels</span>
+                        <span className="font-mono font-semibold text-slate-900 dark:text-white">{activeCountryDetail.shortStayCount}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 block">Long-Term Rentals</span>
+                        <span className="font-mono font-semibold text-slate-900 dark:text-white">{activeCountryDetail.longTermCount}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 block">Sales &amp; Invest</span>
+                        <span className="font-mono font-semibold text-slate-900 dark:text-white">{activeCountryDetail.saleCount}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 block">Transport &amp; Wellness</span>
+                        <span className="font-mono font-semibold text-slate-900 dark:text-white">{activeCountryDetail.serviceCount}</span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3 text-xs">
+                      <div className="flex items-center justify-between">
+                        <label className="font-semibold text-slate-700 dark:text-slate-300">Featured Hub Spotlight</label>
+                        <input
+                          type="checkbox"
+                          checked={activeCountryDetail.featuredHub}
+                          onChange={(e) =>
+                            updateCountryConfig(activeCountryDetail.code, { featuredHub: e.target.checked })
+                          }
+                          className="w-4 h-4 accent-emerald-700"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">VAT / GST Rate (%)</label>
+                        <input
+                          type="number"
+                          step="0.5"
+                          value={activeCountryDetail.vatRatePct}
+                          onChange={(e) =>
+                            updateCountryConfig(activeCountryDetail.code, { vatRatePct: Number(e.target.value) || 0 })
+                          }
+                          className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono tabular-nums"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Transfer / Stamp Duty (%)</label>
+                        <input
+                          type="number"
+                          step="0.5"
+                          value={activeCountryDetail.stampDutyPct}
+                          onChange={(e) =>
+                            updateCountryConfig(activeCountryDetail.code, { stampDutyPct: Number(e.target.value) || 0 })
+                          }
+                          className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono tabular-nums"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Target Gross Rental Yield (%)</label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          value={activeCountryDetail.targetRentalYieldPct}
+                          onChange={(e) =>
+                            updateCountryConfig(activeCountryDetail.code, { targetRentalYieldPct: Number(e.target.value) || 0 })
+                          }
+                          className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono tabular-nums"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
+                      <span className="text-slate-500">Est. Tax Withholding</span>
+                      <span className="font-mono tabular-nums font-bold text-slate-900 dark:text-white">
+                        {formatMoney(activeCountryDetail.estimatedVatZar)} / mo
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ============================================================== */}
+          {/* 5. FINANCIALS, COMMISSIONS & ESCROW                            */}
+          {/* ============================================================== */}
+          {activeSection === 'financials' && (
+            <div className="space-y-6">
+              {/* Live Fee Schedule Synced with PricingPage */}
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
+                  <div>
+                    <h2 className="font-heading text-base font-bold text-slate-900 dark:text-white">
+                      Active Marketplace Commission &amp; Subscription Schedule
+                    </h2>
+                    <p className="text-xs text-slate-500">
+                      Synchronized in real time with the public Pricing page and payout calculator
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveSection('settings');
+                      setSettingsSubTab('pricing');
+                    }}
+                    className="px-3.5 py-1.5 rounded-lg bg-[#0B1F1A] text-white text-xs font-semibold hover:bg-emerald-900"
+                  >
+                    Edit Rates in Settings
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 text-xs">
+                  <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800">
+                    <p className="text-slate-500">Accommodation Providers</p>
+                    <p className="text-xl font-bold font-mono tabular-nums text-slate-900 dark:text-white mt-1">
+                      {settings.commissionRates.shortStayPercent}% / stay
+                    </p>
+                  </div>
+                  <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800">
+                    <p className="text-slate-500">Long-Term Rentals</p>
+                    <p className="text-xl font-bold font-mono tabular-nums text-slate-900 dark:text-white mt-1">
+                      {settings.commissionRates.longTermPlacementPercent}% placement
+                    </p>
+                  </div>
+                  <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800">
+                    <p className="text-slate-500">Property Sales Boost</p>
+                    <p className="text-xl font-bold font-mono tabular-nums text-slate-900 dark:text-white mt-1">
+                      R{settings.commissionRates.salesBoostZar}
+                    </p>
+                  </div>
+                  <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800">
+                    <p className="text-slate-500">Property Managers</p>
+                    <p className="text-xl font-bold font-mono tabular-nums text-slate-900 dark:text-white mt-1">
+                      R{settings.commissionRates.propertyManagerMonthlyZar}/unit/mo
+                    </p>
+                  </div>
+                  <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800">
+                    <p className="text-slate-500">Hotels &amp; Enterprise</p>
+                    <p className="text-xl font-bold font-mono tabular-nums text-emerald-700 dark:text-emerald-400 mt-1">
+                      From {settings.commissionRates.hotelCommissionPercent}%
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Escrow & Payout Ledger */}
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
+                <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                  <h2 className="font-heading text-base font-bold text-slate-900 dark:text-white">
+                    Escrow Settlements &amp; Commission Payouts
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={handleExportCountryCsv}
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 hover:underline"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Download CSV</span>
+                  </button>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 uppercase text-[10px]">
+                      <tr>
+                        <th className="px-4 py-3">Ref ID</th>
+                        <th className="px-4 py-3">Parties</th>
+                        <th className="px-4 py-3">Type</th>
+                        <th className="px-4 py-3 text-right">Amount</th>
+                        <th className="px-4 py-3 text-right">Status</th>
+                        <th className="px-4 py-3 text-right">Control</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                      {transactions.map((tx) => (
+                        <tr key={tx.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                          <td className="px-4 py-3 font-mono text-slate-500">{tx.id}</td>
+                          <td className="px-4 py-3">
+                            <p className="font-semibold text-slate-900 dark:text-white">{tx.senderName}</p>
+                            <p className="text-[11px] text-slate-500">To: {tx.receiverName}</p>
+                          </td>
+                          <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{tx.type}</td>
+                          <td className="px-4 py-3 text-right font-mono tabular-nums font-semibold">
+                            {formatMoney(tx.amount)}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <span
+                              className={`px-2 py-0.5 rounded text-[11px] font-semibold ${
+                                tx.status.includes('Completed')
+                                  ? 'bg-emerald-50 text-emerald-700'
+                                  : tx.status.includes('Frozen')
+                                    ? 'bg-rose-50 text-rose-700'
+                                    : 'bg-amber-50 text-amber-700'
+                              }`}
+                            >
+                              {tx.status}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-right space-x-2 whitespace-nowrap">
+                            {tx.status !== 'Completed' && (
+                              <button
+                                type="button"
+                                onClick={() => handleTransactionAction(tx, 'Completed')}
+                                className="px-2.5 py-1 rounded bg-emerald-700 text-white text-[11px] font-semibold"
+                              >
+                                Release
+                              </button>
+                            )}
+                            {tx.status !== 'Frozen Locked' && (
+                              <button
+                                type="button"
+                                onClick={() => handleTransactionAction(tx, 'Frozen Locked')}
+                                className="px-2.5 py-1 rounded bg-rose-50 text-rose-700 border border-rose-200 text-[11px] font-semibold"
+                              >
+                                Hold
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ============================================================== */}
+          {/* 6. NEIGHBORHOODS & SERVICE PROFESSIONALS                       */}
+          {/* ============================================================== */}
+          {activeSection === 'directory' && (
+            <div className="space-y-6">
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
+                  <div>
+                    <h2 className="font-heading text-base font-bold text-slate-900 dark:text-white">
+                      Neighborhood Explorer Benchmarks (8 Launch Countries)
+                    </h2>
+                    <p className="text-xs text-slate-500">
+                      Synchronized with Neighborhood Explorer cities, launch hubs, and live property density
+                    </p>
+                  </div>
+                  {onNavigatePublicPage && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onNavigatePublicPage('neighborhood-explorer');
+                        if (onClose) onClose();
+                      }}
+                      className="px-3.5 py-1.5 rounded-lg bg-[#0B1F1A] text-white text-xs font-semibold"
+                    >
+                      Open Neighborhood Explorer
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+                  {COUNTRY_MARKET_GUIDES.map((guide) => {
+                    const totalAreas = guide.cities.reduce((sum, c) => sum + c.neighborhoods.length, 0);
+                    return (
+                      <div
+                        key={guide.code}
+                        className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 space-y-2"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-heading font-bold text-sm text-slate-900 dark:text-white">
+                            {guide.name}
+                          </span>
+                          <span className="font-mono text-xs font-semibold text-emerald-700 dark:text-amber-300">
+                            {guide.code}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-600 dark:text-slate-300 line-clamp-2">{guide.overview}</p>
+                        <div className="pt-2 border-t border-slate-200/70 dark:border-slate-700 flex items-center justify-between text-[11px] font-mono">
+                          <span>{guide.cities.length} city tiers</span>
+                          <span>{totalAreas} neighborhoods</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ============================================================== */}
+          {/* 7. COMPLIANCE, MODERATION & SUPPORT                            */}
+          {/* ============================================================== */}
+          {activeSection === 'compliance' && (
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              {/* Compliance & Moderation Queue */}
+              <div className="lg:col-span-7 space-y-6">
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 space-y-3">
+                  <h2 className="font-heading text-base font-bold text-slate-900 dark:text-white border-b border-slate-100 dark:border-slate-800 pb-2">
+                    KYC &amp; Compliance Review Cases
+                  </h2>
+                  {complianceCases.map((c) => (
+                    <div
+                      key={c.id}
+                      className="p-3.5 rounded-lg border border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+                    >
+                      <div>
+                        <p className="font-semibold text-slate-900 dark:text-white">
+                          {c.subjectName || c.userName} · <span className="font-mono text-slate-500">{c.id}</span>
+                        </p>
+                        <p className="text-slate-600 dark:text-slate-300 mt-0.5">{c.details || c.flagReason}</p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 font-semibold">{c.status}</span>
+                        {c.status !== 'Approved Secure' && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setComplianceCases((prev) =>
+                                prev.map((x) => (x.id === c.id ? { ...x, status: 'Approved Secure' } : x))
+                              );
+                              recordAuditEvent('Compliance', `Cleared compliance case ${c.id}.`);
+                              addToast(`Case ${c.id} cleared.`, 'success');
+                            }}
+                            className="px-2.5 py-1 rounded bg-emerald-700 text-white font-semibold"
+                          >
+                            Clear Case
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 space-y-3">
+                  <h2 className="font-heading text-base font-bold text-slate-900 dark:text-white border-b border-slate-100 dark:border-slate-800 pb-2">
+                    Content &amp; Listing Moderation Reports
+                  </h2>
+                  {moderationReports.map((rep) => (
+                    <div
+                      key={rep.id}
+                      className="p-3.5 rounded-lg border border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+                    >
+                      <div>
+                        <p className="font-semibold text-slate-900 dark:text-white">
+                          {rep.contentType} · <span className="font-mono text-slate-500">{rep.id}</span>
+                        </p>
+                        <p className="text-slate-600 dark:text-slate-300 mt-0.5">{rep.issue || rep.reason}</p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {rep.status === 'Pending Investigation' || rep.status === 'Unresolved Alert' ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setModerationReports((prev) =>
+                                prev.map((r) => (r.id === rep.id ? { ...r, status: 'Content Removed' } : r))
+                              );
+                              recordAuditEvent('Moderation', `Resolved report ${rep.id} and removed flagged content.`);
+                              addToast(`Moderation report ${rep.id} resolved.`, 'success');
+                            }}
+                            className="px-2.5 py-1 rounded bg-rose-600 text-white font-semibold"
+                          >
+                            Resolve &amp; Remove
+                          </button>
+                        ) : (
+                          <span className="px-2 py-1 rounded bg-emerald-50 text-emerald-700 font-semibold">{rep.status}</span>
+                        )}
+                      </div>
+                    </div>
                   ))}
                 </div>
               </div>
 
-              {/* ACTIVE REGIONAL INTELLIGENCE NODES GRID */}
-              <div className="space-y-4 font-mono text-xs">
-                <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                  <div className="flex items-center gap-1.5 font-bold text-white uppercase">
-                    <Network className="h-4 w-4 text-cyan-400 animate-pulse" />
-                    Sovereign Regional Nodes
-                  </div>
-                  <span className="text-[10px] text-slate-500">
-                    NETWORK STATUS: <span className="text-emerald-400 font-bold">ALL SYSTEMS SYNCED</span> // FILTER: <strong className="text-cyan-400 uppercase">{chartRegionFilter}</strong>
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-                  {regionalNodes
-                    .filter(node => chartRegionFilter === "All Africa" || node.region === chartRegionFilter)
-                    .map(node => (
-                      <RegionalNodeCard 
-                        key={node.id} 
-                        node={node} 
-                        renderCurrency={renderCurrency} 
-                      />
-                    ))}
-                </div>
-              </div>
-
-              <RevenueTab 
-                transactions={transactions} 
-                selectedTransactionId={selectedTransactionId} 
-                setSelectedTransactionId={setSelectedTransactionId}
-                onAction={handleOpenActionModal}
-                activeSub="Revenue Overview"
-                currencyCodeUsed={currencyCode}
-                renderCurrency={renderCurrency}
-              />
-            </div>
-          )}
-
-          {activeCategory === "Dashboard" && activeSub === "AI Insights" && (
-            <UsersTab 
-              users={users} 
-              selectedUserId={selectedUserId} 
-              setSelectedUserId={setSelectedUserId} 
-              onAction={handleOpenActionModal} 
-              activeSub="Verification Queue"
-            />
-          )}
-
-          {activeCategory === "Dashboard" && activeSub === "Live Activity Feed" && (
-            <div className="rounded-xl border border-slate-850 bg-slate-950 p-6 space-y-4 font-mono text-xs">
-              <div className="flex justify-between items-center pb-2.5 border-b border-slate-800">
-                <h3 className="text-xs font-black text-white uppercase tracking-widest flex items-center gap-2">
-                  <Activity className="h-4 w-4 text-cyan-400 animate-pulse" /> Live Telemetry Console Logging Feed
-                </h3>
-                <span className="text-slate-500">WEBSOCKET POOLS OPEN: 24 buffers</span>
-              </div>
-              <div className="space-y-2.5 max-h-96 overflow-y-auto [scrollbar-width:thin]">
-                {liveEvents.map(e => (
-                  <div key={e.id} className="p-3 bg-slate-900/55 rounded border border-slate-850 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-slate-500">{e.time}</span>
-                      <span className="text-cyan-400 font-extrabold px-1 bg-cyan-950/40 rounded text-[9.5px] uppercase">{e.category}</span>
-                      <span className="text-slate-300 ml-1.5">{e.desc}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* CATEGORY: USERS OPERATIONS VIEWS */}
-          {activeCategory === "Users & Access Operations" && (
-            <UsersTab 
-              users={users} 
-              selectedUserId={selectedUserId} 
-              setSelectedUserId={setSelectedUserId} 
-              onAction={handleOpenActionModal} 
-              activeSub={activeSub}
-            />
-          )}
-
-          {/* CATEGORY: LISTINGS OPERATIONS VIEWS */}
-          {activeCategory === "Listings Operations" && (
-            <ListingsTab 
-              listings={listings} 
-              selectedPropertyId={selectedPropertyId} 
-              setSelectedPropertyId={setSelectedPropertyId} 
-              onAction={handleOpenActionModal} 
-              activeSub={activeSub}
-              selectedMapRegion={selectedMapRegion}
-              setSelectedMapRegion={setSelectedMapRegion}
-              mapLayer={mapLayer}
-              setMapLayer={setMapLayer}
-              currencyCodeUsed={currencyCode}
-              renderCurrency={renderCurrency}
-            />
-          )}
-
-          {/* CATEGORY: REVENUE OPERATIONS VIEWS */}
-          {activeCategory === "Revenue Operations" && (
-            <RevenueTab 
-              transactions={transactions} 
-              selectedTransactionId={selectedTransactionId} 
-              setSelectedTransactionId={setSelectedTransactionId}
-              onAction={handleOpenActionModal}
-              activeSub={activeSub}
-              currencyCodeUsed={currencyCode}
-              renderCurrency={renderCurrency}
-            />
-          )}
-
-          {/* CATEGORY: COMPLIANCE COMMAND */}
-          {activeCategory === "Compliance Command" && (
-            <div className="space-y-6 font-mono text-xs">
-              
-              {activeSub === "Audit Logs" || activeSub === "AML Audit Logs" ? (
-                /* Audit trail feed */
+              {/* Support Desk */}
+              <div className="lg:col-span-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 space-y-4">
+                <h2 className="font-heading text-base font-bold text-slate-900 dark:text-white border-b border-slate-100 dark:border-slate-800 pb-2">
+                  Partner &amp; Seeker Support Tickets
+                </h2>
                 <div className="space-y-4">
-                  <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-850 bg-slate-950 p-4">
-                    <span className="text-slate-400 font-bold uppercase">AML Cryptographic Audit Ledger Registry</span>
-                    <span className="bg-cyan-500/10 text-cyan-400 px-2 py-0.5 rounded text-[10px] font-bold">CO-CHAIN INTERLINK Nominal</span>
-                  </div>
-
-                  <div className="rounded-xl border border-slate-800 bg-[#0c1224] p-5">
-                    <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-3.5">
-                      <h3 className="text-xs font-black text-white tracking-widest uppercase flex items-center gap-1.5">
-                        <Shield className="h-4 w-4 text-cyan-400" /> Cryptographic Immutable Audit Ledger Blocks (SHA-256)
-                      </h3>
-                      <button onClick={() => { pushLog("LEDGER_INTEGRITY: Validating full node merkle proofs."); toast("Ledger integrity certified clean.", "success"); }} className="text-cyan-400 hover:underline uppercase text-[10px] font-bold">
-                        Verify Ledger Integrity
-                      </button>
-                    </div>
-                    <div className="space-y-2 bg-slate-950 p-4 rounded-lg border border-slate-900 font-mono text-[10.5px]">
-                      {auditLogs.map((log, id) => (
-                        <div key={id} className="text-slate-300 border-l border-slate-800 pl-2.5 py-1 flex justify-between items-center">
-                          <span>{log}</span>
-                          <span className="text-[9px] text-[#22c55e] bg-[#22c55e]/10 px-1 py-0.2 rounded">VERIFIED</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              ) : activeSub === "AML Screening" ? (
-                /* AML Screening Search and PEP registers */
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                  <div className="lg:col-span-6 space-y-4">
-                    <div className="rounded-xl border border-slate-800 bg-[#0c1224] p-5">
-                      <h3 className="text-xs font-black text-white uppercase flex items-center gap-1.5 pb-2 border-b border-slate-800 mb-4">
-                        <Users className="h-4 w-4 text-cyan-400" /> Interactive AML Entity & PEP Lookup Engine
-                      </h3>
-                      <p className="text-slate-400 text-[11px] mb-4 leading-relaxed font-sans">
-                        Run real-time high-velocity sanction list checking against international SDN (Specially Designated Nationals), PEP (Politically Exposed Persons) databases.
-                      </p>
-
-                      <form onSubmit={handleRunAmlScreening} className="space-y-3">
-                        <div>
-                          <label className="text-[10px] text-slate-500 block mb-1">Subject / Company / Entity Full Name</label>
-                          <div className="flex gap-2">
-                            <input
-                              type="text"
-                              value={amlSearchTerm}
-                              onChange={(e) => setAmlSearchTerm(e.target.value)}
-                              placeholder="E.g. Khadija Diop or Olumide Alade"
-                              className="bg-slate-950 border border-slate-850 rounded px-2.5 py-1.5 text-xs text-white flex-1 focus:outline-none focus:border-cyan-400"
-                            />
-                            <button
-                              type="submit"
-                              disabled={isAmlSearching}
-                              className="bg-cyan-500 hover:bg-cyan-450 text-black font-extrabold px-4 rounded text-xs uppercase"
-                            >
-                              {isAmlSearching ? "SCANNING..." : "RUN SCAN"}
-                            </button>
-                          </div>
-                        </div>
-                      </form>
-
-                      {isAmlSearching && (
-                        <div className="mt-4 p-3 bg-slate-950 rounded border border-slate-850 text-center text-cyan-400 animate-pulse font-bold text-[11.5px]">
-                          Scanning international registries & biometric logs...
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="rounded-xl border border-[#1e293b] bg-slate-950 p-4">
-                      <span className="text-[10px] text-slate-500 font-bold block mb-1">AUTOMATED SANCTIONS STATUS INDICATORS:</span>
-                      <div className="grid grid-cols-3 gap-2 text-[10px] text-center font-bold">
-                        <div className="bg-[#121c16] text-[#22c55e] border border-[#1b2b20] p-1.5 rounded">OFAC SDN: OK</div>
-                        <div className="bg-[#121c16] text-[#22c55e] border border-[#1b2b20] p-1.5 rounded">PEP LIST: SYNCED</div>
-                        <div className="bg-[#121c16] text-[#22c55e] border border-[#1b2b20] p-1.5 rounded">SARB KYC: PASS</div>
+                  {tickets.map((t) => (
+                    <div key={t.id} className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 space-y-2.5 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono font-semibold text-slate-500">{t.id}</span>
+                        <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-800 font-semibold">{t.status}</span>
                       </div>
-                    </div>
-                  </div>
-
-                  <div className="lg:col-span-6 rounded-xl border border-slate-800 bg-[#0c1224] p-5">
-                    <h3 className="text-xs font-black text-white uppercase flex items-center gap-1.5 pb-2 border-b border-slate-800 mb-4">
-                      <Clock className="h-4 w-4 text-cyan-400" /> Historical Screening Query Records
-                    </h3>
-                    <div className="space-y-3.5 max-h-72 overflow-y-auto pr-1">
-                      {amlScreenHistory.map((item, idx) => (
-                        <div key={idx} className="bg-slate-950 p-3 rounded-lg border border-slate-850 flex justify-between items-start text-[11px]">
-                          <div>
-                            <span className="text-white font-extrabold block">{item.name}</span>
-                            <span className="text-slate-500 block text-[9.5px]">{item.type} • {item.timestamp}</span>
-                          </div>
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                            item.risk.includes("HIGH") ? "bg-rose-500/20 text-rose-450" : "bg-[#22c55e]/15 text-[#22c55e]"
-                          }`}>{item.risk}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              ) : activeSub === "Fraud & Sanctions" ? (
-                /* Fraud & Sanctions velocity check system */
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                  <div className="lg:col-span-7 space-y-4">
-                    <div className="rounded-xl border border-slate-800 bg-[#0c1224] p-5">
-                      <h3 className="text-xs font-black text-white uppercase flex items-center gap-1.5 pb-2.5 border-b border-slate-800 mb-3.5">
-                        <ShieldAlert className="h-4 w-4 text-rose-505" /> High Velocity Fraud Alert Engine (Suspicious Triggers)
-                      </h3>
-
-                      <div className="space-y-2.5">
-                        {[
-                          { id: "TX-221", origin: "Lagos Hub Node", target: "Cayman Escrow", amount: 14500000, trigger: "Multiple cross-border transfer attempts inside 60s window.", gravity: "CRITICAL" },
-                          { id: "TX-904", origin: "Cape Town Hub Node", target: "London Private Holding", amount: 82000000, trigger: "Bypassed standard SARB dual legal notary. Flagged for review.", gravity: "HIGH RISK" }
-                        ].map((trig, idx) => (
-                          <div key={idx} className="bg-slate-950 border border-slate-850 p-4 rounded-lg flex flex-col justify-between md:flex-row gap-4">
-                            <div className="space-y-1">
-                              <div className="flex items-center gap-2">
-                                <span className="text-rose-400 font-extrabold select-all">{trig.id}</span>
-                                <span className="bg-rose-500/10 text-rose-455 text-[8.5px] font-black px-1.5 rounded uppercase">{trig.gravity}</span>
-                              </div>
-                              <p className="text-slate-300 font-sans leading-relaxed text-[11px]">{trig.trigger}</p>
-                              <p className="text-slate-500 text-[10px] flex items-center gap-1 flex-wrap">
-                                <span>{trig.origin}</span>
-                                <ArrowRight className="w-3 h-3 inline text-slate-500" />
-                                <span>{trig.target} • {renderCurrency(trig.amount)}</span>
-                              </p>
-                            </div>
-                            <div className="flex md:flex-col justify-end gap-1.5 select-none self-end md:self-center">
-                              <button onClick={() => { pushLog(`FRAUD: Suspicious transaction ${trig.id} frozen.`); toast(`Alert ${trig.id} isolated & frozen.`, "warn"); }} className="bg-rose-500 hover:bg-rose-400 text-black text-[10px] font-bold px-3 py-1.5 rounded uppercase">Freeze Wallet</button>
-                              <button onClick={() => { pushLog(`FRAUD: Dismissed false alarm on ${trig.id}.`); toast(`Alert cleared secure.`, "success"); }} className="bg-slate-930 text-slate-400 hover:text-white text-[10px] font-bold px-3 py-1.5 rounded uppercase border border-slate-800 hover:border-slate-600">Dismiss</button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="lg:col-span-5 rounded-xl border border-slate-800 bg-slate-950 p-5 space-y-4">
-                    <h3 className="text-xs font-black text-white uppercase pb-2 border-b border-slate-850 mb-1">
-                      Live Sanctions Registry Sync status
-                    </h3>
-                    <p className="text-[11px] text-slate-400 leading-relaxed font-sans">
-                      AfriEstate co-signs and hashes compliance metrics with municipal and federal intelligence centers hourly.
-                    </p>
-                    <div className="space-y-2.5">
-                      <div className="flex justify-between items-center text-[11px] p-2 bg-[#0c1224] rounded border border-slate-900">
-                        <span className="text-slate-300">Interpol Red-Notice List</span>
-                        <span className="text-emerald-400 font-black">ACTIVE SYNC (9ms)</span>
-                      </div>
-                      <div className="flex justify-between items-center text-[11px] p-2 bg-[#0c1224] rounded border border-slate-900">
-                        <span className="text-slate-300">OFAC Blocked Entities Stream</span>
-                        <span className="text-emerald-400 font-black">ACTIVE SYNC (12ms)</span>
-                      </div>
-                      <div className="flex justify-between items-center text-[11px] p-2 bg-[#0c1224] rounded border border-slate-900">
-                        <span className="text-slate-300">SARB Politically Exposed Register</span>
-                        <span className="text-emerald-400 font-black">ACTIVE SYNC (4ms)</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                /* KYC, Legal Cases & Regulatory Reports list */
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                  
-                  {/* Cases list */}
-                  <div className="lg:col-span-8 space-y-4">
-                    <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-850 bg-slate-950 p-4">
-                      <span className="text-slate-450 uppercase font-black">Active Compliance & Legal Incident Register ({complianceCases.length})</span>
-                      <span className="bg-rose-500/10 text-rose-450 px-2 py-0.5 rounded text-[10px] font-bold">VETTING CORE ACTIVE</span>
-                    </div>
-
-                    <div className="rounded-xl border border-slate-850 bg-[#0c1224] overflow-hidden">
-                      <table className="w-full text-left">
-                        <thead>
-                          <tr className="border-b border-slate-850 text-slate-500 text-[10px] uppercase bg-slate-950">
-                            <th className="p-4">INCIDENT ID</th>
-                            <th className="p-4">SUBJECT ROLE</th>
-                            <th className="p-4">INCIDENT FOCUS DETAILS</th>
-                            <th className="p-4 text-center">AML RISK INDEX</th>
-                            <th className="p-4">STATUS</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {complianceCases.map(c => (
-                            <tr 
-                              key={c.id} 
-                              onClick={() => setSelectedCaseId(c.id)}
-                              className={`border-b border-slate-800/40 hover:bg-slate-900/30 cursor-pointer text-[11px] transition-all ${
-                                selectedCaseId === c.id ? "bg-cyan-950/10" : ""
-                              }`}
-                            >
-                              <td className="p-4 font-bold text-white select-all">{c.id}</td>
-                              <td className="p-4">
-                                <span className="text-slate-250 block font-semibold">{c.subjectName}</span>
-                                <span className="text-slate-500 block text-[9.5px]">{c.subjectRole}</span>
-                              </td>
-                              <td className="p-4 text-slate-400 font-sans">{c.details}</td>
-                              <td className="p-4 text-center">
-                                <span className={`font-bold ${c.riskScore > 75 ? "text-rose-400" : "text-amber-400"}`}>{c.riskScore}%</span>
-                              </td>
-                              <td className="p-4">
-                                <span className={`px-1.5 py-0.5 rounded text-[9.5px] font-bold ${
-                                  c.status === 'Approved Secure' ? "bg-emerald-500/10 text-emerald-400" :
-                                  c.status === 'Under EDD Review' ? "bg-amber-500/10 text-amber-405 animate-pulse" : "bg-rose-500/10 text-rose-450"
-                                }`}>{c.status}</span>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  {/* Incident timeline cases & mitigation workspace */}
-                  <div className="lg:col-span-4 rounded-xl border border-slate-850 bg-[#0d142b] p-5 flex flex-col justify-between overflow-hidden">
-                    {selectedCaseId ? (
-                      (() => {
-                        const matchedCase = complianceCases.find(c => c.id === selectedCaseId);
-                        if (!matchedCase) return <div className="text-center py-20 text-slate-500">Case not found.</div>;
-                        return (
-                          <div className="space-y-4">
-                            <div className="flex items-center gap-2 rounded-lg bg-rose-950/40 border border-rose-800/30 p-2 text-rose-400 text-[10px] text-center justify-center font-bold">
-                              <ShieldAlert className="h-3.5 w-3.5" /> CRITICAL LEGAL INCIDENT TIMELINE
-                            </div>
-
-                            <div>
-                              <span className="text-[10px] text-slate-500">INCIDENT ENVELOPE:</span>
-                              <h3 className="text-sm font-black text-white select-all">{matchedCase.id}</h3>
-                              <p className="text-[10px] text-cyan-405 lowercase mb-2">{matchedCase.subjectName} ({matchedCase.subjectRole})</p>
-                            </div>
-
-                            <div className="bg-slate-950 p-3 rounded-lg border border-slate-900 space-y-1.5 font-sans overflow-y-auto max-h-36 [scrollbar-width:thin] pr-1">
-                              <span className="text-[10px] text-slate-550 font-bold block pb-1 border-b border-slate-900 uppercase font-mono">INCIDENT EVENT LOG</span>
-                              {matchedCase.caselog?.map((log, idx) => (
-                                <div key={idx} className="text-[10.5px] text-slate-350 leading-relaxed border-l border-cyan-400 pl-2">{log}</div>
-                              ))}
-                            </div>
-
-                            <div>
-                              <span className="text-[10px] text-slate-500 block mb-1">ATTACHED DOCUMENTATION FILE:</span>
-                              <span onClick={() => handleOpenActionModal("trigger_general_report", matchedCase)} className="text-cyan-400 font-bold hover:underline cursor-pointer flex items-center gap-1">
-                                <FileText className="h-3.5 w-3.5" /> {matchedCase.documentName}
-                              </span>
-                            </div>
-
-                            <div className="space-y-2 border-t border-slate-800 pt-3">
-                              <span className="text-[10px] text-slate-500 block font-bold uppercase">Incident Overrides</span>
-                              <div className="grid grid-cols-2 gap-2">
-                                <button onClick={() => handleModerateComplianceCase(matchedCase.id, "edd")} className="rounded bg-amber-500/15 py-1.5 text-amber-400 border border-amber-500/20 hover:bg-amber-500/25">Trigger EDD</button>
-                                <button onClick={() => handleModerateComplianceCase(matchedCase.id, "escalate")} className="rounded bg-rose-500/15 py-1.5 text-rose-400 border border-rose-500/20 hover:bg-rose-500/25">Escalate Counsel</button>
-                              </div>
-                              <button onClick={() => handleModerateComplianceCase(matchedCase.id, "approve")} className="w-full rounded bg-emerald-500 text-black font-bold py-2 hover:bg-emerald-400 mt-1 uppercase">Approve & Clear Incident</button>
-                            </div>
-                          </div>
-                        );
-                      })()
-                    ) : (
-                      <div className="text-center py-20 text-slate-500">
-                        Select a compliance case card from the incident register to run legal forensic tools.
-                      </div>
-                    )}
-                  </div>
-
-                </div>
-              )}
-
-            </div>
-          )}
-
-          {/* CATEGORY: MODERATION & TRUST */}
-          {activeCategory === "Moderation & Trust" && (
-            <div className="space-y-6 font-mono text-xs">
-              
-              <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-850 bg-slate-950 p-4">
-                <span className="text-slate-400 font-bold uppercase">Sovereign Moderator Vetting & Dispute Room</span>
-                <span className="text-cyan-400 text-[10px] font-bold">TRUST INDEX: 99.8% SPECULATING CHANNELS ON</span>
-              </div>
-
-              {activeSub === "User Reports" || activeSub === "User reports" ? (
-                /* Flagged User Complaint Histories */
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                  <div className="lg:col-span-8 rounded-xl border border-slate-850 bg-[#0c1224] overflow-hidden">
-                    <table className="w-full text-left">
-                      <thead>
-                        <tr className="border-b border-slate-850 text-slate-500 text-[10px] uppercase bg-slate-950">
-                          <th className="p-4">ACCUSED USER</th>
-                          <th className="p-4">REPORTER EMAIL</th>
-                          <th className="p-4">COMPLAINT SUBSTANCE</th>
-                          <th className="p-4">SEVERITY</th>
-                          <th className="p-4 text-right">ACTION</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {[
-                          { id: "U-819", targetName: "Chisom_Invest_Cape", reporter: "investor_39@gold.net", reason: "Attempted to request direct wire transfer outside platform escrow.", severity: "Critical", status: "Active" },
-                          { id: "U-144", targetName: "Bamikole_Agencies", reporter: "buyer_11@yahoo.co.za", reason: "Listing specifications show outdated surveyor reports.", severity: "Medium", status: "Active" }
-                        ].map((compl, idx) => (
-                          <tr key={idx} className="border-b border-slate-800/40 hover:bg-slate-900/30 text-[11px] transition-all">
-                            <td className="p-4">
-                              <span className="text-white font-bold block">{compl.targetName}</span>
-                              <span className="text-slate-500 block text-[9.5px]">{compl.id}</span>
-                            </td>
-                            <td className="p-4 text-slate-400 font-bold">{compl.reporter}</td>
-                            <td className="p-4 text-slate-400 font-sans leading-relaxed">{compl.reason}</td>
-                            <td className="p-4">
-                              <span className={`px-1.5 py-0.2 rounded text-[8px] font-black uppercase ${
-                                compl.severity === "Critical" ? "bg-rose-500 text-black" : "bg-amber-500 text-black"
-                              }`}>{compl.severity}</span>
-                            </td>
-                            <td className="p-4 text-right select-none">
-                              <div className="flex gap-1 justify-end">
-                                <button onClick={() => { pushLog(`SUSPEND: Blocked access for user ${compl.targetName}.`); toast(`User ${compl.targetName} suspended.`, "warn"); }} className="bg-rose-500 hover:bg-rose-400 text-black font-bold px-2 py-1 rounded text-[10px] uppercase">SUSPEND</button>
-                                <button onClick={() => { pushLog(`WARNING: Dispatched code penalty warnings to ${compl.targetName}.`); toast(`Compliance warning sent.`, "info"); }} className="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold px-2 py-1 rounded text-[10px] uppercase">WARN</button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  <div className="lg:col-span-4 rounded-xl border border-slate-850 bg-slate-950 p-5 space-y-4">
-                    <h3 className="text-xs font-black text-white uppercase border-b border-slate-850 pb-2 mb-1">
-                      Platform Anti-Defamation Policy
-                    </h3>
-                    <p className="text-[11px] font-sans text-slate-400 leading-relaxed">
-                      All platform user reports trigger natural language GopherML audits prior to human manual arbitration inside the dashboard workspace.
-                    </p>
-                    <div className="p-3 bg-[#0d142b] border border-slate-900 rounded font-bold text-[10px] text-cyan-400 text-center">
-                      98.2% Auto-Detection Sieve Efficiency
-                    </div>
-                  </div>
-                </div>
-              ) : activeSub === "Dispute Center" ? (
-                /* Escrow disputes and booking settlements */
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                  <div className="lg:col-span-8 space-y-4">
-                    <div className="rounded-xl border border-slate-850 bg-[#0c1224] overflow-hidden">
-                      <table className="w-full text-left">
-                        <thead>
-                          <tr className="border-b border-slate-850 text-slate-500 text-[10px] uppercase bg-slate-950">
-                            <th className="p-4">DISPUTE ID</th>
-                            <th className="p-4">DISPUTE DETAILS / AGENTS</th>
-                            <th className="p-4 text-center">FROZEN FUNDS</th>
-                            <th className="p-4">STATUS</th>
-                            <th className="p-4 text-right">RESOLUTION ACTION</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {disputes.map((disp, idx) => (
-                            <tr key={idx} className="border-b border-slate-800/40 text-[11px]">
-                              <td className="p-4 font-bold text-white uppercase select-all">{disp.id}</td>
-                              <td className="p-4">
-                                <span className="text-slate-200 block font-sans">{disp.details}</span>
-                                <span className="text-slate-500 block text-[9.5px]">Buyer: {disp.buyer} | Developer: {disp.developer}</span>
-                              </td>
-                              <td className="p-4 text-center text-amber-400 font-bold">{renderCurrency(disp.amount)}</td>
-                              <td className="p-4">
-                                  <span className={`px-1.5 py-0.5 rounded text-[9.5px] font-bold ${
-                                    disp.status === 'OPEN' ? "bg-amber-500/10 text-amber-400 animate-pulse" : "bg-emerald-500/10 text-emerald-400"
-                                  }`}>{disp.status}</span>
-                              </td>
-                              <td className="p-4 text-right select-none">
-                                {disp.status === "OPEN" ? (
-                                  <div className="flex gap-1 justify-end">
-                                    <button onClick={() => handleResolveDispute(disp.id, `Release to Buyer (${disp.buyer})`)} className="bg-emerald-500 hover:bg-emerald-400 text-black font-black px-2 py-1 rounded text-[10px] uppercase">Payout Buyer</button>
-                                    <button onClick={() => handleResolveDispute(disp.id, `Release to Developer (${disp.developer})`)} className="bg-cyan-500 hover:bg-cyan-400 text-black font-black px-2 py-1 rounded text-[10px] uppercase">Payout Dev</button>
-                                  </div>
-                                ) : (
-                                  <span className="inline-flex items-center gap-1 text-emerald-400 font-bold text-xs select-none">
-                                    <Check className="w-3.5 h-3.5" />
-                                    <span>Settled</span>
-                                  </span>
-                                )}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  <div className="lg:col-span-4 rounded-xl border border-slate-850 bg-slate-950 p-5 flex flex-col justify-between overflow-hidden">
-                    <div className="space-y-4">
-                      <div className="rounded-lg bg-cyan-950/40 border border-cyan-850/40 p-2.5 text-cyan-400 text-center font-bold">
-                        ARBITRATOR NOTARY PROTOCOL
-                      </div>
-                      <p className="font-sans text-slate-400 text-[11px] leading-relaxed">
-                        By deploying resolution, the Super Admin releases multi-sig cryptographic escrow holdings. Finalized transfers are irreversible under AfriEstate corporate terms.
-                      </p>
-                    </div>
-                    <div className="border-t border-slate-900 pt-3 text-[10px] text-slate-500">
-                      Multi-Sig Authority: <strong className="text-emerald-400 font-mono">AUTHORIZED SUPERUSER</strong>
-                    </div>
-                  </div>
-                </div>
-              ) : activeSub === "AI Moderation Queue" ? (
-                /* GopherML AI Moderation queues */
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                  <div className="lg:col-span-8 rounded-xl border border-slate-850 bg-[#0c1224] overflow-hidden animate-pulse-once">
-                    <table className="w-full text-left">
-                      <thead>
-                        <tr className="border-b border-slate-850 text-slate-500 text-[10px] bg-slate-950 uppercase">
-                          <th className="p-4">SCAN ID</th>
-                          <th className="p-4">ELEMENT / VALUE SCAN</th>
-                          <th className="p-4">NLP FLAG SIGNAL</th>
-                          <th className="p-4 text-center">CONFIDENCE</th>
-                          <th className="p-4 text-right font-bold">ACTIONS</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {[
-                          { id: "AIMP-924", type: "Property Description", val: "Beautiful beachfront loft. Pay directly via bank draft to whatsapp +27 82 042...", flag: "Direct off-channel payment solicit", confidence: 98 },
-                          { id: "AIMP-103", type: "Agent Profile Summary", val: "Professional broker. Contact on direct email owner_richards@scam.com", flag: "Suspicious domain contact", confidence: 84 }
-                        ].map((m, idx) => (
-                          <tr key={idx} className="border-b border-slate-800/40 text-[11px]">
-                            <td className="p-4 text-slate-400 font-bold uppercase select-all">{m.id}</td>
-                            <td className="p-4">
-                              <span className="text-slate-350 block leading-normal border-l border-rose-500 pl-2 font-sans">{m.val}</span>
-                              <span className="text-slate-500 text-[9.5px] block mt-1">{m.type}</span>
-                            </td>
-                            <td className="p-4 text-cyan-405 font-semibold">{m.flag}</td>
-                            <td className="p-4 text-center font-black text-rose-400">{m.confidence}%</td>
-                            <td className="p-4 text-right select-none">
-                              <div className="flex gap-1 justify-end">
-                                <button onClick={() => { pushLog(`MODERATE: Approved machine flag on ${m.id}`); toast("Action taken on machine recommendation.", "success"); }} className="bg-rose-500 hover:bg-rose-455 text-black font-extrabold px-2 py-1 rounded text-[10px] uppercase">Approve Flag</button>
-                                <button onClick={() => { pushLog(`MODERATE: De-categorized & cleared ${m.id}`); toast("Overrode GopherML recommendation.", "info"); }} className="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold px-2 py-1 rounded text-[10px] uppercase">Dismiss</button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  <div className="lg:col-span-4 rounded-xl border border-slate-850 bg-slate-950 p-5 space-y-4">
-                    <h3 className="text-xs font-black text-white uppercase pb-1.5 border-b border-slate-850 mb-1">
-                      GopherML Sentinel Parameters
-                    </h3>
-                    <p className="text-[11px] font-sans text-slate-400 leading-relaxed">
-                      Deep natural language transformer weights filter and isolate listings that contain off-platform escrow payment solicitation vectors on upload.
-                    </p>
-                    <div className="p-3 bg-slate-900 border border-slate-850 rounded text-center text-[10.5px] text-white">
-                      Current Scanning Pipeline: <strong className="text-[#22c55e]">99.9% Nominal</strong>
-                    </div>
-                  </div>
-                </div>
-              ) : activeSub === "Communication Monitoring" ? (
-                /* Chat logs bypass checkers */
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                  <div className="lg:col-span-8 rounded-xl border border-slate-850 bg-[#0c1224] p-5 space-y-4">
-                    <h3 className="text-xs font-black text-white uppercase flex items-center gap-1.5 pb-2 border-b border-slate-800 mb-2">
-                      <Shield className="h-4 w-4 text-cyan-400 animate-pulse" /> Intercepted Off-Platform Escrow Payment Bypass Hooks
-                    </h3>
-
-                    <div className="space-y-3.5">
-                      {[
-                        { sender: "Broker_991", receiver: "Investor_Faraji", text: "Please do not use the bank notary gateway on AfriEstate. Send me the R 45,000 reservation fee directly via western union to avoid fee.", matchWord: "Western Union / directly / avoid fee", hash: "COMM-H-904" },
-                        { sender: "Dev_Accra_Z", receiver: "Buyer_Kaye", text: "Let us chat on my personal cellphone +233 49023 2948. Hard to use this applet.", matchWord: "cellphone / +233 ...", hash: "COMM-H-111" }
-                      ].map((comm, idx) => (
-                        <div key={idx} className="p-3.5 bg-slate-950 border border-rose-950/50 rounded-lg space-y-2">
-                          <div className="flex justify-between items-center bg-slate-900 p-1 px-2.5 rounded text-[10px]">
-                            <span className="inline-flex items-center gap-1 text-rose-400 font-bold">
-                              <span>{comm.sender}</span>
-                              <ArrowRight className="w-3 h-3 inline" />
-                              <span>{comm.receiver}</span>
-                            </span>
-                            <span className="text-slate-500 font-mono text-[9px]">{comm.hash}</span>
-                          </div>
-                          <p className="text-slate-350 font-sans leading-relaxed text-[11px] border-l-2 border-rose-500 pl-3">
-                            {comm.text}
-                          </p>
-                          <div className="flex flex-wrap items-center justify-between text-[10px] gap-2 pt-1">
-                            <span className="text-rose-450 font-bold bg-rose-500/10 px-2 py-0.5 rounded uppercase">TRIGGER WORD MATCH: "{comm.matchWord}"</span>
-                            <div className="flex gap-2 select-none">
-                              <button onClick={() => { pushLog(`COMM: Suspended channel for ${comm.sender}`); toast("Conversation channel frozen.", "warn"); }} className="bg-rose-500 text-black font-extrabold px-3 py-1 rounded text-[9.5px] uppercase">Block Channel</button>
-                              <button onClick={() => { pushLog(`COMM: Issued system policy notice to ${comm.sender}`); toast("System policy notice dispatched.", "info"); }} className="bg-slate-800 text-slate-350 font-bold px-3 py-1 rounded text-[9.5px] uppercase">Warn Actor</button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="lg:col-span-4 rounded-xl border border-slate-850 bg-slate-950 p-5 space-y-4">
-                    <h3 className="text-xs font-black text-white uppercase pb-1.5 border-b border-slate-850 mb-1">
-                      Legal Compliance Mandate
-                    </h3>
-                    <p className="text-[11.5px] font-sans text-slate-400 leading-relaxed font-sans">
-                      AfriEstate maintains anti-solicitation filters to comply with financial escrow regulations of respective hubs. Solicitations bypasses of notary channels violate national anti-money laundering frameworks.
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                /* Content Moderation Queue (Default View) */
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                  
-                  {/* Reports queue table */}
-                  <div className="lg:col-span-8 flex flex-col space-y-4">
-                    <div className="rounded-xl border border-slate-850 bg-[#0c1224] overflow-hidden">
-                      <table className="w-full text-left">
-                        <thead>
-                          <tr className="border-b border-slate-850 text-slate-500 text-[10px] uppercase bg-slate-950 font-mono">
-                            <th className="p-4">REPORT ID</th>
-                            <th className="p-4">CONTENT TYPE</th>
-                            <th className="p-4">REPORTED ISSUE</th>
-                            <th className="p-4">SEVERITY</th>
-                            <th className="p-4 text-right font-mono">STATUS</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {moderationReports.map(m => (
-                            <tr 
-                              key={m.id} 
-                              onClick={() => setSelectedReportId(m.id)}
-                              className={`border-b border-slate-800/40 hover:bg-slate-900/30 cursor-pointer text-[11px] transition-all ${
-                                selectedReportId === m.id ? "bg-cyan-950/10" : ""
-                              }`}
-                            >
-                              <td className="p-4 font-bold text-white uppercase">{m.id}</td>
-                              <td className="p-4">
-                                <span className="text-cyan-400 font-semibold">{m.contentType}</span>
-                                <span className="text-slate-500 block text-[9.5px]">by {m.reportingUser}</span>
-                              </td>
-                              <td className="p-4 text-slate-450 font-sans leading-normal">{m.issue}</td>
-                              <td className="p-4">
-                                <span className={`px-1.5 py-0.2 rounded text-[8px] font-black ${
-                                  m.severity === 'Critical' ? "bg-rose-500 text-black" : "bg-amber-500 text-black"
-                                }`}>{m.severity.toUpperCase()}</span>
-                              </td>
-                              <td className="p-4 text-right font-black">
-                                <span className={`px-1.5 py-0.5 rounded text-[9.5px] ${
-                                  m.status.includes("Removed") ? "bg-rose-500/10 text-rose-450" :
-                                  m.status.includes("Dismiss") ? "bg-emerald-500/10 text-emerald-440" : "bg-cyan-500/10 text-cyan-400"
-                                }`}>{m.status}</span>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  {/* Moderation arbitration detail card */}
-                  <div className="lg:col-span-4 rounded-xl border border-slate-850 bg-[#0d142b] p-5 flex flex-col justify-between overflow-hidden">
-                    {selectedReportId ? (
-                      (() => {
-                        const matchedReport = moderationReports.find(m => m.id === selectedReportId);
-                        if (!matchedReport) return <div className="text-center py-20 text-slate-500">Report not found.</div>;
-                        return (
-                          <div className="space-y-4">
-                            <div className="flex items-center gap-2 rounded-lg bg-cyan-950/40 border border-cyan-800/30 p-2 text-cyan-400 text-[10.5px] text-center justify-center font-bold">
-                              <ShieldAlert className="h-4 w-4" /> REVALUATION DISPUTE ARBITRATOR
-                            </div>
-
-                            <div>
-                              <span className="text-[10px] text-slate-500 uppercase">INCIDENT ENVELOPE:</span>
-                              <h3 className="text-sm font-black text-white">{matchedReport.id}</h3>
-                              <p className="text-[10px] text-slate-400">Reporter: {matchedReport.reportingUser}</p>
-                            </div>
-
-                            <div className="p-3 bg-slate-950 rounded border border-slate-900 font-mono text-[10.5px] space-y-1 text-slate-350">
-                              <span className="text-slate-500 font-bold uppercase block text-[9.5px]">FLAGGED VALUE ELEMENT:</span>
-                              <p className="leading-relaxed border-l-2 border-rose-500 pl-2">{matchedReport.reportedValue}</p>
-                            </div>
-
-                            <div className="space-y-2 border-t border-slate-800 pt-3">
-                              <span className="text-[10px] text-slate-500 block font-bold uppercase">Arbitration Decision</span>
-                              <div className="grid grid-cols-2 gap-2">
-                                <button onClick={() => handleApplyModerationAction(matchedReport.id, "warn")} className="rounded bg-amber-500/10 py-1.5 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 font-bold uppercase">Issue Warn</button>
-                                <button onClick={() => handleApplyModerationAction(matchedReport.id, "dismiss")} className="rounded bg-slate-900 py-1.5 text-slate-400 border border-slate-800 hover:border-slate-600 font-bold uppercase">Dismiss Flag</button>
-                              </div>
-                              <button onClick={() => handleApplyModerationAction(matchedReport.id, "remove")} className="w-full rounded bg-rose-500 text-black font-bold py-2 hover:bg-rose-450 uppercase mt-1">Authorize & Remove Content</button>
-                            </div>
-                          </div>
-                        );
-                      })()
-                    ) : (
-                      <div className="text-center py-20 text-slate-500">
-                        Select a flagged content review or listing report row to dispatch arbitration enforcement verdicts.
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-            </div>
-          )}
-
-          {/* CATEGORY: SYSTEM HEALTH VIEWS */}
-          {activeCategory === "System Health" && (
-            <div className="space-y-6 font-mono text-xs">
-              
-              {/* Service status health cards registry */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                {services.map(srv => (
-                  <div key={srv.id} className="p-4 rounded-xl border border-slate-850 bg-[#0c1224] flex items-center justify-between">
-                    <div>
-                      <span className="text-[10.5px] font-bold text-white block">{srv.name}</span>
-                      <span className="text-[9px] text-slate-500 uppercase">{srv.id} • latency {srv.latency}</span>
-                    </div>
-
-                    <div className="text-right">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                        srv.status === 'ONLINE' ? "bg-emerald-500/10 text-emerald-400" : "bg-amber-500/10 text-amber-400"
-                      }`}>{srv.status}</span>
-                      <button 
-                        onClick={() => handleOpenActionModal("restart_service_node", srv)}
-                        className="text-[9px] text-cyan-400 hover:underline block mt-1.5 uppercase font-bold text-right w-full"
-                      >
-                        REBOOT
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {activeSub === "AI Engine Health" ? (
-                /* AI Engine Performance diagnostics, neural nodes */
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                  <div className="lg:col-span-8 rounded-xl border border-slate-850 bg-[#0c1224] p-5 space-y-4">
-                    <h3 className="text-xs font-bold text-slate-100 flex items-center gap-1.5 border-b border-slate-850 pb-2.5">
-                      <Sparkles className="h-4 w-4 text-cyan-400 animate-pulse" /> Active Neural Vetting Models & Latency Pools
-                    </h3>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      {[
-                        { model: "GopherML-v3 Custom Transformer", use: "Platform Compliance NLP Vetting", latency: "14ms", confidence: "99.8%", safety: "99.9%" },
-                        { model: "AfriPrice Forecaster Matrix", use: "Real Estate Value Synthesis", latency: "28ms", confidence: "97.4%", safety: "100%" },
-                        { model: "Sentinel Asset Classifier", use: "Image Fraud & Surveyor Validation", latency: "42ms", confidence: "98.1%", safety: "99.5%" }
-                      ].map((m, idx) => (
-                        <div key={idx} className="p-3.5 bg-slate-950 border border-slate-850 rounded-lg space-y-2">
-                          <span className="text-white font-bold block leading-relaxed">{m.model}</span>
-                          <span className="text-slate-500 block text-[9.5px] uppercase">{m.use}</span>
-                          <div className="grid grid-cols-3 gap-1 pt-2 border-t border-slate-900 text-[10px] text-center">
-                            <div>
-                              <span className="text-slate-500 block text-[8px] uppercase">Latency</span>
-                              <strong className="text-cyan-400">{m.latency}</strong>
-                            </div>
-                            <div>
-                              <span className="text-slate-500 block text-[8px] uppercase">Accuracy</span>
-                              <strong className="text-[#22c55e]">{m.confidence}</strong>
-                            </div>
-                            <div>
-                              <span className="text-slate-500 block text-[8px] uppercase">Safety</span>
-                              <strong className="text-amber-400">{m.safety}</strong>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="bg-slate-950 p-4 rounded-lg border border-slate-850 space-y-3">
-                      <span className="font-bold text-white block">Tuning Controls & Temperature Thresholds</span>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                          <label className="text-[10px] text-slate-400 flex justify-between">
-                            <span>GopherML Confidence Sieve Filter</span>
-                            <span className="text-cyan-400 font-bold">95%</span>
-                          </label>
-                          <input type="range" min="80" max="100" defaultValue="95" className="w-full accent-cyan-400 h-1 bg-slate-800 rounded" />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-[10px] text-slate-400 flex justify-between">
-                            <span>Inference Divergence Temperature</span>
-                            <span className="text-cyan-400 font-bold">0.15</span>
-                          </label>
-                          <input type="range" min="0" max="100" defaultValue="15" className="w-full accent-cyan-400 h-1 bg-slate-800 rounded" />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="lg:col-span-4 rounded-xl border border-slate-850 bg-slate-950 p-5 space-y-4">
-                    <h3 className="text-xs font-black text-white uppercase border-b border-slate-850 pb-2">
-                      GPU Context Memory Buffers
-                    </h3>
-                    <div className="space-y-3.5">
-                      <div>
-                        <div className="flex justify-between text-[10px] mb-1">
-                          <span className="text-slate-400">VRAM Allocation (80GB A100 Pool)</span>
-                          <span className="text-[#22c55e] font-bold">48.2 GB / 80 GB</span>
-                        </div>
-                        <div className="w-full h-1.5 bg-slate-900 rounded overflow-hidden">
-                          <div className="bg-[#22c55e] h-full" style={{ width: "60%" }}></div>
-                        </div>
-                      </div>
-                      <div>
-                        <div className="flex justify-between text-[10px] mb-1">
-                          <span className="text-slate-400">Embedding Cache Sync State</span>
-                          <span className="text-cyan-400 font-bold">SYNCHRONIZED (100%)</span>
-                        </div>
-                        <div className="w-full h-1.5 bg-slate-900 rounded overflow-hidden">
-                          <div className="bg-cyan-400 h-full" style={{ width: "100%" }}></div>
-                        </div>
-                      </div>
-                    </div>
-                    <button onClick={() => { pushLog("SYSTEM: Manual garbage collection requested on AI VRAM."); toast("Flushed stale context cache pools.", "success"); }} className="w-full py-2 bg-slate-900 hover:bg-slate-850 text-cyan-450 border border-slate-800 rounded text-center block font-extrabold uppercase text-[10px]">
-                      Flush Context Cache Pools
-                    </button>
-                  </div>
-                </div>
-              ) : activeSub === "Cybersecurity & Threats" ? (
-                /* Active cyber threat logs */
-                <div className="rounded-xl border border-slate-850 bg-[#0c1224] p-5 space-y-4">
-                  <h3 className="text-xs font-bold text-slate-100 flex items-center gap-1.5 border-b border-slate-850 pb-2.5">
-                    <ShieldAlert className="h-4 w-4 text-rose-500 animate-pulse" /> INTRUSION DETECTION & ACTIVE BRUTE-FORCE ATTEMPT CHANNELS
-                  </h3>
-
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left">
-                      <thead>
-                        <tr className="border-b border-slate-850 text-slate-500 text-[9.5px]">
-                          <th>INCIDENT SOURCE IP</th>
-                          <th>SOURCE GEOLOCATION</th>
-                          <th>PROBING ATTACK TYPE</th>
-                          <th>SEVERITY</th>
-                          <th>STATUS</th>
-                          <th className="text-right font-bold">MITIGATION</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {threats.map(th => (
-                          <tr key={th.id} className="border-b border-slate-800/40 hover:bg-[#070b19] text-[11px]">
-                            <td className="py-3 font-bold text-slate-200 select-all">{th.sourceIp}</td>
-                            <td className="py-3 text-slate-400">{th.location}</td>
-                            <td className="py-3 text-cyan-400 font-bold">{th.attackType}</td>
-                            <td className="py-3">
-                              <span className={`px-1 rounded text-[9px] font-bold ${
-                                th.severity === 'CRITICAL' ? "bg-rose-500 text-black" : "bg-amber-500 text-black"
-                              }`}>{th.severity}</span>
-                            </td>
-                            <td className="py-3 text-slate-400">{th.status}</td>
-                            <td className="py-3 text-right">
-                              {th.status.includes("Mitigated") ? (
-                                <span className="inline-flex items-center gap-1 text-emerald-400 font-bold">
-                                  <span>Mitigated</span>
-                                  <Check className="w-3.5 h-3.5" />
-                                </span>
-                              ) : (
-                                <button 
-                                  onClick={() => handleOpenActionModal("isolate_threat", th)}
-                                  className="bg-rose-500 hover:bg-rose-450 text-black font-bold px-3 py-1 rounded text-[10px] uppercase animate-pulse"
-                                >
-                                  Isolate IP
-                                </button>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              ) : activeSub === "APIs & Error Logs" ? (
-                /* Console log outputs terminal & run diagnostic triggers */
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                  <div className="lg:col-span-5 rounded-xl border border-slate-850 bg-slate-950 p-5 space-y-4">
-                    <h3 className="text-xs font-black text-rose-400 uppercase flex items-center gap-1.5 pb-2 border-b border-slate-850">
-                      <Shield className="h-4 w-4" /> Multi-Node Network Probes & Verification
-                    </h3>
-
-                    <p className="font-sans text-slate-400 text-[11px] leading-relaxed">
-                      Dispatch end-to-end telemetry ping tests across AfriEstate banking partners, municipal land records registries, and Escrow agents.
-                    </p>
-
-                    <button
-                      onClick={handleExecuteApiDiagnostics}
-                      disabled={isTestingApi}
-                      className="w-full py-2.5 bg-cyan-500 hover:bg-cyan-450 text-black border-none font-black text-xs rounded uppercase block tracking-wider"
-                    >
-                      {isTestingApi ? "TEST DIAGNOSTICS IN PROGRESS..." : "TRIGGER MULTI-NODE INTEGRITY SCAN"}
-                    </button>
-
-                    <div className="bg-[#0c1224] border border-slate-850 p-3.5 rounded-lg space-y-1.5 font-sans">
-                      <span className="text-[10px] text-slate-500 uppercase block font-mono">Integration Output</span>
-                      <p className={`text-[11px] leading-relaxed ${isTestingApi ? "text-cyan-405 animate-pulse" : "text-white"}`}>
-                        {apiPingResult || "Ready: Tap above trigger button to probe API nodes."}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="lg:col-span-7 rounded-xl border border-slate-850 bg-[#0c1224] p-5 space-y-3.5">
-                    <div className="flex justify-between border-b border-slate-800 pb-2">
-                      <span className="text-cyan-455 font-bold flex items-center gap-1.5"><Terminal className="h-4 w-4 text-cyan-400 animate-pulse" /> SOVEREIGN NODE REAL-TIME TERMINAL PRINTS</span>
-                      <span className="text-slate-500 font-mono">SHA-256 REGISTER</span>
-                    </div>
-                    <div className="font-mono text-[10.5px] space-y-1 text-slate-400 bg-slate-950 border border-slate-900 rounded p-4 h-56 overflow-y-auto [scrollbar-width:thin]">
-                      {auditLogs.map((log, id) => (
-                        <div key={id} className="text-slate-300 border-l border-slate-850 pl-2 py-0.5">{log}</div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                /* Default/Service Status layout view */
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="rounded-xl border border-slate-850 bg-[#0c1224] p-5 space-y-3">
-                    <h3 className="text-xs font-black text-white uppercase pb-2 border-b border-slate-800">Operating Telemetry Architecture</h3>
-                    <p className="font-sans text-[11px] text-slate-400 leading-relaxed">
-                      Sovereign OS holds 14 distributed regional node meshes ensuring sub-50ms high availability for sovereign REIT asset settlement across SSA territories.
-                    </p>
-                    <div className="grid grid-cols-2 gap-2 text-center text-[10px]">
-                      <div className="p-2 bg-slate-950 rounded border border-slate-900">
-                        <span className="text-slate-500 block">GLOBAL UPTIME</span>
-                        <strong className="text-emerald-400">99.982%</strong>
-                      </div>
-                      <div className="p-2 bg-slate-950 rounded border border-slate-900">
-                        <span className="text-slate-500 block">LAST AUDIT HASH</span>
-                        <strong className="text-cyan-400 select-all">SHA-256</strong>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="rounded-xl border border-slate-850 bg-slate-950 p-5 space-y-3">
-                    <h3 className="text-xs font-black text-white uppercase pb-2 border-b border-slate-850">Regulatory Notarization State</h3>
-                    <p className="font-sans text-[11px] text-slate-400 leading-relaxed">
-                      All critical overrides inside the Command Center are captured cryptographically via legal multi-sig. Complete accountability is enforced natively.
-                    </p>
-                  </div>
-                </div>
-              )}
-
-            </div>
-          )}
-
-          {/* CATEGORY: AI CO-PILOT COMMAND */}
-          {activeCategory === "AI Co-Pilot" && (
-            <div className="space-y-6 font-mono text-xs">
-              
-              <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-850 bg-slate-950 p-4">
-                <span className="text-slate-400 font-bold uppercase">Sovereign Executive AI Matrix Center (GopherML v3)</span>
-                <span className="bg-cyan-500/10 text-cyan-400 px-2.5 py-0.5 rounded text-[10px] font-bold">Inference Speed: 22ms</span>
-              </div>
-
-              {activeSub === "Revenue Forecasting" ? (
-                /* Dynamic revenue forecasting simulations */
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                  <div className="lg:col-span-8 rounded-xl border border-slate-800 bg-[#0d1430] p-6 space-y-4">
-                    <h3 className="text-xs font-black text-white tracking-widest uppercase flex items-center gap-1.5 pb-2.5 border-b border-slate-800 mb-2">
-                      <Sparkles className="h-4 w-4 text-cyan-400 animate-pulse" /> AI Neural Revenue Projection Matrix
-                    </h3>
-
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="bg-[#0c1224] p-3.5 rounded border border-slate-850">
-                        <span className="text-slate-500 text-[10px] uppercase block mb-1">Baseline Year Forecast</span>
-                        <strong className="text-xl text-white">R 482.4 M</strong>
-                        <span className="text-emerald-400 text-[9.5px] block mt-1">+12.4% Organic YoY</span>
-                      </div>
-                      <div className="bg-[#0c1224] p-3.5 rounded border border-slate-850">
-                        <span className="text-slate-500 text-[10px] uppercase block mb-1">Staking Pool Escrow Accruals</span>
-                        <strong className="text-xl text-white">R 124.9 M</strong>
-                        <span className="text-emerald-400 text-[9.5px] block mt-1">+8.2% Compound yield</span>
-                      </div>
-                      <div className="bg-[#0c1224] p-3.5 rounded border border-slate-850">
-                        <span className="text-slate-500 text-[10px] uppercase block mb-1">Token Commission Yields</span>
-                        <strong className="text-xl text-white">R 45.1 M</strong>
-                        <span className="text-cyan-400 text-[9.5px] block mt-1">2.5% Flat Rate fee</span>
-                      </div>
-                    </div>
-
-                    <div className="p-4 bg-slate-950 rounded-lg border border-slate-850 space-y-3.5">
-                      <span className="font-bold text-white block">Modulate Regional Macroeconomic Growth Triggers</span>
-                      <p className="text-[11px] text-slate-400 leading-relaxed font-sans">
-                        Simulate the revenue elasticity coefficients next quarter by adjusting expected sovereign stamp duty variables or adding tax incentives:
-                      </p>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <button
-                          onClick={() => {
-                            pushLog("REVENUE_FORECAST: Simulated 10% rent index increase across Sub-Saharan Hubs.");
-                            toast("Simulation run complete: Revenue pool projected to hit R 522.4M next quarter.", "success");
-                          }}
-                          className="bg-slate-900 hover:bg-slate-850 text-cyan-400 border border-slate-800 rounded py-2 text-center uppercase font-bold text-[10.5px] block"
-                        >
-                          Simulate +10% Rent Growth
-                        </button>
-                        <button
-                          onClick={() => {
-                            pushLog("REVENUE_FORECAST: Simulated 2.5% Stamp Duty subsidy across Accra and Lagos Hubs.");
-                            toast("Simulation run complete: Total tax-free margins increased by R 14.8M.", "info");
-                          }}
-                          className="bg-slate-900 hover:bg-slate-850 text-cyan-400 border border-slate-800 rounded py-2 text-center uppercase font-bold text-[10.5px] block"
-                        >
-                          Simulate -2.5% Stamp Duty Subsidy
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="lg:col-span-4 rounded-xl border border-slate-850 bg-slate-950 p-5 space-y-4">
-                    <h3 className="text-xs font-black text-white uppercase pb-1.5 border-b border-slate-850">
-                      Forecasting Confidence Interval
-                    </h3>
-                    <p className="text-[11.5px] font-sans text-slate-400 leading-relaxed">
-                      Sovereign OS projections utilize triple-exponential smoothing models trained against 18-years of historic real estate asset valuations on-chain.
-                    </p>
-                    <div className="p-3 bg-[#0d142b] border border-cyan-900/30 rounded text-center text-cyan-450 font-bold">
-                      Confidence Interval: 94.8% ± 0.2%
-                    </div>
-                  </div>
-                </div>
-              ) : activeSub === "Market Intelligence" ? (
-                /* Market appreciation and demand intelligence list */
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                  <div className="lg:col-span-8 rounded-xl border border-slate-850 bg-[#0c1224] overflow-hidden">
-                    <table className="w-full text-left">
-                      <thead>
-                        <tr className="border-b border-slate-850 text-slate-500 text-[10px] bg-slate-950 uppercase">
-                          <th className="p-4">SOVEREIGN NODE HUB</th>
-                          <th className="p-4">YOY ASSET APPRECIATION</th>
-                          <th className="p-4">DEMAND HEAT MATRIX</th>
-                          <th className="p-4 text-center">AVERAGE CONVEYANCE TIME</th>
-                          <th className="p-4 text-right">FORECAST VERDICT</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {[
-                          { hub: "Lagos Atlantic Node", YoY: "+14.8%", heat: "EXTREMELY HIGH", time: "2.4 days (Escrow)", verdict: "Strong Buy" },
-                          { hub: "Cape Town Coast Node", YoY: "+9.2%", heat: "HIGH DEMAND", time: "1.8 days (Sovereign)", verdict: "Accumulate" },
-                          { hub: "Accra Green Node", YoY: "+11.4%", heat: "STABLE GROWTH", time: "3.2 days (Multi-Sig)", verdict: "Stable Hold" },
-                          { hub: "Nairobi Tech Node", YoY: "+16.1%", heat: "VIBRANT HIGH", time: "1.1 days (Instant)", verdict: "Strong Buy" }
-                        ].map((intel, idx) => (
-                          <tr key={idx} className="border-b border-slate-800/40 text-[11px] hover:bg-[#080d1a] transition-all">
-                            <td className="p-4 font-bold text-white leading-relaxed">{intel.hub}</td>
-                            <td className="p-4 text-[#22c55e] font-extrabold">{intel.YoY}</td>
-                            <td className="p-4 text-amber-400 font-bold">{intel.heat}</td>
-                            <td className="p-4 text-center text-slate-400">{intel.time}</td>
-                            <td className="p-4 text-right">
-                              <span className="bg-cyan-500/10 text-cyan-400 px-2 py-0.5 rounded text-[10px] font-bold uppercase">{intel.verdict}</span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  <div className="lg:col-span-4 rounded-xl border border-slate-850 bg-slate-950 p-5 space-y-4">
-                    <h3 className="text-xs font-black text-white uppercase border-b border-slate-850 pb-2 mb-1">
-                      GopherML Land Index Sentinel
-                    </h3>
-                    <p className="text-[11.5px] font-sans text-slate-400 leading-relaxed leading-normal">
-                      Deep satellite-mesh scanning calculates regional cadastral variances hourly, verifying developer offerings to block localized artificial pricing manipulation.
-                    </p>
-                    <button onClick={() => { pushLog("SYSTEM: Re-synthesized all continental land price matrices."); toast("Cadastral price maps updated.", "success"); }} className="w-full bg-slate-900 hover:bg-slate-850 text-cyan-400 border border-slate-800 py-1.5 rounded text-[10.5px] uppercase font-bold">
-                      Re-Index Cadastral Map
-                    </button>
-                  </div>
-                </div>
-              ) : activeSub === "AI Automation Workflows" ? (
-                /* List of auto workflows with interactive triggers */
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                  <div className="lg:col-span-8 rounded-xl border border-slate-850 bg-[#0c1224] overflow-hidden">
-                    <table className="w-full text-left">
-                      <thead>
-                        <tr className="border-b border-slate-850 text-slate-500 text-[10px] bg-slate-950 uppercase">
-                          <th className="p-4 font-bold">WORKFLOW ID</th>
-                          <th className="p-4 font-bold">WORKFLOW RULE & IDENTIFIER</th>
-                          <th className="p-4 font-bold">FREQUENCY INTENSITY</th>
-                          <th className="p-4 text-center font-bold">ACTIVE PIPELINE STATUS</th>
-                          <th className="p-4 text-right font-bold">ACTION SYSTEM</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {autoWorkflows.map((wf) => (
-                          <tr key={wf.id} className="border-b border-slate-800/40 text-[11px] hover:bg-[#070b1a] transition-all">
-                            <td className="p-4 font-bold text-slate-300 uppercase select-all">{wf.id}</td>
-                            <td className="p-4">
-                              <span className="text-white font-extrabold block">{wf.name}</span>
-                              <span className="text-slate-500 block text-[9.5px]">{wf.desc}</span>
-                            </td>
-                            <td className="p-4 text-cyan-405 font-bold uppercase">{wf.frequency}</td>
-                            <td className="p-4 text-center">
-                              <span className={`px-2 py-0.5 rounded text-[9.5px] font-bold ${
-                                wf.enabled ? "bg-[#22c55e]/15 text-[#22c55e]" : "bg-rose-500/15 text-rose-450"
-                              }`}>{wf.enabled ? "ACTIVE PIPELINE" : "DISABLED"}</span>
-                            </td>
-                            <td className="p-4 text-right select-none">
-                              <button
-                                onClick={() => handleToggleWorkflow(wf.id)}
-                                className={`px-3 py-1 rounded text-[10px] uppercase font-black tracking-wider transition-all ${
-                                  wf.enabled ? "bg-rose-500 text-black hover:bg-rose-450" : "bg-cyan-500 text-black hover:bg-cyan-455"
-                                }`}
-                              >
-                                {wf.enabled ? "SHUTDOWN" : "BOOT WORKFLOW"}
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  <div className="lg:col-span-4 rounded-xl border border-slate-850 bg-slate-950 p-5 space-y-4">
-                    <h3 className="text-xs font-black text-white uppercase border-b border-slate-850 pb-2 mb-1">
-                      System Orchestration Ledger
-                    </h3>
-                    <p className="text-[11.5px] font-sans text-slate-400 leading-relaxed">
-                      Shutting down standard workflows releases processing thresholds but requires manual sovereign notary co-signing. Watch active logs closely on transition.
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                /* Executive AI Assistant (Default View) */
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                  
-                  {/* Left query side */}
-                  <div className="lg:col-span-8 rounded-xl border border-slate-800 bg-[#0d1430] p-6 flex flex-col justify-between min-h-[420px]">
-                    <div>
-                      <h3 className="text-xs font-black text-white tracking-widest uppercase flex items-center gap-1.5 pb-2.5 border-b border-slate-800 mb-4">
-                        <Sparkles className="h-4 w-4 text-cyan-400 animate-pulse" /> Sovereign Executive AI Assistant (GopherML v3)
-                      </h3>
-
-                      <div className="space-y-4 max-h-80 overflow-y-auto [scrollbar-width:thin] pr-2">
-                        {aiHistory.map((item, idx) => (
-                          <div key={idx} className="p-3 bg-[#0a0f24] rounded-lg border border-slate-800 space-y-1.5">
-                            <span className="text-cyan-400 font-bold block">▶ OPERATOR_Q: "{item.query}"</span>
-                            <p className="text-slate-300 border-l border-cyan-500 pl-3 leading-relaxed font-sans">{item.answer}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <form onSubmit={handleCoPilotSubmit} className="pt-4 border-t border-slate-850 flex gap-2">
-                      <div className="relative flex-1">
-                        <Terminal className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-500" />
+                      <p className="font-semibold text-slate-900 dark:text-white">{t.subject}</p>
+                      <p className="text-slate-600 dark:text-slate-300">{t.message}</p>
+                      <div className="flex gap-2 pt-1">
                         <input
                           type="text"
-                          value={aiInput}
-                          onChange={(e) => setAiInput(e.target.value)}
-                          placeholder="Instruct AI, e.g. Forecast next quarter revenue or Detect agents with suspicious transaction patterns"
-                          className="w-full bg-slate-950 rounded-lg pl-9 pr-4 py-2 border border-slate-850 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
+                          value={ticketReplyDraft[t.id] || ''}
+                          onChange={(e) => setTicketReplyDraft({ ...ticketReplyDraft, [t.id]: e.target.value })}
+                          placeholder="Write resolution response..."
+                          className="flex-1 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs"
                         />
-                      </div>
-                      <button 
-                        type="submit" 
-                        disabled={isAiComputing}
-                        className="bg-cyan-500 hover:bg-cyan-400 text-black font-extrabold px-4 rounded text-xs"
-                      >
-                        {isAiComputing ? "COMPUTING..." : "EXECUTE"}
-                      </button>
-                    </form>
-                  </div>
-
-                  {/* Right presets options & interactive network graph visualization */}
-                  <div className="lg:col-span-4 rounded-xl border border-slate-800 bg-slate-950 p-5 flex flex-col justify-between">
-                    <div>
-                      <h3 className="text-xs font-black text-white tracking-widest uppercase pb-2 border-b border-slate-850 mb-3 block">
-                        Recommended AI Query Templates
-                      </h3>
-                      <div className="space-y-2.5">
-                        {PRESET_AI_ASSISTANCE.map((item, idx) => (
-                          <button
-                            key={idx}
-                            onClick={() => { setAiInput(item.text); }}
-                            className="w-full p-2.5 bg-[#0a0f24] hover:bg-[#141b3a] rounded border border-slate-850 text-left text-[11px] text-slate-300 leading-normal"
-                          >
-                            {item.text}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Simulated fraud network connected graph diagram representation */}
-                    <div className="bg-slate-900 border border-slate-850 rounded p-3 text-[10.5px] mt-4 space-y-1">
-                      <span className="text-rose-450 font-bold uppercase block text-[9px] tracking-widest">Interactive Fraud Network Plot</span>
-                      <div className="flex h-16 items-center justify-center border border-slate-850 border-dashed rounded relative">
-                        <span className="absolute text-[8.5px] text-slate-500 font-bold uppercase">GopherML Graph Analysis Output</span>
-                        <div className="h-2 w-2 rounded-full bg-rose-500 absolute left-8"></div>
-                        <div className="h-0.5 w-12 bg-slate-850 absolute left-10"></div>
-                        <div className="h-2 w-2 rounded-full bg-amber-400 absolute left-22"></div>
-                        <div className="h-0.5 w-12 bg-slate-850 absolute left-24"></div>
-                        <div className="h-2 w-2 rounded-full bg-cyan-400 absolute left-36"></div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-            </div>
-          )}
-
-          {/* CATEGORY: ANALYTICS INTELLIGENCE */}
-          {activeCategory === "Analytics Intelligence" && (
-            <div className="space-y-6 font-mono text-xs">
-              
-              <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-855 bg-slate-950 p-4">
-                <span className="text-slate-400 font-bold uppercase">Sovereign Business Intelligence & Analytic Mesh</span>
-                <span className="bg-cyan-500/10 text-cyan-400 px-2.5 py-0.5 rounded text-[10px] font-bold">Updated: Real-time</span>
-              </div>
-
-              {activeSub === "Geographic Insights" ? (
-                /* Geographic Insights - Map Layer evaluation summaries */
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                  <div className="lg:col-span-8 rounded-xl border border-slate-800 bg-[#0d1430] p-5 space-y-4">
-                    <h3 className="text-xs font-bold text-white uppercase border-b border-slate-800 pb-2">
-                      Continental Land Registry Map Coverages
-                    </h3>
-                    <p className="text-[11px] text-slate-400 leading-relaxed font-sans font-medium">
-                      Verify risk evaluation grids by selecting active coordinate layer matrices. GopherML correlates national cadastre files directly with municipal records in real-time.
-                    </p>
-
-                    <div className="grid grid-cols-3 gap-3">
-                      {[
-                        { title: "Appreciation Evaluator", status: "Enabled", color: "text-[#22c55e]" },
-                        { title: "Investor Density Matrix", status: "Enabled", color: "text-cyan-400" },
-                        { title: "Fraud Hotspots Overlay", status: "Active Scanner", color: "text-rose-455" }
-                      ].map((lyr, i) => (
-                        <div key={i} className="p-3 bg-[#0c1224] border border-slate-850 rounded text-center space-y-1">
-                          <span className="text-slate-400 font-bold block">{lyr.title}</span>
-                          <strong className={`text-[10px] uppercase font-black block ${lyr.color}`}>{lyr.status}</strong>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="bg-slate-950 p-4 rounded-lg border border-slate-850 space-y-3">
-                      <span className="font-bold text-white block">Active Cadastral Mesh Coverage</span>
-                      <div className="grid grid-cols-4 gap-2 text-center text-[10px]">
-                        <div className="p-2 border border-slate-900 bg-[#0c1224] rounded">
-                          <span className="text-slate-500 block text-[9px]">NIGERIA</span>
-                          <span className="text-white font-bold">14,923 Blocks</span>
-                        </div>
-                        <div className="p-2 border border-slate-900 bg-[#0c1224] rounded">
-                          <span className="text-slate-500 block text-[9px]">SOUTH AFRICA</span>
-                          <span className="text-white font-bold">28,401 Blocks</span>
-                        </div>
-                        <div className="p-2 border border-slate-900 bg-[#0c1224] rounded">
-                          <span className="text-slate-500 block text-[9px]">KENYA</span>
-                          <span className="text-white font-bold">9,203 Blocks</span>
-                        </div>
-                        <div className="p-2 border border-slate-900 bg-[#0c1224] rounded">
-                          <span className="text-slate-500 block text-[9px]">GHANA</span>
-                          <span className="text-white font-bold">6,128 Blocks</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="lg:col-span-4 rounded-xl border border-slate-850 bg-slate-950 p-5 space-y-4">
-                    <h3 className="text-xs font-black text-white uppercase border-b border-slate-855 pb-2">
-                      Geographic Indexing Tool
-                    </h3>
-                    <p className="text-[11.5px] font-sans text-slate-400 leading-normal">
-                      Initiate a satellite verification run to synchronize newly added plots with regional multi-spectral coordinates.
-                    </p>
-                    <button
-                      onClick={() => { pushLog("GEO: Initiated remote sensing map recalibration over West African Node."); toast("Map layers successfully updated with satellite index.", "success"); }}
-                      className="w-full py-2 bg-slate-900 hover:bg-slate-850 text-cyan-400 border border-slate-855 rounded text-center block font-black uppercase text-[10px]"
-                    >
-                      Trigger Satellite Recalibration
-                    </button>
-                  </div>
-                </div>
-              ) : activeSub === "Occupancy & Performance" ? (
-                /* Occupancy performance statistics charts representations */
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                  <div className="lg:col-span-8 rounded-xl border border-slate-850 bg-[#0c1224] space-y-4 p-5">
-                    <h3 className="text-xs font-bold text-white uppercase pb-2 border-b border-slate-800">
-                      Sovereign REIT Portfolio Occupancy Matrix
-                    </h3>
-
-                    <div className="space-y-3.5">
-                      {[
-                        { location: "Cape Town Coastside Hub", occupancy: "96.8%", rent: "R 42,000 / mo", count: "128 Verified Units" },
-                        { location: "Lagos Atlantic Highrise Hub", occupancy: "94.2%", rent: "R 84,500 / mo", count: "310 Verified Units" },
-                        { location: "Accra Greenery Villa Hub", occupancy: "92.4%", rent: "R 29,300 / mo", count: "82 Verified Units" },
-                        { location: "Nairobi Tech-Tower Loft Hub", occupancy: "97.1%", rent: "R 34,800 / mo", count: "148 Verified Units" }
-                      ].map((item, id) => (
-                        <div key={id} className="p-3 bg-[#090e1c] border border-slate-850 rounded flex justify-between items-center">
-                          <div>
-                            <span className="text-white font-bold block">{item.location}</span>
-                            <span className="text-[9.5px] text-slate-500 block">{item.count} • avg yield {item.rent}</span>
-                          </div>
-                          <div className="text-right">
-                            <span className="text-[#22c55e] font-extrabold text-xs block">{item.occupancy} Occupied</span>
-                            <span className="text-[9px] text-slate-550 block uppercase">Nominal Performance</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="lg:col-span-4 rounded-xl border border-slate-850 bg-slate-950 p-5 space-y-4">
-                    <h3 className="text-xs font-black text-white uppercase border-b border-slate-855 pb-2">
-                      Portfolio Performance Action
-                    </h3>
-                    <p className="text-[11.5px] font-sans text-slate-400 leading-normal text-slate-300">
-                      Initiate dividend recalculation based on actual occupancy and performance parameters for fractional holders.
-                    </p>
-                    <button 
-                      onClick={() => handleOpenActionModal("schedule_dividend", {})}
-                      className="w-full py-2 bg-cyan-500 hover:bg-cyan-400 text-black rounded text-center block font-black uppercase text-[10.5px]"
-                    >
-                      Authorize Dividend Payouts
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                /* Business Intelligence View (Default View) */
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  
-                  {/* Visual Capital Allocation Flows */}
-                  <div className="rounded-xl border border-slate-800 bg-[#0d1430] p-5 space-y-4">
-                    <h3 className="text-xs font-bold text-slate-100 flex items-center gap-1.5 border-b border-slate-800 pb-2.5 font-sans">
-                      <TrendingUp className="h-4 w-4 text-emerald-400 animate-pulse" /> CONTINENTAL CAPITAL FLOWS SEGMENTATION
-                    </h3>
-                    <div className="space-y-3 pt-1.5">
-                      {[
-                        { l: "Retail Fractional Holders", p: 48, c: "bg-cyan-400" },
-                        { l: "Sovereign REIT Funds Pool", p: 32, c: "bg-purple-500" },
-                        { l: "Continental Escrow Buffers", p: 14, c: "bg-amber-400" },
-                        { l: "Tax Reserve Outflow", p: 6, c: "bg-rose-500" }
-                      ].map((item, idx) => (
-                        <div key={idx} className="space-y-1 text-[11px]">
-                          <div className="flex justify-between text-slate-350">
-                            <span>{item.l}</span>
-                            <span className="font-bold">{item.p}%</span>
-                          </div>
-                          <div className="h-1.5 w-full bg-slate-950 rounded-full overflow-hidden">
-                            <div className={`h-full rounded-full ${item.c}`} style={{ width: `${item.p}%` }}></div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Visual business analytics stats */}
-                  <div className="rounded-xl border border-slate-800 bg-[#0d1430] p-5 space-y-4">
-                    <h3 className="text-xs font-bold text-slate-100 flex items-center gap-1.5 border-b border-slate-800 pb-2.5 font-sans">
-                      <Activity className="h-4 w-4 text-cyan-400" /> SYSTEM TRANSACTION FLOW COEFFICIENTS
-                    </h3>
-                    
-                    <div className="grid grid-cols-2 gap-3 pt-2 font-mono">
-                      <div className="bg-slate-950 border border-slate-850 p-3 rounded text-center">
-                        <span className="text-slate-500 block">TOTAL TRANS OUTFLOW</span>
-                        <strong className="text-emerald-400 block text-lg font-bold">R 1.84B</strong>
-                        <span className="text-[9.5px] text-slate-500 mt-1 block font-sans">99% checked safe</span>
-                      </div>
-                      <div className="bg-slate-950 border border-slate-850 p-3 rounded text-center">
-                        <span className="text-slate-500 block">TAX RESERVE LOCK</span>
-                        <strong className="text-cyan-400 block text-lg font-bold">R 4.20M</strong>
-                        <span className="text-[9.5px] text-slate-500 mt-1 block font-sans">Corporate SARS provisions</span>
-                      </div>
-                    </div>
-                  </div>
-
-                </div>
-              )}
-
-            </div>
-          )}
-
-          {/* CATEGORY: SETTINGS & GOVERNANCE */}
-          {activeCategory === "Settings & Governance" && (
-            <div className="rounded-xl border border-slate-850 bg-[#0d1430] p-6 space-y-6 font-mono text-xs">
-              <div className="pb-3 border-b border-slate-800 flex justify-between items-center">
-                <h3 className="text-xs font-bold text-slate-100 flex items-center gap-1.5">
-                  <Lock className="h-4 w-4 text-cyan-400 animate-pulse" /> Sovereign Platform Configuration & RBAC Variables
-                </h3>
-                <span className="text-[10px] text-slate-500">MUTATIONS REQUIRE PIN CLEARANCE</span>
-              </div>
-
-              {activeSub === "Localization & Currency" ? (
-                /* Localization & Currency settings */
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="bg-slate-950 border border-slate-850 rounded-xl p-4 space-y-4">
-                    <span className="text-xs font-bold text-white block border-b border-slate-850 pb-1.5 uppercase">Sovereign Active Currency Hub</span>
-                    <p className="text-slate-400 text-[11px] leading-relaxed font-sans">
-                      Select the primary base currency denomination for rendering reports, dividends, and listings valuation. The current base node currency is <strong className="text-cyan-400">{currencyCode}</strong>.
-                    </p>
-                    <div className="flex flex-wrap gap-2 pt-2">
-                      {[
-                        { code: "ZAR", symbol: "R", desc: "South African Rand" },
-                        { code: "NGN", symbol: "₦", desc: "Nigerian Naira" },
-                        { code: "KES", symbol: "KSh", desc: "Kenyan Shilling" },
-                        { code: "GHS", symbol: "GH₵", desc: "Ghanaian Cedi" },
-                        { code: "USD", symbol: "$", desc: "US Dollar" }
-                      ].map((curr) => (
                         <button
-                          key={curr.code}
+                          type="button"
                           onClick={() => {
-                            setCurrencyCode(curr.code as "ZAR" | "USD" | "NGN" | "KES" | "GHS");
-                            pushLog(`LOCALIZATION: Currency base swapped to: ${curr.code}`);
-                            toast(`Platform base currency swapped to ${curr.code}`, "success");
+                            setTickets((prev) => prev.map((x) => (x.id === t.id ? { ...x, status: 'Resolved' } : x)));
+                            setTicketReplyDraft({ ...ticketReplyDraft, [t.id]: '' });
+                            recordAuditEvent('Support', `Resolved ticket ${t.id}.`);
+                            addToast(`Ticket ${t.id} resolved and user notified.`, 'success');
                           }}
-                          className={`px-3 py-2 rounded font-bold border transition-all text-[11px] ${
-                            currencyCode === curr.code
-                              ? "bg-cyan-500 text-black border-cyan-500"
-                              : "bg-[#0c1224] text-slate-300 border-slate-800 hover:border-slate-700"
-                          }`}
+                          className="px-3 py-1.5 rounded-lg bg-[#0B1F1A] text-white font-semibold"
                         >
-                          {curr.code} ({curr.symbol})
+                          Resolve
                         </button>
-                      ))}
+                      </div>
                     </div>
-                  </div>
-
-                  <div className="bg-slate-950 border border-slate-850 rounded-xl p-4 space-y-4">
-                    <span className="text-xs font-bold text-white block border-b border-slate-850 pb-1.5 uppercase">Timezone Synchronization</span>
-                    <p className="text-slate-400 text-[11px] leading-normal font-sans font-medium">
-                      Sovereign OS transaction ledgers synchronize on a unified consensus UTC tick to verify stamp certificates globally.
-                    </p>
-                    <div className="p-3 bg-[#0c1224] border border-slate-850 rounded text-cyan-400 font-bold text-[11px]">
-                      CONSENSUS TIME: UTC (+00:00) GMT
-                    </div>
-                  </div>
+                  ))}
                 </div>
-              ) : activeSub === "AI Configuration & API Keys" ? (
-                /* AI parameters, temperature sliders and tokens */
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="bg-slate-950 border border-slate-850 rounded-xl p-4 space-y-4">
-                    <span className="text-xs font-bold text-white block border-b border-slate-850 pb-1.5 uppercase">Neural Inference Pipeline Weights</span>
-                    <div className="space-y-3">
-                      <div>
-                        <label className="text-[10px] text-slate-500 block mb-1">GopherML Key Status</label>
-                        <input type="password" value="****************************************" className="w-full bg-[#0c1224] border border-slate-800 rounded px-2.5 py-1.5 text-xs text-white" disabled />
-                      </div>
-                      <div>
-                        <label className="text-[10px] text-slate-500 block text-slate-400 flex justify-between max-w-sm mb-1">
-                          <span>Model Vector Weights temperature</span>
-                          <span className="text-cyan-405 font-bold">0.12 (Low Deviation)</span>
-                        </label>
-                        <input type="range" min="0" max="100" defaultValue="12" className="w-full accent-cyan-440 h-1 bg-slate-900 rounded" />
-                      </div>
-                    </div>
-                    <button onClick={() => { pushLog("SYSTEM: Recalibrated active vector weights."); toast("Neural pipeline weights optimized.", "success"); }} className="bg-cyan-500 hover:bg-cyan-404 text-black font-extrabold px-4 py-2 rounded text-[10.5px] uppercase font-mono">Re-calibrate Weights</button>
-                  </div>
-
-                  <div className="bg-slate-950 border border-slate-850 rounded-xl p-4 space-y-4">
-                    <span className="text-xs font-bold text-white block border-b border-slate-850 pb-1.5 uppercase">AI Safety Filters</span>
-                    <p className="text-slate-400 text-[11px] leading-relaxed font-sans">
-                      GopherML strictly screens listing metadata files to intercept false valuations, PEP compliance matches, and potential off-platform bypass terms.
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                /* Default Platform Settings View */
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  
-                  {/* API keys setting */}
-                  <div className="bg-slate-950 border border-slate-850 rounded-xl p-4 space-y-4">
-                    <span className="text-xs font-bold text-white block border-b border-slate-850 pb-1.5 uppercase">API KEY CREDENTIALS</span>
-                    <div className="space-y-3">
-                      <div>
-                        <label className="text-[10px] text-slate-500 block mb-1">GopherML AI Engine Secret API Key</label>
-                        <input type="password" value="****************************************" className="w-full bg-[#0c1224] border border-slate-800 rounded px-2.5 py-1.5 text-xs text-white" disabled />
-                      </div>
-                      <div>
-                        <label className="text-[10px] text-slate-500 block mb-1">SARS Tax Escrow Notary API Identifier</label>
-                        <input type="text" defaultValue="sars_token_hash_49210e9" className="w-full bg-[#0c1224] border border-slate-800 rounded px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500" />
-                      </div>
-                    </div>
-                    <button onClick={() => setActiveModal({ type: "adjust_pricing_config", data: {} as any })} className="bg-cyan-500 hover:bg-cyan-400 text-black font-extrabold px-4 py-2 rounded text-[10.5px] uppercase">Save API Config</button>
-                  </div>
-
-                  {/* Platform default variables configuring */}
-                  <div className="bg-slate-950 border border-slate-850 rounded-xl p-4 space-y-4">
-                    <span className="text-xs font-bold text-white block border-b border-slate-850 pb-1.5 uppercase">ROUTER VARIABLES DEFAULT</span>
-                    <div className="space-y-3">
-                      <div>
-                        <label className="text-[10px] text-slate-500 block mb-1">Max cross-border payout lock duration</label>
-                        <input type="text" defaultValue="48h (Lock Required)" className="w-full bg-[#0c1224] border border-slate-800 rounded px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500" />
-                      </div>
-                      <div>
-                        <label className="text-[10px] text-slate-500 block mb-1">Sovereign override bypass passcode</label>
-                        <input type="password" value="************" className="w-full bg-[#0c1224] border border-slate-800 rounded px-2.5 py-1.5 text-xs text-white" disabled />
-                      </div>
-                    </div>
-                  </div>
-
-                </div>
-              )}
+              </div>
             </div>
           )}
 
-          {/* CATEGORY: SUPPORT & INCIDENT RESPONSE */}
-          {activeCategory === "Support & Incident Response" && (
-            <div className="space-y-6 font-mono text-xs">
-              
-              <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-850 bg-slate-950 p-4">
-                <span className="text-slate-400 font-bold uppercase">Sovereign Incident & Ticket Management Center</span>
-                <span className="bg-[#22c55e]/10 text-[#22c55e] px-2.5 py-0.5 rounded text-[10px] font-bold">Consensus SLA: 10 mins</span>
+          {/* ============================================================== */}
+          {/* 8. FULLY FUNCTIONAL PLATFORM SETTINGS                          */}
+          {/* ============================================================== */}
+          {activeSection === 'settings' && (
+            <div className="space-y-6">
+              {/* Settings Sub-Navigation */}
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-2 flex flex-wrap gap-1.5">
+                {[
+                  { id: 'general' as SettingsSubTab, label: 'General & Public Banner' },
+                  { id: 'pricing' as SettingsSubTab, label: 'Commission & Plan Pricing' },
+                  { id: 'features' as SettingsSubTab, label: 'Vertical & Feature Switches' },
+                  { id: 'security' as SettingsSubTab, label: 'Security & Verification Policies' },
+                  { id: 'localization' as SettingsSubTab, label: 'Currency, Language & AI' },
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setSettingsSubTab(tab.id)}
+                    className={`px-3.5 py-2 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap shrink-0 ${
+                      settingsSubTab === tab.id
+                        ? 'bg-[#0B1F1A] text-white'
+                        : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
               </div>
 
-              {activeSub === "Live Chat Console" ? (
-                /* Full size Live Broker Chat Console */
-                <div className="rounded-xl border border-slate-800 bg-[#0d1430] p-6 flex flex-col justify-between min-h-[460px]">
+              {/* Tab 1: General & Public Banner */}
+              {settingsSubTab === 'general' && (
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 space-y-6">
                   <div>
-                    <h3 className="text-xs font-black text-white tracking-widest uppercase flex items-center gap-1.5 pb-2.5 border-b border-slate-800 mb-4">
-                      <MessageSquare className="h-4 w-4 text-cyan-400" /> Sovereign Customer Live Chat Console
-                    </h3>
-
-                    <div className="space-y-4 max-h-80 overflow-y-auto [scrollbar-width:thin] pr-2">
-                      {supportChat.map((chat, idx) => (
-                        <div key={idx} className={`p-3 rounded-lg border max-w-[70%] ${
-                          chat.sender.includes("Operator") 
-                            ? "bg-cyan-950/20 border-cyan-800/40 text-cyan-300 ml-auto text-right" 
-                            : "bg-slate-950 border-slate-850 text-slate-350"
-                        }`}>
-                          <div className="flex justify-between text-[9.5px] font-bold mb-1 opacity-70">
-                            <span>{chat.sender}</span>
-                            <span>{chat.time}</span>
-                          </div>
-                          <p className="leading-relaxed text-[11px] font-sans">{chat.msg}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="pt-4 border-t border-slate-800 flex gap-2">
-                    <input
-                      type="text"
-                      value={chatInput}
-                      onChange={(e) => setChatInput(e.target.value)}
-                      placeholder="Type response back to broker..."
-                      className="w-full bg-slate-950 rounded-lg px-4 py-2.5 border border-slate-850 text-xs text-white focus:outline-none focus:border-cyan-500"
-                    />
-                    <button 
-                      onClick={handleSendSupportMessage}
-                      className="bg-cyan-500 hover:bg-cyan-400 text-black font-extrabold px-6 rounded text-xs uppercase"
-                    >
-                      Send Message
-                    </button>
-                  </div>
-                </div>
-              ) : activeSub === "Escalations" ? (
-                /* Critical Escalations timeline queue */
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                  <div className="lg:col-span-8 rounded-xl border border-slate-850 bg-[#0c1224] overflow-hidden">
-                    <table className="w-full text-left">
-                      <thead>
-                        <tr className="border-b border-slate-855 text-slate-500 text-[10px] bg-slate-950 uppercase">
-                          <th className="p-4">CRISIS ID</th>
-                          <th className="p-4">INCIDENT DETAILS</th>
-                          <th className="p-4">LEVEL SEVERITY</th>
-                          <th className="p-4">BREACH ORIGIN HUB</th>
-                          <th className="p-4 text-right">MITIGATION STATUS</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {escalationsList.map((esc) => (
-                          <tr key={esc.id} className="border-b border-slate-800/40 text-[11px] hover:bg-[#080d1a] transition-all">
-                            <td className="p-4 font-bold text-slate-300 uppercase select-all">{esc.id}</td>
-                            <td className="p-4 font-sans font-medium">
-                              <span className="text-white font-extrabold block">{esc.title}</span>
-                              <span className="text-slate-500 block text-[9.5px]">Duration: {esc.duration}</span>
-                            </td>
-                            <td className="p-4">
-                              <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${
-                                esc.level === "CRITICAL" ? "bg-rose-500 text-black animate-pulse" : "bg-amber-500 text-black"
-                              }`}>{esc.level}</span>
-                            </td>
-                            <td className="p-4 text-slate-400 font-bold uppercase">{esc.origin}</td>
-                            <td className="p-4 text-right">
-                              {esc.status === "MITIGATED" ? (
-                                <span className="inline-flex items-center gap-1 text-[#22c55e] font-extrabold">
-                                  <span>Mitigated</span>
-                                  <Check className="w-3.5 h-3.5" />
-                                </span>
-                              ) : (
-                                <button
-                                  onClick={() => {
-                                    setEscalationsList(prev => prev.map(item => {
-                                      if (item.id === esc.id) {
-                                        return { ...item, status: "MITIGATED" };
-                                      }
-                                      return item;
-                                    }));
-                                    pushLog(`CRISIS_COMMAND: Mitigated incident ${esc.id} successfully.`);
-                                    toast(`Mitigation dispatched to target router successfully.`, "success");
-                                  }}
-                                  className="bg-rose-500 hover:bg-rose-455 text-black font-black px-3 py-1 rounded text-[10px] uppercase animate-pulse"
-                                >
-                                  Deploy Defense Shield
-                                </button>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  <div className="lg:col-span-4 rounded-xl border border-slate-855 bg-slate-950 p-5 space-y-4 font-mono">
-                    <h3 className="text-xs font-black text-rose-500 uppercase border-b border-slate-855 pb-2 mb-1 animate-pulse">
-                      Sovereign Guard Mode
-                    </h3>
-                    <p className="text-[11.5px] font-sans text-slate-400 leading-normal">
-                      Activating emergency lockdown halts cross-border capital flow nodes immediately. Ensure security council verification pins are aligned.
+                    <h2 className="font-heading text-lg font-bold text-slate-900 dark:text-white">
+                      Brand Identity, Announcement Banner &amp; Maintenance Control
+                    </h2>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Updates propagate immediately to the website Header, Footer, and public landing route
                     </p>
-                    <button
-                      onClick={() => { pushLog("SYSTEM: Platform-wide emergency safe mode triggered."); toast("Platform entered lockdown: Escrows frozen.", "warn"); }}
-                      className="w-full bg-rose-500 hover:bg-rose-450 text-black font-extrabold py-2 rounded text-[10.5px] uppercase"
-                    >
-                      Emergency Node Lockdown
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                /* Tickets directory timeline (Default View) */
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                  
-                  {/* Tickets directory table */}
-                  <div className="lg:col-span-6 space-y-4 flex flex-col justify-between">
-                    <div>
-                      <div className="flex justify-between items-center bg-slate-950 border border-slate-850 p-4 rounded-xl mb-4 font-sans font-bold">
-                        <span className="text-slate-400 font-bold uppercase">Customer Support SLA Incidents</span>
-                        <span className="text-slate-500">2 OPEN COHORTS</span>
-                      </div>
-
-                      <div className="space-y-3 max-h-85 overflow-y-auto pr-1">
-                        {tickets.map(t => (
-                          <div key={t.id} className="bg-[#0c1224] border border-slate-850 rounded-xl p-4 space-y-2">
-                            <div className="flex justify-between">
-                              <span className="text-cyan-400 font-bold">{t.id} • {t.assignedTeam}</span>
-                              <span className={`px-1 rounded text-[9px] font-bold ${
-                                t.priority === 'CRITICAL' ? "bg-rose-500 text-black animate-pulse" : "bg-amber-500 text-black"
-                              }`}>{t.priority}</span>
-                            </div>
-                            <h4 className="font-bold text-slate-200 text-xs">{t.subject}</h4>
-                            <p className="text-[11px] text-slate-400 leading-normal font-sans">{t.message}</p>
-                            
-                            <div className="flex justify-between items-center text-[10px] text-slate-500 border-t border-slate-900 pt-2">
-                              <span>User: {t.userEmail}</span>
-                              <button onClick={() => toast("Incident assigned escalating.", "info")} className="text-cyan-400 font-bold hover:underline">ESCALATE SLA</button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <span className="text-slate-600 font-[10px] select-none block">SLA Response Limit: <strong className="text-emerald-400">10 mins</strong></span>
                   </div>
 
-                  {/* Dynamic live chat console with real estate actors */}
-                  <div className="lg:col-span-6 rounded-xl border border-slate-800 bg-[#0d1430] p-5 flex flex-col justify-between min-h-[420px]">
-                    
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                     <div>
-                      <h3 className="text-xs font-black text-white tracking-widest uppercase flex items-center gap-1.5 pb-2.5 border-b border-slate-800 mb-4">
-                        <MessageSquare className="h-4 w-4 text-cyan-400" /> Sovereign Customer Live Chat Console
-                      </h3>
-
-                      <div className="space-y-3 max-h-60 overflow-y-auto [scrollbar-width:thin] pr-2">
-                        {supportChat.map((chat, idx) => (
-                          <div key={idx} className={`p-2.5 rounded-lg border max-w-[85%] ${
-                            chat.sender.includes("Operator") 
-                              ? "bg-cyan-950/10 border-cyan-800/40 text-cyan-300 ml-auto" 
-                              : "bg-slate-950 border-slate-850 text-slate-350"
-                          }`}>
-                            <div className="flex justify-between text-[9.5px] font-bold mb-1 opacity-70">
-                              <span>{chat.sender}</span>
-                              <span>{chat.time}</span>
-                            </div>
-                            <p className="leading-relaxed text-[11px] font-sans">{chat.msg}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="pt-4 border-t border-slate-800 flex gap-2">
+                      <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Platform Name</label>
                       <input
                         type="text"
-                        value={chatInput}
-                        onChange={(e) => setChatInput(e.target.value)}
-                        placeholder="Type response back to broker..."
-                        className="w-full bg-slate-950 rounded-lg px-3 py-2 border border-slate-850 text-xs text-white focus:outline-none focus:border-cyan-500"
+                        value={draftSettings.siteName}
+                        onChange={(e) => setDraftSettings({ ...draftSettings, siteName: e.target.value })}
+                        className="w-full px-3.5 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-semibold"
                       />
-                      <button 
-                        onClick={handleSendSupportMessage}
-                        className="bg-cyan-500 hover:bg-cyan-400 text-black font-extrabold px-4 rounded text-xs uppercase"
-                      >
-                        Send
-                      </button>
+                    </div>
+                    <div>
+                      <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Platform Tagline</label>
+                      <input
+                        type="text"
+                        value={draftSettings.tagline}
+                        onChange={(e) => setDraftSettings({ ...draftSettings, tagline: e.target.value })}
+                        className="w-full px-3.5 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800"
+                      />
                     </div>
                   </div>
 
+                  <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 space-y-4 text-xs">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-bold text-slate-900 dark:text-white">Global Public Announcement Banner</p>
+                        <p className="text-slate-500">Displays a pinned notification strip above navigation</p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={draftSettings.announcementBanner.enabled}
+                        onChange={(e) =>
+                          setDraftSettings({
+                            ...draftSettings,
+                            announcementBanner: { ...draftSettings.announcementBanner, enabled: e.target.checked },
+                          })
+                        }
+                        className="w-4 h-4 accent-emerald-700"
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div className="md:col-span-2">
+                        <label className="block font-semibold mb-1">Banner Message</label>
+                        <input
+                          type="text"
+                          value={draftSettings.announcementBanner.text}
+                          onChange={(e) =>
+                            setDraftSettings({
+                              ...draftSettings,
+                              announcementBanner: { ...draftSettings.announcementBanner, text: e.target.value },
+                            })
+                          }
+                          className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
+                        />
+                      </div>
+                      <div>
+                        <label className="block font-semibold mb-1">Target Page Route</label>
+                        <select
+                          value={draftSettings.announcementBanner.targetPage}
+                          onChange={(e) =>
+                            setDraftSettings({
+                              ...draftSettings,
+                              announcementBanner: { ...draftSettings.announcementBanner, targetPage: e.target.value },
+                            })
+                          }
+                          className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
+                        >
+                          <option value="pricing">Pricing Plans</option>
+                          <option value="book-a-stay">Short-Term Stays</option>
+                          <option value="long-term-stays">Long-Term Accommodation</option>
+                          <option value="neighborhood-explorer">Neighborhood Explorer</option>
+                          <option value="hotel-registration">Hotel Registration</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-4 rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50/50 dark:bg-rose-950/20 space-y-3 text-xs">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-bold text-slate-900 dark:text-white">Maintenance Mode Lock</p>
+                        <p className="text-slate-600 dark:text-slate-300">Pauses public marketplace routes with scheduled notice</p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={draftSettings.maintenanceMode}
+                        onChange={(e) => setDraftSettings({ ...draftSettings, maintenanceMode: e.target.checked })}
+                        className="w-4 h-4 accent-rose-600"
+                      />
+                    </div>
+                    <input
+                      type="text"
+                      value={draftSettings.maintenanceMessage}
+                      onChange={(e) => setDraftSettings({ ...draftSettings, maintenanceMessage: e.target.value })}
+                      className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
+                    />
+                  </div>
+
+                  <div className="flex justify-end gap-3">
+                    <button
+                      type="button"
+                      onClick={() => handleSaveSettingsSection('Saved general brand identity, banner, and maintenance settings.')}
+                      className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[#0B1F1A] hover:bg-emerald-900 text-white text-xs font-semibold"
+                    >
+                      <Save className="w-4 h-4 text-amber-300" />
+                      <span>Save &amp; Publish General Settings</span>
+                    </button>
+                  </div>
                 </div>
               )}
 
+              {/* Tab 2: Commission & Plan Pricing */}
+              {settingsSubTab === 'pricing' && (
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 space-y-6">
+                  <div>
+                    <h2 className="font-heading text-lg font-bold text-slate-900 dark:text-white">
+                      Marketplace Fee &amp; Partner Pricing Rates
+                    </h2>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Directly updates the Pricing page plans, comparison matrix, and live net payout calculator
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
+                    <div>
+                      <label className="block font-semibold mb-1.5">Accommodation Booking Commission (%)</label>
+                      <input
+                        type="number"
+                        step="0.5"
+                        value={draftSettings.commissionRates.shortStayPercent}
+                        onChange={(e) =>
+                          setDraftSettings({
+                            ...draftSettings,
+                            commissionRates: { ...draftSettings.commissionRates, shortStayPercent: Number(e.target.value) || 0 },
+                          })
+                        }
+                        className="w-full px-3.5 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono tabular-nums font-bold"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-semibold mb-1.5">Long-Term Tenant Placement Fee (%)</label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={draftSettings.commissionRates.longTermPlacementPercent}
+                        onChange={(e) =>
+                          setDraftSettings({
+                            ...draftSettings,
+                            commissionRates: { ...draftSettings.commissionRates, longTermPlacementPercent: Number(e.target.value) || 0 },
+                          })
+                        }
+                        className="w-full px-3.5 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono tabular-nums font-bold"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-semibold mb-1.5">Property Sales Premium Boost (ZAR)</label>
+                      <input
+                        type="number"
+                        step="10"
+                        value={draftSettings.commissionRates.salesBoostZar}
+                        onChange={(e) =>
+                          setDraftSettings({
+                            ...draftSettings,
+                            commissionRates: { ...draftSettings.commissionRates, salesBoostZar: Number(e.target.value) || 0 },
+                          })
+                        }
+                        className="w-full px-3.5 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono tabular-nums font-bold"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-semibold mb-1.5">Property Manager Fee (ZAR / property / mo)</label>
+                      <input
+                        type="number"
+                        step="10"
+                        value={draftSettings.commissionRates.propertyManagerMonthlyZar}
+                        onChange={(e) =>
+                          setDraftSettings({
+                            ...draftSettings,
+                            commissionRates: { ...draftSettings.commissionRates, propertyManagerMonthlyZar: Number(e.target.value) || 0 },
+                          })
+                        }
+                        className="w-full px-3.5 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono tabular-nums font-bold"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-semibold mb-1.5">Hotels &amp; Enterprise Floor (%)</label>
+                      <input
+                        type="number"
+                        step="0.5"
+                        value={draftSettings.commissionRates.hotelCommissionPercent}
+                        onChange={(e) =>
+                          setDraftSettings({
+                            ...draftSettings,
+                            commissionRates: { ...draftSettings.commissionRates, hotelCommissionPercent: Number(e.target.value) || 0 },
+                          })
+                        }
+                        className="w-full px-3.5 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono tabular-nums font-bold"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-3">
+                    <button
+                      type="button"
+                      onClick={() => handleSaveSettingsSection('Updated global partner commission rates and synced Pricing page.')}
+                      className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[#0B1F1A] hover:bg-emerald-900 text-white text-xs font-semibold"
+                    >
+                      <Save className="w-4 h-4 text-amber-300" />
+                      <span>Apply Commission Schedule</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Tab 3: Feature & Vertical Switches */}
+              {settingsSubTab === 'features' && (
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 space-y-6">
+                  <div>
+                    <h2 className="font-heading text-lg font-bold text-slate-900 dark:text-white">
+                      Platform Modules &amp; Vertical Availability
+                    </h2>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Enable or disable public navigation sections and platform capabilities instantaneously
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
+                    {[
+                      { key: 'shortStays', label: 'Short-Term Stays & Hotels' },
+                      { key: 'longTerm', label: 'Long-Term Accommodation' },
+                      { key: 'transport', label: 'Transport & Fleet Rentals' },
+                      { key: 'wellness', label: 'Wellness Retreats & Clinics' },
+                      { key: 'neighborhoods', label: 'Neighborhood Explorer' },
+                      { key: 'professionals', label: 'Find a Professional' },
+                      { key: 'hotelRegistration', label: '9-Stage Hotel Registration Flow' },
+                      { key: 'aiConcierge', label: 'AI Marketplace Concierge' },
+                      { key: 'aiValuation', label: 'AI Valuation & Listing Assistant' },
+                    ].map((flag) => {
+                      const k = flag.key as keyof typeof draftSettings.featureFlags;
+                      return (
+                        <label
+                          key={flag.key}
+                          className="flex items-center justify-between p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 cursor-pointer"
+                        >
+                          <span className="font-semibold text-slate-900 dark:text-white">{flag.label}</span>
+                          <input
+                            type="checkbox"
+                            checked={draftSettings.featureFlags[k]}
+                            onChange={(e) =>
+                              setDraftSettings({
+                                ...draftSettings,
+                                featureFlags: { ...draftSettings.featureFlags, [k]: e.target.checked },
+                              })
+                            }
+                            className="w-4 h-4 accent-emerald-700"
+                          />
+                        </label>
+                      );
+                    })}
+                  </div>
+
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => handleSaveSettingsSection('Updated platform module & vertical feature flags.')}
+                      className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[#0B1F1A] hover:bg-emerald-900 text-white text-xs font-semibold"
+                    >
+                      <Save className="w-4 h-4 text-amber-300" />
+                      <span>Save Feature Toggles</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Tab 4: Security Policies */}
+              {settingsSubTab === 'security' && (
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 space-y-6">
+                  <div>
+                    <h2 className="font-heading text-lg font-bold text-slate-900 dark:text-white">
+                      Publishing Gates, Moderation &amp; Session Security
+                    </h2>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Controls KYC enforcement during listing submission, moderation state, and session timeouts
+                    </p>
+                  </div>
+
+                  <div className="space-y-3 text-xs">
+                    <label className="flex items-center justify-between p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 cursor-pointer">
+                      <div>
+                        <p className="font-semibold text-slate-900 dark:text-white">Require KYC Approval Before Publishing</p>
+                        <p className="text-slate-500">Prevents unverified accounts from submitting live listings or services</p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={draftSettings.securityPolicies.requireKycToPublish}
+                        onChange={(e) =>
+                          setDraftSettings({
+                            ...draftSettings,
+                            securityPolicies: { ...draftSettings.securityPolicies, requireKycToPublish: e.target.checked },
+                          })
+                        }
+                        className="w-4 h-4 accent-emerald-700"
+                      />
+                    </label>
+
+                    <label className="flex items-center justify-between p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 cursor-pointer">
+                      <div>
+                        <p className="font-semibold text-slate-900 dark:text-white">Hold New Listings in Pending Approval Queue</p>
+                        <p className="text-slate-500">Routes newly submitted properties into Super Admin moderation before public release</p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={draftSettings.securityPolicies.autoModerateListings}
+                        onChange={(e) =>
+                          setDraftSettings({
+                            ...draftSettings,
+                            securityPolicies: { ...draftSettings.securityPolicies, autoModerateListings: e.target.checked },
+                          })
+                        }
+                        className="w-4 h-4 accent-emerald-700"
+                      />
+                    </label>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                      <div>
+                        <label className="block font-semibold mb-1.5">Session Inactivity Timeout (Minutes)</label>
+                        <input
+                          type="number"
+                          min={5}
+                          max={120}
+                          value={draftSettings.securityPolicies.sessionTimeoutMinutes}
+                          onChange={(e) =>
+                            setDraftSettings({
+                              ...draftSettings,
+                              securityPolicies: {
+                                ...draftSettings.securityPolicies,
+                                sessionTimeoutMinutes: Number(e.target.value) || 15,
+                              },
+                            })
+                          }
+                          className="w-full px-3.5 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono tabular-nums"
+                        />
+                      </div>
+                      <div>
+                        <label className="block font-semibold mb-1.5">Form Anti-Spam Cooldown (Seconds)</label>
+                        <input
+                          type="number"
+                          min={5}
+                          max={120}
+                          value={draftSettings.securityPolicies.autoThrottleCooldownSeconds}
+                          onChange={(e) =>
+                            setDraftSettings({
+                              ...draftSettings,
+                              securityPolicies: {
+                                ...draftSettings.securityPolicies,
+                                autoThrottleCooldownSeconds: Number(e.target.value) || 15,
+                              },
+                            })
+                          }
+                          className="w-full px-3.5 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono tabular-nums"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => handleSaveSettingsSection('Updated global publishing gates, moderation queue, and session security policies.')}
+                      className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[#0B1F1A] hover:bg-emerald-900 text-white text-xs font-semibold"
+                    >
+                      <Save className="w-4 h-4 text-amber-300" />
+                      <span>Enforce Security Policies</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Tab 5: Localization, Currency & AI */}
+              {settingsSubTab === 'localization' && (
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 space-y-6">
+                  <div>
+                    <h2 className="font-heading text-lg font-bold text-slate-900 dark:text-white">
+                      Localization, Currency Baseline &amp; AI Configuration
+                    </h2>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Controls live currency &amp; language defaults across AfriEstate plus Reset Controls
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                    <div>
+                      <label className="block font-semibold mb-1.5">Active Platform Currency</label>
+                      <select
+                        value={draftSettings.defaultCurrency}
+                        onChange={(e) => setDraftSettings({ ...draftSettings, defaultCurrency: e.target.value as Currency })}
+                        className="w-full px-3.5 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-semibold"
+                      >
+                        {Object.values(Currency).map((cur) => (
+                          <option key={cur} value={cur}>
+                            {cur}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block font-semibold mb-1.5">Active Platform Language</label>
+                      <select
+                        value={draftSettings.defaultLanguage}
+                        onChange={(e) => setDraftSettings({ ...draftSettings, defaultLanguage: e.target.value as Language })}
+                        className="w-full px-3.5 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-semibold"
+                      >
+                        {Object.values(Language).map((lng) => (
+                          <option key={lng} value={lng}>
+                            {lng.toUpperCase()}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block font-semibold mb-1.5">AI Routing Model</label>
+                      <select
+                        value={draftSettings.securityPolicies.aiModel}
+                        onChange={(e) =>
+                          setDraftSettings({
+                            ...draftSettings,
+                            securityPolicies: {
+                              ...draftSettings.securityPolicies,
+                              aiModel: e.target.value as 'gemini-2.5-flash' | 'gemini-2.5-pro',
+                            },
+                          })
+                        }
+                        className="w-full px-3.5 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-semibold"
+                      >
+                        <option value="gemini-2.5-flash">gemini-2.5-flash (Fast Marketplace)</option>
+                        <option value="gemini-2.5-pro">gemini-2.5-pro (Deep Valuation)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        resetAllGovernance();
+                        addToast('All platform settings, rates, and overrides restored to defaults.', 'info');
+                      }}
+                      className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold"
+                    >
+                      <RotateCcw className="w-4 h-4" />
+                      <span>Reset All Governance Defaults</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleSaveSettingsSection('Updated global currency, language, and AI configuration.')}
+                      className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[#0B1F1A] hover:bg-emerald-900 text-white text-xs font-semibold"
+                    >
+                      <Save className="w-4 h-4 text-amber-300" />
+                      <span>Save Localization &amp; AI Settings</span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
-
-        </div>
-      </main>
-
-      {/* 3. CORE ADOPTION OVERRIDE ACTION MODE EXECUTOR (THE CONFIRMATORY MODAL) */}
-      {activeModal && (
-        <div className="fixed inset-0 z-[110000] flex items-center justify-center bg-black/85 backdrop-blur-sm px-4">
-          <div className="w-full max-w-md bg-[#0d142b] border border-cyan-500/30 rounded-2xl p-6 font-mono text-xs space-y-4 shadow-[0_0_30px_rgba(6,182,212,0.15)] animate-fadeIn">
-            
-            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-              <span className="text-xs font-black text-rose-500 tracking-widest uppercase flex items-center gap-1.5 animate-pulse">
-                <AlertTriangle className="h-4 w-4" /> AUTHORIZATION SECURITY SIG_LOCK
-              </span>
-              <button 
-                onClick={() => setActiveModal(null)}
-                className="text-slate-500 hover:text-white"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            <p className="text-slate-300 leading-relaxed text-[11px] font-sans">
-              "You are executing a server-level override that directly mutates live database buffers, blocks transaction releases, and alters verification indexes across Africa hubs. Verify clearances."
-            </p>
-
-            <div className="bg-slate-950 p-3 rounded-lg border border-slate-900 space-y-2 text-[10.5px]">
-              <div>OVERRIDE TARGET ID: <strong className="text-white font-bold select-all">{activeModal.data?.id || "GENERIC_CONFIG"}</strong></div>
-              <div>DESCRIPTION: <strong className="text-cyan-400 font-bold uppercase">{activeModal.type}</strong></div>
-              {activeModal.data?.name && <div>AFFECTED USER: <strong className="text-slate-300 font-bold">{activeModal.data.name}</strong></div>}
-              {activeModal.data?.amount && <div>VALUATION CAP: <strong className="text-amber-405 font-bold">R {activeModal.data.amount.toLocaleString()} ZAR</strong></div>}
-            </div>
-
-            <div className="space-y-3">
-              <div>
-                <label className="text-[10px] text-slate-500 block mb-1 uppercase font-bold">Override Reason (Legal Log Auditing)</label>
-                <input
-                  type="text"
-                  placeholder="Describe compliance clearance terms..."
-                  className="w-full bg-[#0c1224] border border-slate-800 rounded px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500"
-                />
-              </div>
-              <div>
-                <label className="text-[10px] text-slate-500 block mb-1 uppercase font-bold">Secured Override PIN Clearance</label>
-                <input
-                  type="password"
-                  placeholder="Enter pin (e.g., AES-3942-CPT)"
-                  className="w-full bg-[#0c1224] border border-slate-800 rounded px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500 text-center font-bold tracking-widest"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 pt-2">
-              <button 
-                onClick={() => setActiveModal(null)}
-                className="bg-slate-900 text-slate-400 font-bold py-2 rounded-lg border border-slate-800 hover:text-white text-[10.5px]"
-              >
-                Abort Override
-              </button>
-              <button 
-                onClick={handleExecuteModalAction}
-                className="bg-cyan-500 text-black font-extrabold py-2 rounded-lg hover:bg-cyan-400 hover:shadow-[0_0_15px_rgba(6,182,212,0.3)] text-[10.5px] uppercase"
-              >
-                Confirm Sig Override
-              </button>
-            </div>
-
-          </div>
-        </div>
-      )}
-
-    </div>
-  );
-}
-
-// --- SOVEREIGN NETWORKS REGIONAL NODES DEFINITIONS ---
-const regionalNodes = [
-  {
-    id: "NODE-SA-01",
-    name: "Southern Africa Node",
-    alias: "Primary Sovereign Vault",
-    region: "Southern Africa",
-    city: "Cape Town / Johannesburg",
-    capitalPool: 2450000000,
-    activeWallets: 2840,
-    listings: 45,
-    occupancyRate: "94.8%",
-    avgYield: "12.8%",
-    status: "ONLINE",
-    multiplier: "1.45x Over 3y",
-    notaryStatus: "Fully Certified",
-    latency: "12ms",
-    integrityScore: 99.8,
-    gateways: ["CPT-EDGE-01", "JHB-BACKBONE-02"],
-    highlightColor: "text-cyan-400"
-  },
-  {
-    id: "NODE-WA-02",
-    name: "West Africa Node",
-    alias: "Lagos / Lekki Hub",
-    region: "West Africa",
-    city: "Lagos / Lekki Corridor",
-    capitalPool: 3100000000,
-    activeWallets: 1620,
-    listings: 32,
-    occupancyRate: "91.2%",
-    avgYield: "18.4%",
-    status: "ONLINE",
-    multiplier: "2.10x Over 3y",
-    notaryStatus: "Multi-Sig Secured",
-    latency: "28ms",
-    integrityScore: 97.4,
-    gateways: ["LOS-CORE-01", "LEKKI-WIRED-03"],
-    highlightColor: "text-emerald-400"
-  },
-  {
-    id: "NODE-EA-03",
-    name: "East Africa Node",
-    alias: "Nairobi / Westlands Hub",
-    region: "East Africa",
-    city: "Nairobi / Westlands",
-    capitalPool: 1220000000,
-    activeWallets: 910,
-    listings: 21,
-    occupancyRate: "88.6%",
-    avgYield: "14.1%",
-    status: "SYNCING",
-    multiplier: "1.65x Over 3y",
-    notaryStatus: "Cadaster Mesh Update",
-    latency: "45ms",
-    integrityScore: 96.1,
-    gateways: ["NBO-WEST-EDGE", "KILIMANI-ROUTER-2"],
-    highlightColor: "text-amber-400"
-  },
-  {
-    id: "NODE-NA-04",
-    name: "North Africa Node",
-    alias: "Cairo Administrative Hub",
-    region: "North Africa",
-    city: "Cairo / Administrative Plaza",
-    capitalPool: 1480000000,
-    activeWallets: 1122,
-    listings: 19,
-    occupancyRate: "92.4%",
-    avgYield: "9.6%",
-    status: "ONLINE",
-    multiplier: "1.20x Over 3y",
-    notaryStatus: "Decentralized Notary Synced",
-    latency: "18ms",
-    integrityScore: 99.1,
-    gateways: ["CAI-SMART-01", "GIZA-GATEWAY-2"],
-    highlightColor: "text-purple-400"
-  }
-];
-
-function RegionalNodeCard({ node, renderCurrency }: { node: any; renderCurrency: (val: number) => string }) {
-  const [isPinging, setIsPinging] = useState(false);
-  const [latencyState, setLatencyState] = useState(node.latency);
-  const [integrityState, setIntegrityState] = useState(node.integrityScore);
-  const [pingHistory, setPingHistory] = useState<string[]>([]);
-
-  const handlePing = () => {
-    setIsPinging(true);
-    setPingHistory(prev => [...prev.slice(-2), `[PING] Sending ICP packet to ${node.id}...`]);
-    setTimeout(() => {
-      setIsPinging(false);
-      const randomLatency = Math.floor(Math.random() * 25) + 8;
-      setLatencyState(`${randomLatency}ms`);
-      const scoreVariance = (Math.random() * 0.4 - 0.2);
-      setIntegrityState(Math.min(100, Math.max(95, parseFloat((node.integrityScore + scoreVariance).toFixed(1)))));
-      setPingHistory(prev => [...prev.slice(-2), `[PONG] Responded in ${randomLatency}ms. Security clean.`]);
-    }, 850);
-  };
-
-  return (
-    <div className="rounded-xl border border-slate-800 bg-[#090e1f] p-4 flex flex-col justify-between transition-all duration-300 hover:border-slate-700 hover:shadow-[0_0_20px_rgba(6,182,212,0.08)] relative overflow-hidden font-mono text-left">
-      <div className={`absolute top-0 left-0 right-0 h-[2px] ${node.status === "ONLINE" ? "bg-emerald-500" : "bg-amber-500"} ${isPinging ? "animate-pulse" : ""}`} />
-      
-      <div>
-        <div className="flex items-start justify-between mb-2">
-          <div>
-            <h4 className="text-xs font-bold text-white tracking-wide">{node.name}</h4>
-            <span className="text-[9.5px] text-slate-500">{node.alias}</span>
-          </div>
-          <div className="flex items-center gap-1.5 bg-slate-950 px-2 py-0.5 rounded border border-slate-850">
-            <span className={`h-1.5 w-1.5 rounded-full ${node.status === "ONLINE" ? "bg-emerald-400 animate-pulse" : "bg-amber-400 animate-pulse"}`} />
-            <span className="text-[8px] text-slate-400 font-extrabold uppercase">{node.status}</span>
-          </div>
-        </div>
-
-        <div className="space-y-1.5 border-t border-slate-900 pt-3 my-3 text-[10px] text-slate-400">
-          <div className="flex justify-between">
-            <span>Primary Hub:</span>
-            <span className="text-white font-semibold">{node.city}</span>
-          </div>
-          <div className="flex justify-between">
-            <span>Capital Pool:</span>
-            <span className="text-white font-bold">{renderCurrency(node.capitalPool)}</span>
-          </div>
-          <div className="flex justify-between">
-            <span>Active Wallets:</span>
-            <span className="text-cyan-400 font-bold">{node.activeWallets.toLocaleString()}</span>
-          </div>
-          <div className="flex justify-between">
-            <span>Listings Base:</span>
-            <span className="text-white">{node.listings} properties</span>
-          </div>
-          <div className="flex justify-between border-t border-slate-900/50 pt-1.5 mt-1.5 text-[9.5px]">
-            <span>Avg Yield:</span>
-            <span className="text-emerald-405 font-bold">{node.avgYield} YoY</span>
-          </div>
-          <div className="flex justify-between">
-            <span>Occupancy Predict:</span>
-            <span className="text-white">{node.occupancyRate}</span>
-          </div>
-          <div className="flex justify-between pb-1.5">
-            <span>Registry Security:</span>
-            <span className="text-purple-400 font-semibold text-[9px] uppercase">{node.notaryStatus}</span>
-          </div>
-        </div>
-      </div>
-
-      <div className="space-y-2 border-t border-slate-900/50 pt-3">
-        <div className="flex items-center justify-between text-[9px] text-slate-500">
-          <span className="flex items-center gap-1">
-            <Cpu className="h-3 w-3 text-slate-500" /> Integrity: <strong className="text-slate-350 font-semibold">{integrityState}%</strong>
-          </span>
-          <span className="flex items-center gap-1">
-            <Clock className="h-3 w-3 text-slate-500" /> Ping: <strong className="text-cyan-400 font-bold">{latencyState}</strong>
-          </span>
-        </div>
-
-        {pingHistory.length > 0 && (
-          <div className="bg-slate-950 p-1.5 rounded text-[8.5px] text-slate-400 leading-tight space-y-0.5 border border-slate-900/80">
-            {pingHistory.map((h, i) => (
-              <div key={i} className="truncate text-slate-440 font-mono">{h}</div>
-            ))}
-          </div>
-        )}
-
-        <button
-          onClick={handlePing}
-          disabled={isPinging}
-          className="w-full text-[9px] font-bold uppercase py-1 px-2.5 rounded border border-slate-800 hover:border-slate-700 bg-slate-950/60 hover:bg-slate-900 transition-all text-slate-350 hover:text-white flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
-        >
-          {isPinging ? <RefreshCw className="h-3 w-3 text-cyan-400 animate-spin" /> : "Verify Cadaster Connection"}
-        </button>
+        </main>
       </div>
     </div>
   );

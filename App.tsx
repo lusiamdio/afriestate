@@ -23,7 +23,40 @@ import PropertyFormModal from './components/PropertyFormModal';
 import ServiceListingFormModal from './components/ServiceListingFormModal';
 import FinancialServices from './components/FinancialServices';
 import AIResponseModal from './components/AIResponseModal';
-import { getProperties, saveProperties, getTourRequests, addTourRequest, getSavedPropertiesForUser, savePropertiesForUser, getInquiriesForSeller, getSavedSearchesForUser, saveSearchesForUser, incrementPropertyView, getMessagesForUser, sendMessage, addReview, getEvents, addEvent, updateEvent, deleteEvent, getAgentProfile, updateAgentProfile, getReviewsForAgent as getAllReviewsForAgent, getLeadsForAgent, getInvestorSettings, saveInvestorSettings, getInvestmentRequests, addInvestmentRequest, getNotifications, getReadNotificationIds, markNotificationsAsRead } from './lib/data';
+import {
+  getProperties,
+  saveProperties,
+  upsertPublishedProperty,
+  removePublishedProperty,
+  getPublishedStayProfiles,
+  getTourRequests,
+  addTourRequest,
+  getSavedPropertiesForUser,
+  savePropertiesForUser,
+  getInquiriesForSeller,
+  getSavedSearchesForUser,
+  saveSearchesForUser,
+  incrementPropertyView,
+  getMessagesForUser,
+  sendMessage,
+  addReview,
+  getEvents,
+  addEvent,
+  updateEvent,
+  deleteEvent,
+  getAgentProfile,
+  updateAgentProfile,
+  getReviewsForAgent as getAllReviewsForAgent,
+  getLeadsForAgent,
+  getInvestorSettings,
+  saveInvestorSettings,
+  getInvestmentRequests,
+  addInvestmentRequest,
+  getNotifications,
+  getReadNotificationIds,
+  markNotificationsAsRead,
+} from './lib/data';
+import type { StayPropertyProfile } from './data/stayDetailData';
 import PersonalizedMatches from './components/PersonalizedMatches';
 import AgentContactModal from './components/AgentContactModal';
 import VRTourModal from './components/VRTourModal';
@@ -46,7 +79,7 @@ import ServiceRegistrationModal from './components/ServiceRegistrationModal';
 import BlogDetailModal from './components/BlogDetailModal';
 import SessionTimeoutModal from './components/SessionTimeoutModal';
 import { useToast } from './contexts/ToastContext';
-import { useAdminState } from './contexts/AdminStateContext';
+import { useAdminState, type SovereignRoleKey } from './contexts/AdminStateContext';
 import MapInterface from './components/MapInterface';
 import ExploreAfricaMap from './components/ExploreAfricaMap';
 import BookingStyleFilterSidebar from './components/BookingStyleFilterSidebar';
@@ -66,7 +99,7 @@ import NeighborhoodExplorerPage from './components/pages/NeighborhoodExplorerPag
 import FindProfessionalPage from './components/pages/FindProfessionalPage';
 import HotelRegistrationPage from './components/pages/HotelRegistrationPage';
 
-type Page = 'home' | 'about' | 'services' | 'contact' | 'pricing' | 'rent-a-car' | 'find-wellness' | 'book-a-stay' | 'auth' | 'property-detail' | 'neighborhood-explorer' | 'find-professional' | 'hotel-registration';
+type Page = 'home' | 'about' | 'services' | 'contact' | 'pricing' | 'rent-a-car' | 'find-wellness' | 'book-a-stay' | 'long-term-stays' | 'auth' | 'property-detail' | 'neighborhood-explorer' | 'find-professional' | 'hotel-registration';
 
 const initialFilters: SearchFilters = {
     location: '',
@@ -116,7 +149,7 @@ const blogSchema = {
             title: { type: Type.STRING, description: "A catchy, SEO-friendly title for the blog post." },
             author: { type: Type.STRING, description: "A realistic-sounding author name." },
             date: { type: Type.STRING, description: "A recent date in the format 'Month Day, Year'." },
-            image: { type: Type.STRING, description: "A URL for a relevant image from picsum.photos, e.g., https://picsum.photos/seed/blog1/400/250." },
+            image: { type: Type.STRING, description: "A verified local image path under /images/, e.g., /images/house_suburbs_1779978598551.png." },
             summary: { type: Type.STRING, description: "A concise, one-sentence summary of the article." },
             content: { type: Type.STRING, description: "The full content of the blog post, formatted in Markdown with headings (e.g., ## My Heading), lists, and paragraphs. It should be 3-4 paragraphs long." },
         },
@@ -125,7 +158,7 @@ const blogSchema = {
 };
 
 const App: React.FC = () => {
-  const { lastAction } = useAdminState();
+  const { settings, roleControls, userOverrides, applyListingOverrides, lastAction } = useAdminState();
   const [page, setPage] = useState<Page>('home');
   const [filters, setFilters] = useState<SearchFilters>(initialFilters);
   
@@ -151,6 +184,7 @@ const App: React.FC = () => {
   };
   
   const [allProperties, setAllProperties] = useState<Property[]>([]);
+  const [publishedStayProfiles, setPublishedStayProfiles] = useState<StayPropertyProfile[]>(() => getPublishedStayProfiles());
   const [investmentProperties, setInvestmentProperties] = useState<Property[]>([]);
   const [filteredProperties, setFilteredProperties] = useState<Property[]>([]);
   const [isLoadingProperties, setIsLoadingProperties] = useState(true);
@@ -298,8 +332,9 @@ const App: React.FC = () => {
   const warningTimerRef = useRef<number | null>(null);
   const logoutTimerRef = useRef<number | null>(null);
   const countdownIntervalRef = useRef<number | null>(null);
-  const INACTIVITY_TIMEOUT = 15 * 60 * 1000;
-  const WARNING_TIMEOUT = 14 * 60 * 1000;
+  const timeoutMinutes = Math.max(5, settings.securityPolicies?.sessionTimeoutMinutes || 15);
+  const INACTIVITY_TIMEOUT = timeoutMinutes * 60 * 1000;
+  const WARNING_TIMEOUT = Math.max(60 * 1000, INACTIVITY_TIMEOUT - 60 * 1000);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -450,6 +485,33 @@ const App: React.FC = () => {
     }
   }, [lastAction, currentUser]);
 
+  // Keep document title synchronized with Super Admin general brand settings
+  useEffect(() => {
+    const brand = settings.siteName || 'AfriEstate';
+    const tag = settings.tagline || 'Real Estate for Real People';
+    document.title = `${brand} — ${tag}`;
+  }, [settings.siteName, settings.tagline]);
+
+  // Enforce active role/user suspension & overrides pushed from Super Admin
+  const currentUserOverride = useMemo(() => {
+    if (!currentUser) return undefined;
+    const byUsername = userOverrides[currentUser.username.toLowerCase()];
+    const byEmail = currentUser.email ? userOverrides[currentUser.email.toLowerCase()] : undefined;
+    return byUsername || byEmail;
+  }, [currentUser, userOverrides]);
+
+  const effectiveUserRoleKey = ((currentUserOverride?.role || currentUser?.role || 'user') as SovereignRoleKey);
+  const effectiveRolePolicy = roleControls[effectiveUserRoleKey] || roleControls.user;
+
+  useEffect(() => {
+    if (!currentUser) return;
+    if (currentUserOverride?.status === 'Suspended' || effectiveRolePolicy?.canLogin === false) {
+      addToast('Account access has been suspended by Platform Administration.', 'error');
+      setCurrentUser(null);
+      setIsDashboardOpen(false);
+    }
+  }, [currentUser, currentUserOverride?.status, effectiveRolePolicy?.canLogin, addToast]);
+
   // Data Fetching and Initial Setup
   useEffect(() => {
     const fetchData = async () => {
@@ -523,14 +585,21 @@ const App: React.FC = () => {
     }
   }, []);
   
-  // Centralized Filtering & Sorting Logic
+  const governedProperties = useMemo(() => {
+    return applyListingOverrides(allProperties);
+  }, [allProperties, applyListingOverrides]);
+
+  // Centralized Filtering & Sorting Logic (operates on Super Admin governed properties)
   useEffect(() => {
     const isTraditionalSearch = [PropertyType.ALL, PropertyType.APARTMENT, PropertyType.HOUSE, PropertyType.COMMERCIAL, PropertyType.STUDENT_HOUSING, PropertyType.TOWNSHIP, PropertyType.RURAL, PropertyType.LAND, PropertyType.LUXURY_ESTATE, PropertyType.IN_CONSTRUCTION].includes(filters.propertyType);
     const isStaySearch = [PropertyType.SHORT_TERM_RENTAL, PropertyType.HOTEL].includes(filters.propertyType);
     const isTransportSearch = filters.propertyType === PropertyType.TRANSPORT;
     const isWellnessSearch = filters.propertyType === PropertyType.WELLNESS;
 
-    const filtered = allProperties.filter(p => {
+    const filtered = governedProperties.filter(p => {
+        if (p.status === PropertyStatus.DRAFT || p.status === PropertyStatus.PENDING) {
+          return false;
+        }
         // 1. Pan-African Location & Cross-Border Geographic matching
         const locQuery = (filters.location || '').toLowerCase().trim();
         const matchesLocation = !locQuery || 
@@ -647,24 +716,24 @@ const App: React.FC = () => {
     });
 
     setFilteredProperties(filtered);
-  }, [filters, allProperties, sortOrder]);
+  }, [filters, governedProperties, sortOrder]);
 
 
   // Derived State
   const featuredProperties = useMemo(() => {
-    return allProperties.filter(p => p.featured && p.status === PropertyStatus.ACTIVE && ![PropertyType.HOTEL, PropertyType.SHORT_TERM_RENTAL, PropertyType.TRANSPORT, PropertyType.WELLNESS].includes(p.propertyType));
-  }, [allProperties]);
+    return governedProperties.filter(p => p.featured && p.status === PropertyStatus.ACTIVE && ![PropertyType.HOTEL, PropertyType.SHORT_TERM_RENTAL, PropertyType.TRANSPORT, PropertyType.WELLNESS].includes(p.propertyType));
+  }, [governedProperties]);
 
   const recentProperties = useMemo(() => {
-    return [...allProperties]
-      .filter(p => ![PropertyType.HOTEL, PropertyType.SHORT_TERM_RENTAL, PropertyType.TRANSPORT, PropertyType.WELLNESS].includes(p.propertyType))
+    return [...governedProperties]
+      .filter(p => p.status === PropertyStatus.ACTIVE && ![PropertyType.HOTEL, PropertyType.SHORT_TERM_RENTAL, PropertyType.TRANSPORT, PropertyType.WELLNESS].includes(p.propertyType))
       .sort((a, b) => b.dateListed - a.dateListed)
       .slice(0, 3);
-  }, [allProperties]);
+  }, [governedProperties]);
 
   const savedProperties = useMemo(() => {
-    return Array.from(savedPropertyIds).map(id => allProperties.find(p => p.id === id)).filter((p): p is Property => p !== undefined);
-  }, [savedPropertyIds, allProperties]);
+    return Array.from(savedPropertyIds).map(id => governedProperties.find(p => p.id === id)).filter((p): p is Property => p !== undefined);
+  }, [savedPropertyIds, governedProperties]);
   
   const receivedInquiries = useMemo(() => {
       return tourRequests; 
@@ -942,17 +1011,46 @@ const App: React.FC = () => {
     setIsSessionWarningOpen(false);
   };
 
+  const canCurrentUserPublish = (): boolean => {
+    if (!currentUser) return false;
+    if (currentUserOverride?.status === 'Suspended' || currentUserOverride?.status === 'Restricted') {
+      addToast('Your account is restricted by Platform Administration.', 'error');
+      return false;
+    }
+    if (currentUserOverride?.canPublish === false || !effectiveRolePolicy.canPublishListings) {
+      addToast(`Publishing is currently disabled for ${effectiveRolePolicy.label} accounts.`, 'error');
+      return false;
+    }
+    const effectiveKyc = currentUserOverride?.kycStatus || currentUser.kycStatus || (currentUser.isVerified ? 'Approved' : 'Pending');
+    if ((settings.securityPolicies.requireKycToPublish || effectiveRolePolicy.requiresKycApproval) && effectiveKyc !== 'Approved') {
+      addToast('KYC approval is required before publishing listings. Review status in your Member Hub.', 'error');
+      return false;
+    }
+    const userOwnedCount = allProperties.filter(p => p.agent.name === currentUser.username).length;
+    if (userOwnedCount >= effectiveRolePolicy.maxActiveListings) {
+      addToast(`Listing limit reached (${effectiveRolePolicy.maxActiveListings} listings for ${effectiveRolePolicy.label}).`, 'error');
+      return false;
+    }
+    return true;
+  };
+
   const handleListPropertyClick = () => {
     if (!currentUser) {
         setPage('pricing');
         return;
     }
+
+    if (!canCurrentUserPublish()) return;
     
-    if (currentUser.role === 'investor') {
+    if (effectiveUserRoleKey === 'investor') {
+        if (!effectiveRolePolicy.canAccessInvestmentDesk) {
+          addToast('Investment Desk access is currently paused for Investor accounts.', 'error');
+          return;
+        }
         setIsInvestmentRequestModalOpen(true);
-    } else if (currentUser.role === 'user') {
+    } else if (effectiveUserRoleKey === 'user') {
         setIsServiceListingFormOpen(true);
-    } else if (currentUser.role === 'agent') {
+    } else {
         setPropertyToEdit(null);
         setIsPropertyFormOpen(true);
     }
@@ -965,25 +1063,60 @@ const App: React.FC = () => {
   };
 
   const handleDeleteProperty = async (propertyId: string) => {
-      if (window.confirm("Are you sure you want to delete this property?")) {
-        const newProperties = allProperties.filter(p => p.id !== propertyId);
-        setAllProperties(newProperties);
-        await saveProperties(newProperties);
-      }
+    const newProperties = allProperties.filter(p => p.id !== propertyId);
+    setAllProperties(newProperties);
+    setInvestmentProperties(newProperties.filter(p => p.listingType === ListingType.FOR_INVESTMENT));
+    await removePublishedProperty(propertyId);
+    await saveProperties(newProperties);
+    addToast('Listing removed from platform directory.', 'info');
   };
 
   const handleSaveProperty = async (property: Property) => {
-    let newProperties;
     const existing = allProperties.find(p => p.id === property.id);
-    if (existing) {
-        newProperties = allProperties.map(p => p.id === property.id ? property : p);
-    } else {
-        newProperties = [...allProperties, property];
-    }
+    const shouldQueueModeration =
+      !existing &&
+      settings.securityPolicies.autoModerateListings &&
+      property.status !== PropertyStatus.DRAFT;
+
+    const preparedProperty: Property = shouldQueueModeration
+      ? { ...property, status: PropertyStatus.PENDING }
+      : property;
+
+    const savedRecord = await upsertPublishedProperty(preparedProperty);
+    const newProperties = existing
+      ? allProperties.map(p => p.id === savedRecord.id ? savedRecord : p)
+      : [savedRecord, ...allProperties];
+
     setAllProperties(newProperties);
-    await saveProperties(newProperties);
+    setInvestmentProperties(newProperties.filter(p => p.listingType === ListingType.FOR_INVESTMENT));
     setIsPropertyFormOpen(false);
-    setIsDashboardOpen(true);
+    setIsDashboardOpen(false);
+
+    if (shouldQueueModeration) {
+      addToast(`"${savedRecord.title}" queued in Super Admin moderation before public release.`, 'info');
+      setIsDashboardOpen(true);
+      return;
+    }
+
+    if (savedRecord.propertyType === PropertyType.TRANSPORT) {
+      addToast(`Published "${savedRecord.title}" to Transport Rentals.`, 'success');
+      scrollToSection('rent-a-car');
+    } else if (savedRecord.propertyType === PropertyType.WELLNESS) {
+      addToast(`Published "${savedRecord.title}" to Wellness Retreats.`, 'success');
+      scrollToSection('find-wellness');
+    } else if (
+      savedRecord.propertyType === PropertyType.HOTEL ||
+      savedRecord.propertyType === PropertyType.SHORT_TERM_RENTAL
+    ) {
+      addToast(`Published "${savedRecord.title}" to Short-Term Stays.`, 'success');
+      scrollToSection('book-a-stay');
+    } else if (savedRecord.listingType === ListingType.RENT) {
+      addToast(`Published "${savedRecord.title}" to Long-Term Accommodation & Marketplace.`, 'success');
+      scrollToSection('long-term-stays');
+    } else {
+      addToast(`Published "${savedRecord.title}" to live marketplace.`, 'success');
+      setIsDashboardOpen(true);
+    }
   };
   
   const handleScheduleTour = async (request: Omit<TourRequest, 'id' | 'username' | 'status' | 'timestamp'>) => {
@@ -1135,7 +1268,7 @@ const App: React.FC = () => {
 
   const handleApplicationSubmit = () => {
     setIsApplicationModalOpen(false);
-    alert(`Your application for '${applyingForJob}' has been successfully submitted! We'll be in touch.`);
+    addToast(`Your application for '${applyingForJob}' has been submitted.`, 'success');
     setApplyingForJob('');
   };
 
@@ -1251,9 +1384,33 @@ const App: React.FC = () => {
       } else {
           clearTimers();
       }
-  }, [currentUser]);
+  }, [currentUser, INACTIVITY_TIMEOUT, WARNING_TIMEOUT]);
+
+  const renderPausedModuleNotice = (moduleName: string) => (
+    <div className="min-h-[65vh] flex items-center justify-center px-6 py-16 bg-[#FAF8F5] dark:bg-slate-950">
+      <div className="max-w-lg w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 text-center space-y-4">
+        <p className="text-xs font-semibold uppercase tracking-widest text-amber-600">
+          Platform Administration Notice
+        </p>
+        <h2 className="text-2xl font-bold font-heading text-slate-900 dark:text-white">
+          {moduleName} Temporarily Paused
+        </h2>
+        <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+          This vertical is currently disabled in Super Admin Command Centre Feature Toggles. Active listings and bookings remain safely stored.
+        </p>
+        <button
+          type="button"
+          onClick={() => scrollToSection('home')}
+          className="px-5 py-2.5 rounded-xl bg-[#0B1F1A] hover:bg-emerald-900 text-white text-xs font-semibold"
+        >
+          Return to Marketplace
+        </button>
+      </div>
+    </div>
+  );
 
   const renderPage = () => {
+    const flags = settings.featureFlags;
     switch(page) {
       case 'auth':
           return (
@@ -1274,11 +1431,11 @@ const App: React.FC = () => {
           );
       case 'property-detail':
           if (selectedProperty) {
-            const liveProperty = allProperties.find(p => p.id === selectedProperty.id) || selectedProperty;
+            const liveProperty = governedProperties.find(p => p.id === selectedProperty.id) || selectedProperty;
             return (
               <PropertyDetailPage
                 property={liveProperty}
-                allProperties={allProperties}
+                allProperties={governedProperties}
                 currentUser={currentUser}
                 isSaved={savedPropertyIds.has(selectedProperty.id)}
                 isCompared={compareList.some(item => item.id === selectedProperty.id)}
@@ -1309,16 +1466,68 @@ const App: React.FC = () => {
       case 'pricing':
           return <PricingPage onPlanSelect={handlePlanSelect} onBack={() => scrollToSection('home')} />;
       case 'rent-a-car':
-          return <RentACarPage properties={allProperties.filter(p => p.propertyType === PropertyType.TRANSPORT)} />;
+          if (!flags.transport) return renderPausedModuleNotice('Transport Rentals');
+          return (
+            <RentACarPage
+              properties={governedProperties.filter(p => p.propertyType === PropertyType.TRANSPORT && p.status === PropertyStatus.ACTIVE)}
+              onNavigate={(target) => scrollToSection(target as Page)}
+              onListFleet={() => {
+                if (!currentUser) {
+                  openAuthPage('login');
+                } else if (canCurrentUserPublish()) {
+                  setIsServiceListingFormOpen(true);
+                }
+              }}
+            />
+          );
       case 'find-wellness':
-          return <FindWellnessPage properties={allProperties.filter(p => p.propertyType === PropertyType.WELLNESS)} />;
+          if (!flags.wellness) return renderPausedModuleNotice('Wellness Retreats');
+          return (
+            <FindWellnessPage
+              properties={governedProperties.filter(p => p.propertyType === PropertyType.WELLNESS && p.status === PropertyStatus.ACTIVE)}
+              onNavigate={(target) => scrollToSection(target as Page)}
+              onListSanctuary={() => {
+                if (!currentUser) {
+                  openAuthPage('login');
+                } else if (canCurrentUserPublish()) {
+                  setIsServiceListingFormOpen(true);
+                }
+              }}
+            />
+          );
       case 'book-a-stay':
-          return <BookAStayPage properties={allProperties.filter(p => [PropertyType.HOTEL, PropertyType.SHORT_TERM_RENTAL].includes(p.propertyType))} />;
+      case 'long-term-stays':
+          if (page === 'book-a-stay' && !flags.shortStays) return renderPausedModuleNotice('Short-Term Stays');
+          if (page === 'long-term-stays' && !flags.longTerm) return renderPausedModuleNotice('Long-Term Accommodation');
+          return (
+            <BookAStayPage
+              initialTermMode={page === 'long-term-stays' ? 'long-term' : 'short-term'}
+              properties={governedProperties.filter(
+                p =>
+                  p.status === PropertyStatus.ACTIVE &&
+                  ([PropertyType.HOTEL, PropertyType.SHORT_TERM_RENTAL].includes(p.propertyType) ||
+                    (p.listingType === ListingType.RENT &&
+                      ![PropertyType.TRANSPORT, PropertyType.WELLNESS].includes(p.propertyType)))
+              )}
+              publishedStays={publishedStayProfiles}
+              onGoHome={() => scrollToSection('home')}
+              onOpenAuth={() => openAuthPage('login')}
+              onNavigate={(target) => scrollToSection(target as Page)}
+              onListProperty={() => {
+                if (!currentUser) {
+                  openAuthPage('login');
+                } else if (canCurrentUserPublish()) {
+                  setIsServiceListingFormOpen(true);
+                }
+              }}
+            />
+          );
       case 'neighborhood-explorer':
+          if (!flags.neighborhoods) return renderPausedModuleNotice('Neighborhood Explorer');
           return (
             <NeighborhoodExplorerPage
               initialNeighborhoodId={initialNeighborhoodId}
-              allProperties={allProperties}
+              allProperties={governedProperties}
               savedNeighborhoodIds={savedNeighborhoodIds}
               onSaveToggle={handleSaveNeighborhoodToggle}
               onBack={() => scrollToSection('home', 'neighborhoods')}
@@ -1329,6 +1538,7 @@ const App: React.FC = () => {
             />
           );
       case 'find-professional':
+          if (!flags.professionals) return renderPausedModuleNotice('Find a Professional');
           return (
             <FindProfessionalPage
               initialServiceFilter={providerServiceFilter}
@@ -1341,10 +1551,19 @@ const App: React.FC = () => {
             />
           );
       case 'hotel-registration':
+          if (!flags.hotelRegistration) return renderPausedModuleNotice('Hotel Partner Onboarding');
           return (
             <HotelRegistrationPage
               onBack={() => scrollToSection('home')}
               onSignInClick={() => openAuthPage('login')}
+              onPublishHotel={(stayProfile, propertyRecord) => {
+                setPublishedStayProfiles(prev => [stayProfile, ...prev.filter(s => s.id !== stayProfile.id)]);
+                const normalizedProp = settings.securityPolicies.autoModerateListings
+                  ? { ...propertyRecord, status: PropertyStatus.PENDING }
+                  : propertyRecord;
+                setAllProperties(prev => [normalizedProp, ...prev.filter(p => p.id !== normalizedProp.id)]);
+              }}
+              onViewLiveStays={() => scrollToSection('book-a-stay')}
             />
           );
       case 'home':
@@ -1357,7 +1576,7 @@ const App: React.FC = () => {
                       filters={filters}
                       onFilterChange={handleFilterChange}
                       onMarketSelect={() => scrollToSection('home', 'all-listings')}
-                      properties={allProperties}
+                      properties={governedProperties}
                       enquiryCounts={computedEnquiryCounts}
                       onOpenDetailModal={handleOpenDetailModal}
                   />
@@ -1441,10 +1660,10 @@ const App: React.FC = () => {
                           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 items-stretch">
                           {CATEGORIES.map((category, idx) => {
                               const lifestyleMedia = [
-                                { image: '/images/841376502.webp', actionLabel: 'Browse Short Stays', onClick: () => setPage('book-a-stay') },
-                                { image: '/images/2a47542b078d54560485a1e72a5373aa9c3a4a48-800x535.avif', actionLabel: 'Explore Vehicles', onClick: () => setPage('rent-a-car') },
-                                { image: '/images/getlstd-property-photo.jpg', actionLabel: 'Discover Retreats', onClick: () => setPage('find-wellness') },
-                                { image: '/images/2ec34ce4ca57aef13fc8b3239a99345e.jpg', actionLabel: 'Search Long-Term', onClick: () => { handleFilterChange('mode', 'rent'); handleFilterChange('listingType', ListingType.RENT); scrollToSection('home', 'all-listings'); } },
+                                { image: '/images/841376502.webp', actionLabel: 'Browse Short Stays', onClick: () => scrollToSection('book-a-stay') },
+                                { image: '/images/2a47542b078d54560485a1e72a5373aa9c3a4a48-800x535.avif', actionLabel: 'Explore Vehicles', onClick: () => scrollToSection('rent-a-car') },
+                                { image: '/images/getlstd-property-photo.jpg', actionLabel: 'Discover Retreats', onClick: () => scrollToSection('find-wellness') },
+                                { image: '/images/2ec34ce4ca57aef13fc8b3239a99345e.jpg', actionLabel: 'Search Long-Term', onClick: () => scrollToSection('long-term-stays') },
                               ][idx] || { image: '/images/house_suburbs_1779978598551.png', actionLabel: 'Explore', onClick: () => scrollToSection('home', 'all-listings') };
 
                               return (
@@ -1771,79 +1990,146 @@ const App: React.FC = () => {
       }
   };
 
+  const isPublicMaintenanceActive = settings.maintenanceMode && !isSuperAdminLoggedIn && page !== 'auth';
 
   return (
     <div className={`font-sans min-h-screen flex flex-col ${theme}`}>
-      {isSuperAdminLoggedIn ? (
-        <SuperAdminDashboard onClose={() => setIsSuperAdminLoggedIn(false)} />
-      ) : null}
-      <Header
-        currentUser={currentUser}
-        notifications={notificationsWithReadStatus}
-        readNotificationIds={readNotificationIds}
-        onLoginClick={() => openAuthPage('login')}
-        onSignUpClick={() => setPage('pricing')}
-        onDashboardClick={() => setIsDashboardOpen(true)}
-        onListPropertyClick={handleListPropertyClick}
-        onNotificationClick={handleNotificationClick}
-        onMarkAllNotificationsAsRead={handleMarkAllAsRead}
-        onHomeClick={() => scrollToSection('home')}
-        onAboutClick={() => scrollToSection('about', 'about')}
-        onServicesClick={() => scrollToSection('services', 'services')}
-        onContactClick={() => scrollToSection('contact', 'contact')}
-        onBuyClick={() => {
-          handleFilterChange('mode', 'buy');
-          handleFilterChange('listingType', ListingType.SALE);
-          scrollToSection('home', 'all-listings');
-        }}
-        onRentClick={() => {
-          handleFilterChange('mode', 'rent');
-          handleFilterChange('listingType', ListingType.RENT);
-          scrollToSection('home', 'all-listings');
-        }}
-        onInvestClick={() => {
-          handleFilterChange('mode', 'invest');
-          handleFilterChange('listingType', ListingType.FOR_INVESTMENT);
-          scrollToSection('home', 'all-listings');
-        }}
-        onSellClick={handleListPropertyClick}
-        onDevelopClick={() => {
-          handleFilterChange('propertyType', PropertyType.IN_CONSTRUCTION);
-          scrollToSection('home', 'all-listings');
-        }}
-        onExploreClick={() => scrollToSection('home', 'explore-africa')}
-        savedCount={savedPropertyIds.size}
-        onSavedClick={() => {
-          setActiveTab('saved');
-          scrollToSection('home', 'all-listings');
-        }}
-      />
-      <main className="flex-grow">
-        {renderPage()}
-      </main>
-      {page !== 'auth' && (
-        <Footer 
-          onAboutClick={() => scrollToSection('about', 'about')}
-          onContactClick={() => scrollToSection('contact', 'contact')}
-          onBlogClick={() => scrollToSection('home', 'blog')}
-          onPrivacyPolicyClick={() => setIsPrivacyPolicyModalOpen(true)}
-          onTermsOfServiceClick={() => setIsTermsOfServiceModalOpen(true)}
-          onCareersClick={() => setIsCareersModalOpen(true)}
-          onFindAProClick={() => handleOpenProviderServices('All')}
-          onMarketJump={(loc) => {
-            handleFilterChange('location', loc);
-            setActiveTab('all');
-            scrollToSection('home', 'all-listings');
+      {isSuperAdminLoggedIn && (
+        <SuperAdminDashboard
+          onClose={() => setIsSuperAdminLoggedIn(false)}
+          allProperties={allProperties}
+          publishedStays={publishedStayProfiles}
+          tourRequests={tourRequests}
+          messages={messages}
+          currentUser={currentUser}
+          onUpdateProperty={async (updated) => {
+            await upsertPublishedProperty(updated);
+            setAllProperties(prev => prev.map(p => p.id === updated.id ? updated : p));
           }}
-          onModeJump={(mode) => {
-            handleFilterChange('mode', mode);
-            handleFilterChange('listingType', mode === 'buy' ? ListingType.SALE : mode === 'rent' ? ListingType.RENT : ListingType.FOR_INVESTMENT);
-            setActiveTab('all');
-            scrollToSection('home', 'all-listings');
+          onDeleteProperty={handleDeleteProperty}
+          onNavigatePublicPage={(target) => {
+            setIsSuperAdminLoggedIn(false);
+            scrollToSection(target as Page);
           }}
         />
       )}
-      <Chatbot />
+
+      {settings.announcementBanner.enabled && !isSuperAdminLoggedIn && page !== 'auth' && !settings.maintenanceMode && (
+        <div className="bg-[#0B1F1A] text-white border-b border-emerald-900 px-4 sm:px-6 lg:px-10 py-2.5 flex flex-wrap items-center justify-center gap-3 text-xs">
+          <span className="font-medium text-slate-200">{settings.announcementBanner.text}</span>
+          {settings.announcementBanner.ctaLabel && (
+            <button
+              type="button"
+              onClick={() => scrollToSection((settings.announcementBanner.targetPage || 'pricing') as Page)}
+              className="px-3 py-1 rounded-md bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold transition-colors whitespace-nowrap"
+            >
+              {settings.announcementBanner.ctaLabel}
+            </button>
+          )}
+        </div>
+      )}
+
+      {isPublicMaintenanceActive ? (
+        <main className="flex-grow min-h-screen bg-[#0B1F1A] text-white flex items-center justify-center px-6 py-16">
+          <div className="max-w-lg w-full bg-white/5 border border-white/10 rounded-2xl p-8 text-center space-y-5">
+            <p className="text-xs font-semibold uppercase tracking-widest text-amber-300">
+              {settings.siteName || 'AfriEstate'} · Scheduled Maintenance
+            </p>
+            <h1 className="text-3xl font-bold font-heading text-white">
+              Platform Upgrade in Progress
+            </h1>
+            <p className="text-sm text-slate-300 leading-relaxed">
+              {settings.maintenanceMessage}
+            </p>
+            <button
+              type="button"
+              onClick={() => openAuthPage('login')}
+              className="inline-flex items-center justify-center px-5 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-bold transition-colors"
+            >
+              Administrator &amp; Partner Sign In
+            </button>
+          </div>
+        </main>
+      ) : (
+        <>
+          <Header
+            currentUser={currentUser}
+            notifications={notificationsWithReadStatus}
+            readNotificationIds={readNotificationIds}
+            onLoginClick={() => openAuthPage('login')}
+            onSignUpClick={() => setPage('pricing')}
+            onDashboardClick={() => setIsDashboardOpen(true)}
+            onListPropertyClick={handleListPropertyClick}
+            onNotificationClick={handleNotificationClick}
+            onMarkAllNotificationsAsRead={handleMarkAllAsRead}
+            onHomeClick={() => scrollToSection('home')}
+            onAboutClick={() => scrollToSection('about', 'about')}
+            onServicesClick={() => scrollToSection('services', 'services')}
+            onContactClick={() => scrollToSection('contact', 'contact')}
+            onBuyClick={() => {
+              handleFilterChange('mode', 'buy');
+              handleFilterChange('listingType', ListingType.SALE);
+              scrollToSection('home', 'all-listings');
+            }}
+            onRentClick={() => {
+              handleFilterChange('mode', 'rent');
+              handleFilterChange('listingType', ListingType.RENT);
+              scrollToSection('home', 'all-listings');
+            }}
+            onStayClick={() => scrollToSection('book-a-stay')}
+            onLongTermClick={() => scrollToSection('long-term-stays')}
+            onTransportClick={() => scrollToSection('rent-a-car')}
+            onWellnessClick={() => scrollToSection('find-wellness')}
+            onInvestClick={() => {
+              handleFilterChange('mode', 'invest');
+              handleFilterChange('listingType', ListingType.FOR_INVESTMENT);
+              scrollToSection('home', 'all-listings');
+            }}
+            onSellClick={handleListPropertyClick}
+            onDevelopClick={() => {
+              handleFilterChange('propertyType', PropertyType.IN_CONSTRUCTION);
+              scrollToSection('home', 'all-listings');
+            }}
+            onExploreClick={() => scrollToSection('home', 'explore-africa')}
+            onNeighborhoodsClick={() => handleOpenNeighborhoodExplorer()}
+            onFindProClick={() => handleOpenProviderServices('All')}
+            onHotelRegisterClick={() => scrollToSection('hotel-registration')}
+            onPricingClick={() => scrollToSection('pricing')}
+            savedCount={savedPropertyIds.size}
+            onSavedClick={() => {
+              setActiveTab('saved');
+              scrollToSection('home', 'all-listings');
+            }}
+          />
+          <main className="flex-grow">
+            {renderPage()}
+          </main>
+          {page !== 'auth' && (
+            <Footer 
+              onAboutClick={() => scrollToSection('about', 'about')}
+              onContactClick={() => scrollToSection('contact', 'contact')}
+              onBlogClick={() => scrollToSection('home', 'blog')}
+              onPrivacyPolicyClick={() => setIsPrivacyPolicyModalOpen(true)}
+              onTermsOfServiceClick={() => setIsTermsOfServiceModalOpen(true)}
+              onCareersClick={() => setIsCareersModalOpen(true)}
+              onFindAProClick={() => handleOpenProviderServices('All')}
+              onPageJump={(target) => scrollToSection(target as Page)}
+              onMarketJump={(loc) => {
+                handleFilterChange('location', loc);
+                setActiveTab('all');
+                scrollToSection('home', 'all-listings');
+              }}
+              onModeJump={(mode) => {
+                handleFilterChange('mode', mode);
+                handleFilterChange('listingType', mode === 'buy' ? ListingType.SALE : mode === 'rent' ? ListingType.RENT : ListingType.FOR_INVESTMENT);
+                setActiveTab('all');
+                scrollToSection('home', 'all-listings');
+              }}
+            />
+          )}
+          {settings.featureFlags.aiConcierge && <Chatbot />}
+        </>
+      )}
       
       {selectedProperty && <MortgageCalculator isOpen={isCalculatorOpen} onClose={() => setIsCalculatorOpen(false)} propertyPrice={selectedProperty.price} propertyTitle={selectedProperty.title} />}
       {selectedProperty && <ScheduleTourModal isOpen={isTourModalOpen} onClose={() => setIsTourModalOpen(false)} propertyTitle={selectedProperty.title} propertyId={selectedProperty.id} agentName={selectedProperty.agent.name} onSubmit={handleScheduleTour} />}
@@ -1854,7 +2140,7 @@ const App: React.FC = () => {
             isOpen={isDashboardOpen}
             onClose={() => setIsDashboardOpen(false)}
             user={currentUser}
-            allProperties={allProperties}
+            allProperties={governedProperties}
             investmentProperties={investmentProperties}
             tourRequests={tourRequests}
             receivedInquiries={receivedInquiries}
@@ -1902,7 +2188,22 @@ const App: React.FC = () => {
           />
       }
       {currentUser && <PropertyFormModal isOpen={isPropertyFormOpen} onClose={() => setIsPropertyFormOpen(false)} onSave={handleSaveProperty} propertyToEdit={propertyToEdit} currentUser={currentUser} />}
-      {currentUser && <ServiceListingFormModal currentUser={currentUser} isOpen={isServiceListingFormOpen} onClose={() => setIsServiceListingFormOpen(false)} />}
+      {currentUser && (
+        <ServiceListingFormModal
+          currentUser={currentUser}
+          isOpen={isServiceListingFormOpen}
+          onClose={() => setIsServiceListingFormOpen(false)}
+          onListingPublished={(publishedProperty, targetRoute) => {
+            setAllProperties(prev => [publishedProperty, ...prev.filter(p => p.id !== publishedProperty.id)]);
+            if (targetRoute === 'book-a-stay') {
+              setPublishedStayProfiles(getPublishedStayProfiles());
+            }
+            if (targetRoute) {
+              scrollToSection(targetRoute);
+            }
+          }}
+        />
+      )}
       {inquiryForResponse && <AIResponseModal isOpen={isAIResponseModalOpen} onClose={() => setIsAIResponseModalOpen(false)} tourRequest={inquiryForResponse} />}
       <AgentContactModal isOpen={isAgentContactModalOpen} onClose={() => setIsAgentContactModalOpen(false)} mode={agentContactMode} agentName={agentContactName} />
       <VRTourModal isOpen={isVRTourOpen} onClose={() => setIsVRTourOpen(false)} url={vrTourUrl} />

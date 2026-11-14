@@ -120,11 +120,12 @@ const ServicesPage: React.FC<ServicesPageProps> = ({ onServiceClick }) => {
       <section className="relative h-[60vh] min-h-[500px] flex items-center justify-center overflow-hidden">
         <div className="absolute inset-0 z-0">
           <img 
-            src="https://images.unsplash.com/photo-1570129477492-45c003edd2be?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80" 
+            src="/images/565600_H_39.jpg" 
             alt="Premium Real Estate Services" 
+            referrerPolicy="no-referrer"
             className="w-full h-full object-cover"
           />
-          <div className="absolute inset-0 bg-brand-dark/80 mix-blend-multiply"></div>
+          <div className="absolute inset-0 bg-gradient-to-t from-[#0B1F1A] via-[#0B1F1A]/75 to-[#0B1F1A]/50"></div>
         </div>
         
         <div className="relative z-10 text-center px-6 max-w-4xl mx-auto mt-16">

@@ -44,11 +44,12 @@ const AboutPage: React.FC<AboutPageProps> = ({ onExploreProperties }) => {
       <section className="relative h-[70vh] min-h-[600px] flex items-center justify-center overflow-hidden">
         <div className="absolute inset-0 z-0">
           <img 
-            src="https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80" 
+            src="/images/coastal_mansion_1779978805301.png" 
             alt="Luxury African Estate" 
+            referrerPolicy="no-referrer"
             className="w-full h-full object-cover"
           />
-          <div className="absolute inset-0 bg-brand-dark/70 mix-blend-multiply"></div>
+          <div className="absolute inset-0 bg-gradient-to-t from-[#0B1F1A] via-[#0B1F1A]/70 to-[#0B1F1A]/45"></div>
         </div>
         
         <div className="relative z-10 text-center px-6 max-w-5xl mx-auto">
@@ -71,8 +72,9 @@ const AboutPage: React.FC<AboutPageProps> = ({ onExploreProperties }) => {
               <div className="relative">
                 <div className="absolute -inset-4 bg-brand-gold/20 rounded-t-full transform -rotate-3 z-0"></div>
                 <img 
-                  src="https://images.unsplash.com/photo-1556912172-45b7abe8b7e1?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80" 
+                  src="/images/luxury_kitchen_living_1779978720358.png" 
                   alt="Our Heritage" 
+                  referrerPolicy="no-referrer"
                   className="relative z-10 w-full h-[600px] object-cover rounded-t-full shadow-2xl"
                 />
               </div>
@@ -168,8 +170,9 @@ const AboutPage: React.FC<AboutPageProps> = ({ onExploreProperties }) => {
             
             <FadeInSection>
               <img 
-                src="https://images.unsplash.com/photo-1531123897727-8f129e1688ce?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80" 
+                src="/images/tersia-kroonstad.webp" 
                 alt="Naledi Radebe" 
+                referrerPolicy="no-referrer"
                 className="w-40 h-40 object-cover rounded-full mx-auto border-4 border-brand-secondary shadow-2xl relative z-10"
               />
               <h3 className="text-3xl font-heading font-bold mt-8 mb-2 relative z-10">Naledi Radebe</h3>

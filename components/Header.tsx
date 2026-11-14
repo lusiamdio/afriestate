@@ -8,6 +8,7 @@ import { useCurrency } from '../contexts/CurrencyContext';
 import { languageOptions, currencyOptions } from '../constants';
 import { Bars3Icon, XMarkIcon, ChatBubbleLeftRightIcon } from '@heroicons/react/24/outline';
 import NotificationsPanel from './NotificationsPanel';
+import { useAdminState } from '../contexts/AdminStateContext';
 
 interface HeaderProps {
   currentUser: User | null;
@@ -25,10 +26,18 @@ interface HeaderProps {
   onContactClick: () => void;
   onBuyClick?: () => void;
   onRentClick?: () => void;
+  onStayClick?: () => void;
+  onLongTermClick?: () => void;
+  onTransportClick?: () => void;
+  onWellnessClick?: () => void;
   onInvestClick?: () => void;
   onSellClick?: () => void;
   onDevelopClick?: () => void;
   onExploreClick?: () => void;
+  onNeighborhoodsClick?: () => void;
+  onFindProClick?: () => void;
+  onHotelRegisterClick?: () => void;
+  onPricingClick?: () => void;
   savedCount?: number;
   onSavedClick?: () => void;
   onMessagesClick?: () => void;
@@ -50,10 +59,18 @@ const Header: React.FC<HeaderProps> = (props) => {
     onContactClick,
     onBuyClick,
     onRentClick,
+    onStayClick,
+    onLongTermClick,
+    onTransportClick,
+    onWellnessClick,
     onInvestClick,
     onSellClick,
     onDevelopClick,
     onExploreClick,
+    onNeighborhoodsClick,
+    onFindProClick,
+    onHotelRegisterClick,
+    onPricingClick,
     savedCount = 0,
     onSavedClick,
     onMessagesClick
@@ -70,6 +87,9 @@ const Header: React.FC<HeaderProps> = (props) => {
 
   const { language, setLanguage, t, isTranslating } = useTranslations();
   const { currency, setCurrency } = useCurrency();
+  const { settings } = useAdminState();
+  const flags = settings.featureFlags;
+  const brandTitle = (settings.siteName || 'AfriEstate').toUpperCase();
 
   const unreadCount = useMemo(() => {
     return notifications.filter(n => !n.isRead).length;
@@ -112,15 +132,15 @@ const Header: React.FC<HeaderProps> = (props) => {
           className="flex items-center gap-2 shrink-0 group focus:outline-none"
         >
           <span className="text-xl font-black text-slate-900 dark:text-white tracking-tight whitespace-nowrap">
-            AFRIESTATE
+            {brandTitle}
           </span>
           <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-widest hidden sm:inline">
             Africa
           </span>
         </button>
 
-        {/* Zone 2: Global Navigation Links (Buy, Rent, Invest, Sell, Develop, Explore) */}
-        <nav className="hidden md:flex items-center gap-6 text-xs sm:text-sm font-semibold text-slate-600 dark:text-slate-300">
+        {/* Zone 2: Synchronized Platform Navigation Links */}
+        <nav className="hidden lg:flex items-center gap-4 xl:gap-5 text-xs font-semibold text-slate-600 dark:text-slate-300">
           <button 
             type="button"
             onClick={onBuyClick || onHomeClick}
@@ -135,34 +155,67 @@ const Header: React.FC<HeaderProps> = (props) => {
           >
             Rent
           </button>
+          {flags.shortStays && (
+            <button 
+              type="button"
+              onClick={onStayClick || onHomeClick}
+              className="hover:text-slate-900 dark:hover:text-white transition-colors whitespace-nowrap"
+            >
+              Short Stays
+            </button>
+          )}
+          {flags.longTerm && (
+            <button 
+              type="button"
+              onClick={onLongTermClick || onStayClick || onRentClick}
+              className="hover:text-slate-900 dark:hover:text-white transition-colors whitespace-nowrap"
+            >
+              Long-Term
+            </button>
+          )}
+          {flags.transport && (
+            <button 
+              type="button"
+              onClick={onTransportClick || onServicesClick}
+              className="hover:text-slate-900 dark:hover:text-white transition-colors whitespace-nowrap"
+            >
+              Transport
+            </button>
+          )}
+          {flags.wellness && (
+            <button 
+              type="button"
+              onClick={onWellnessClick || onServicesClick}
+              className="hover:text-slate-900 dark:hover:text-white transition-colors whitespace-nowrap"
+            >
+              Wellness
+            </button>
+          )}
           <button 
             type="button"
             onClick={onInvestClick || onHomeClick}
-            className="text-amber-700 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-300 font-bold transition-colors whitespace-nowrap flex items-center gap-1"
+            className="text-amber-700 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-300 font-bold transition-colors whitespace-nowrap"
           >
             Invest
           </button>
-          <button 
-            type="button"
-            onClick={onSellClick || onListPropertyClick}
-            className="hover:text-slate-900 dark:hover:text-white transition-colors whitespace-nowrap"
-          >
-            Sell
-          </button>
-          <button 
-            type="button"
-            onClick={onDevelopClick || onServicesClick}
-            className="hover:text-slate-900 dark:hover:text-white transition-colors whitespace-nowrap"
-          >
-            Develop
-          </button>
-          <button 
-            type="button"
-            onClick={onExploreClick || onHomeClick}
-            className="hover:text-slate-900 dark:hover:text-white transition-colors whitespace-nowrap"
-          >
-            Explore Africa
-          </button>
+          {flags.neighborhoods && (
+            <button 
+              type="button"
+              onClick={onNeighborhoodsClick || onExploreClick || onHomeClick}
+              className="hover:text-slate-900 dark:hover:text-white transition-colors whitespace-nowrap hidden xl:inline"
+            >
+              Neighborhoods
+            </button>
+          )}
+          {flags.hotelRegistration && (
+            <button 
+              type="button"
+              onClick={onHotelRegisterClick || onSellClick || onListPropertyClick}
+              className="hover:text-slate-900 dark:hover:text-white transition-colors whitespace-nowrap hidden xl:inline"
+            >
+              List Hotel
+            </button>
+          )}
         </nav>
 
         {/* Zone 3: Right Action Controls */}
@@ -309,17 +362,17 @@ const Header: React.FC<HeaderProps> = (props) => {
           {/* Mobile Menu Toggle Button */}
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 md:hidden"
+            className="p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 lg:hidden"
           >
             {isMobileMenuOpen ? <XMarkIcon className="w-6 h-6" /> : <Bars3Icon className="w-6 h-6" />}
           </button>
         </div>
       </div>
 
-      {/* Mobile Dropdown Navigation */}
+      {/* Mobile & Tablet Synchronized Dropdown Navigation */}
       {isMobileMenuOpen && (
-        <div className="md:hidden bg-white dark:bg-slate-900 shadow-lg px-4 py-4 space-y-3">
-          <div className="grid grid-cols-3 gap-2 pb-3">
+        <div className="lg:hidden bg-white dark:bg-slate-900 shadow-lg px-4 py-4 space-y-3 border-t border-slate-100 dark:border-slate-800">
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 pb-3">
             <button
               onClick={() => { onBuyClick?.(); setIsMobileMenuOpen(false); }}
               className="p-2 text-center rounded-xl bg-slate-50 dark:bg-slate-800 text-xs font-bold"
@@ -332,54 +385,104 @@ const Header: React.FC<HeaderProps> = (props) => {
             >
               Rent
             </button>
-            <button
-              onClick={() => { onInvestClick?.(); setIsMobileMenuOpen(false); }}
-              className="p-2 text-center rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-400 text-xs font-bold"
-            >
-              Invest
-            </button>
+            {flags.shortStays && (
+              <button
+                onClick={() => { onStayClick?.(); setIsMobileMenuOpen(false); }}
+                className="p-2 text-center rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 text-xs font-bold"
+              >
+                Short Stays
+              </button>
+            )}
+            {flags.longTerm && (
+              <button
+                onClick={() => { (onLongTermClick || onStayClick)?.(); setIsMobileMenuOpen(false); }}
+                className="p-2 text-center rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 text-xs font-bold"
+              >
+                Long-Term
+              </button>
+            )}
+            {flags.transport && (
+              <button
+                onClick={() => { (onTransportClick || onServicesClick)?.(); setIsMobileMenuOpen(false); }}
+                className="p-2 text-center rounded-xl bg-slate-50 dark:bg-slate-800 text-xs font-bold"
+              >
+                Transport
+              </button>
+            )}
+            {flags.wellness && (
+              <button
+                onClick={() => { (onWellnessClick || onServicesClick)?.(); setIsMobileMenuOpen(false); }}
+                className="p-2 text-center rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-400 text-xs font-bold"
+              >
+                Wellness
+              </button>
+            )}
           </div>
 
-          <nav className="space-y-2 text-sm font-medium">
+          <nav className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 text-sm font-medium">
             <button
-              onClick={() => { onExploreClick?.(); setIsMobileMenuOpen(false); }}
+              onClick={() => { onInvestClick?.(); setIsMobileMenuOpen(false); }}
+              className="block w-full text-left py-1.5 text-amber-700 dark:text-amber-400 font-semibold"
+            >
+              Invest &amp; High-Yield Deals
+            </button>
+            {flags.neighborhoods && (
+              <button
+                onClick={() => { (onNeighborhoodsClick || onExploreClick)?.(); setIsMobileMenuOpen(false); }}
+                className="block w-full text-left py-1.5 text-slate-700 dark:text-slate-200"
+              >
+                Neighborhood Explorer
+              </button>
+            )}
+            {flags.professionals && (
+              <button
+                onClick={() => { (onFindProClick || onServicesClick)?.(); setIsMobileMenuOpen(false); }}
+                className="block w-full text-left py-1.5 text-slate-700 dark:text-slate-200"
+              >
+                Find a Professional
+              </button>
+            )}
+            {flags.hotelRegistration && (
+              <button
+                onClick={() => { (onHotelRegisterClick || onSellClick)?.(); setIsMobileMenuOpen(false); }}
+                className="block w-full text-left py-1.5 text-slate-700 dark:text-slate-200"
+              >
+                List Your Hotel
+              </button>
+            )}
+            <button
+              onClick={() => { (onPricingClick || onSignUpClick)?.(); setIsMobileMenuOpen(false); }}
               className="block w-full text-left py-1.5 text-slate-700 dark:text-slate-200"
             >
-              Explore 54 African Markets
+              Pricing &amp; Plans
             </button>
             <button
-              onClick={() => { onSellClick?.(); setIsMobileMenuOpen(false); }}
+              onClick={() => { onServicesClick(); setIsMobileMenuOpen(false); }}
               className="block w-full text-left py-1.5 text-slate-700 dark:text-slate-200"
             >
-              Sell Property
-            </button>
-            <button
-              onClick={() => { onDevelopClick?.(); setIsMobileMenuOpen(false); }}
-              className="block w-full text-left py-1.5 text-slate-700 dark:text-slate-200"
-            >
-              Developments
+              Platform Services
             </button>
             <button
               onClick={() => { onAboutClick(); setIsMobileMenuOpen(false); }}
               className="block w-full text-left py-1.5 text-slate-700 dark:text-slate-200"
             >
-              About AfriEstate
+              About {settings.siteName || 'AfriEstate'}
             </button>
             <button
               onClick={() => { onContactClick(); setIsMobileMenuOpen(false); }}
               className="block w-full text-left py-1.5 text-slate-700 dark:text-slate-200"
             >
-              Contact
+              Contact Desk
             </button>
-            {!currentUser && (
-              <button
-                onClick={() => { onLoginClick(); setIsMobileMenuOpen(false); }}
-                className="w-full mt-2 py-2.5 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white text-center text-xs font-bold"
-              >
-                Sign In / Create Account
-              </button>
-            )}
           </nav>
+          {!currentUser && (
+            <button
+              onClick={() => { onLoginClick(); setIsMobileMenuOpen(false); }}
+              className="w-full mt-2 py-2.5 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white text-center text-xs font-bold"
+            >
+              Sign In / Create Account
+            </button>
+          )}
         </div>
       )}
     </header>

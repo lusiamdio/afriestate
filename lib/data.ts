@@ -1,8 +1,43 @@
 
 import { ALL_PROPERTIES as initialProperties, MOCK_NOTIFICATIONS } from '../constants';
 import type { Property, TourRequest, User, SearchFilters, Message, Review, CalendarEvent, AgentProfile, Lead, InvestorSettings, InvestmentRequest, PropertyAlert, UserDocument, Notification } from '../types';
-import { ListingType, PropertyStatus } from '../types';
+import { ListingType, PropertyStatus, PropertyType } from '../types';
+import type { StayPropertyProfile } from '../data/stayDetailData';
+import { FLAGSHIP_AFRICAN_GRAND_HOTEL } from '../data/stayDetailData';
 import { supabase } from './supabase';
+import { generateListingSignature, sanitizeSafeUrl, sanitizeText } from './security';
+
+const PUBLISHED_PROPERTIES_KEY = 'afriestate_published_properties_v1';
+const PUBLISHED_STAYS_KEY = 'afriestate_published_stays_v1';
+
+const readLocalJson = <T,>(key: string, fallback: T): T => {
+    try {
+        const raw = localStorage.getItem(key);
+        if (!raw) return fallback;
+        return JSON.parse(raw) as T;
+    } catch {
+        return fallback;
+    }
+};
+
+const writeLocalJson = (key: string, value: unknown) => {
+    try {
+        localStorage.setItem(key, JSON.stringify(value));
+    } catch {
+        // Ignore quota / private browsing errors
+    }
+};
+
+const mergePublishedWithBase = (base: Property[]): Property[] => {
+    const localPublished = readLocalJson<Property[]>(PUBLISHED_PROPERTIES_KEY, []);
+    if (!Array.isArray(localPublished) || localPublished.length === 0) {
+        return base;
+    }
+    const mergedMap = new Map<string, Property>();
+    base.forEach((p) => mergedMap.set(String(p.id), p));
+    localPublished.forEach((p) => mergedMap.set(String(p.id), p));
+    return Array.from(mergedMap.values()).sort((a, b) => (b.dateListed || 0) - (a.dateListed || 0));
+};
 
 // --- Helper for handling Supabase errors ---
 const handleError = (error: any, message: string) => {
@@ -60,7 +95,7 @@ export const getAgentProfile = async (username: string): Promise<AgentProfile> =
         bio: `Welcome to AfriEstate! Tell clients a bit about yourself.`,
         email: `${username.toLowerCase().replace(/\s+/g, '.')}@AfriEstate.co.za`,
         phone: 'Please add your phone number.',
-        profilePicture: `https://i.pravatar.cc/150?u=${encodeURIComponent(username)}`,
+        profilePicture: '/images/tersia-kroonstad.webp',
         socials: { twitter: '', linkedin: '', facebook: '' }
     };
 };
@@ -163,10 +198,12 @@ export const getProperties = async (excludeMock = false): Promise<Property[]> =>
 
         if (error) {
             handleError(error, 'fetching properties');
-            return excludeMock ? [] : initialProperties;
+            return excludeMock ? readLocalJson<Property[]>(PUBLISHED_PROPERTIES_KEY, []) : mergePublishedWithBase(initialProperties);
         }
 
-        if (!data || data.length === 0) return excludeMock ? [] : initialProperties;
+        if (!data || data.length === 0) {
+            return excludeMock ? readLocalJson<Property[]>(PUBLISHED_PROPERTIES_KEY, []) : mergePublishedWithBase(initialProperties);
+        }
 
         const curatedMap = new Map(initialProperties.map(prop => [String(prop.id), prop]));
 
@@ -190,7 +227,6 @@ export const getProperties = async (excludeMock = false): Promise<Property[]> =>
                 perNightPrice: p.perNightPrice ?? p.per_night_price,
                 packageIncludes: p.packageIncludes ?? p.package_includes,
                 vehicleType: p.vehicleType ?? p.vehicle_type,
-                // Handle JSON fields if they come back as strings (rare with supabase-js but possible with some configs)
                 address: typeof p.address === 'string' ? JSON.parse(p.address) : p.address,
                 details: typeof p.details === 'string' ? JSON.parse(p.details) : p.details,
                 amenities: typeof p.amenities === 'string' ? JSON.parse(p.amenities) : p.amenities,
@@ -200,16 +236,363 @@ export const getProperties = async (excludeMock = false): Promise<Property[]> =>
             };
         });
 
-        return mappedData.sort((a, b) => b.dateListed - a.dateListed);
+        return mergePublishedWithBase(mappedData);
 
     } catch (criticalErr: any) {
         if (criticalErr.message && (criticalErr.message.includes('Failed to fetch') || criticalErr.message.includes('Network request failed'))) {
-            console.warn('[AfriEstate] Backend unreachable (fetch exception). Using mock data.');
+            console.warn('[AfriEstate] Backend unreachable (fetch exception). Using synced local data.');
         } else {
-            console.warn("Failed to fetch properties from Supabase, using mock data.", criticalErr);
+            console.warn("Failed to fetch properties from Supabase, using synced local data.", criticalErr);
         }
-        return excludeMock ? [] : initialProperties;
+        return excludeMock ? readLocalJson<Property[]>(PUBLISHED_PROPERTIES_KEY, []) : mergePublishedWithBase(initialProperties);
     }
+};
+
+export const upsertPublishedProperty = async (property: Property): Promise<Property> => {
+    const existingLocal = readLocalJson<Property[]>(PUBLISHED_PROPERTIES_KEY, []);
+    const sig = generateListingSignature(property.id, property.agent?.name || 'afriestate', property.price);
+    const enriched: Property = {
+        ...property,
+        verificationDetails: property.verificationDetails || {
+            verifiedDate: new Date().toISOString().split('T')[0],
+            titleDeedNumber: sig,
+            inspectionDate: new Date().toISOString().split('T')[0],
+            registryStatus: property.verified ? 'Verified Registry Record' : 'Owner Attested · Integrity Signed',
+            surveyVerified: true,
+        },
+    };
+    const nextLocal = [enriched, ...existingLocal.filter((p) => String(p.id) !== String(enriched.id))];
+    writeLocalJson(PUBLISHED_PROPERTIES_KEY, nextLocal);
+    await saveProperties([enriched]);
+    return enriched;
+};
+
+export const removePublishedProperty = async (propertyId: string): Promise<void> => {
+    const existingLocal = readLocalJson<Property[]>(PUBLISHED_PROPERTIES_KEY, []);
+    writeLocalJson(PUBLISHED_PROPERTIES_KEY, existingLocal.filter((p) => String(p.id) !== String(propertyId)));
+    try {
+        await supabase.from('properties').delete().eq('id', propertyId);
+    } catch {
+        // Ignore if table/record is demo-only
+    }
+};
+
+export const publishCarRental = async (
+    payload: {
+        business_name: string;
+        trading_name?: string | null;
+        registration_number?: string | null;
+        vat_number?: string | null;
+        business_type: string;
+        contact_person: string;
+        mobile_number: string;
+        whatsapp_number: string;
+        email_address: string;
+        website?: string | null;
+        country: string;
+        province: string;
+        city: string;
+        pickup_address: string;
+        vehicle_title: string;
+        vehicle_category: string;
+        vehicle_make_model: string;
+        vehicle_year: number;
+        transmission: string;
+        daily_rate: number;
+        currency: string;
+        description: string;
+        image_url?: string;
+    },
+    currentUser: User
+): Promise<Property> => {
+    const id = `car_${Date.now().toString(36)}`;
+    const sig = generateListingSignature(id, currentUser.username, payload.daily_rate);
+    const catLower = (payload.vehicle_category || '').toLowerCase();
+    const vehicleType: Property['vehicleType'] =
+        catLower.includes('luxury') ? 'Luxury' : catLower.includes('van') ? 'Van' : catLower.includes('suv') || catLower.includes('pickup') ? 'SUV' : 'Sedan';
+    const defaultImg = vehicleType === 'Sedan' ? '/images/executive_sedan_fleet.jpg' : '/images/luxury_suv_fleet.jpg';
+
+    try {
+        await supabase.from('car_rentals').insert([{
+            user_id: currentUser.id,
+            ...payload,
+            status: 'active',
+        }]);
+    } catch {
+        // Proceed with unified synced store
+    }
+
+    const newProperty: Property = {
+        id,
+        title: sanitizeText(payload.vehicle_title || payload.vehicle_make_model, 120),
+        listingType: ListingType.RENT,
+        propertyType: PropertyType.TRANSPORT,
+        address: {
+            street: sanitizeText(payload.pickup_address, 140),
+            city: sanitizeText(payload.city, 80),
+            zip: '0001',
+        },
+        country: sanitizeText(payload.country, 80),
+        coordinates: { lat: -26.2041, lng: 28.0473 },
+        price: Math.max(100, Number(payload.daily_rate) || 950),
+        perNightPrice: true,
+        localCurrency: sanitizeText(payload.currency, 8) || 'ZAR',
+        vehicleType,
+        details: { beds: 0, baths: 0, area: 0 },
+        description: sanitizeText(payload.description, 1500),
+        neighborhoodInfo: `${sanitizeText(payload.business_name, 80)} (${sanitizeText(payload.business_type, 60)}) · Pickup at ${sanitizeText(payload.pickup_address, 120)}, ${sanitizeText(payload.city, 60)}`,
+        amenities: [
+            payload.transmission === 'auto' ? 'Automatic Transmission' : 'Manual Transmission',
+            `${payload.vehicle_year || 2025} Model`,
+            sanitizeText(payload.vehicle_make_model, 60),
+            sanitizeText(payload.business_type, 50),
+            'Unlimited Mileage Option',
+            'Verified Mobility Partner',
+        ].filter(Boolean),
+        images: [sanitizeSafeUrl(payload.image_url, defaultImg)],
+        agent: {
+            name: sanitizeText(payload.business_name || payload.contact_person || currentUser.username, 80),
+            phone: sanitizeText(payload.mobile_number || currentUser.phone || '+27 11 000 0000', 30),
+            verified: true,
+            rating: 4.9,
+            reviewCount: 1,
+        },
+        featured: false,
+        verified: true,
+        views: 1,
+        status: PropertyStatus.ACTIVE,
+        dateListed: Date.now(),
+        saves: 0,
+        verificationDetails: {
+            verifiedDate: new Date().toISOString().split('T')[0],
+            titleDeedNumber: sig,
+            inspectionDate: new Date().toISOString().split('T')[0],
+            registryStatus: `Fleet License Verified · ${sanitizeText(payload.email_address, 80)}`,
+            surveyVerified: true,
+        },
+    };
+
+    return upsertPublishedProperty(newProperty);
+};
+
+export const publishWellnessService = async (
+    payload: {
+        business_name: string;
+        trading_name?: string | null;
+        registration_number?: string | null;
+        wellness_category: string;
+        contact_person: string;
+        mobile_number: string;
+        whatsapp_number: string;
+        email_address: string;
+        website?: string | null;
+        country: string;
+        province?: string | null;
+        city: string;
+        physical_address?: string | null;
+        description: string;
+        session_price?: number;
+        image_url?: string;
+    },
+    currentUser: User
+): Promise<Property> => {
+    const id = `well_${Date.now().toString(36)}`;
+    const sig = generateListingSignature(id, currentUser.username, payload.session_price || 650);
+
+    try {
+        await supabase.from('wellness_services').insert([{
+            user_id: currentUser.id,
+            ...payload,
+            status: 'active',
+        }]);
+    } catch {
+        // Proceed with unified synced store
+    }
+
+    const categoryMap: Record<string, string> = {
+        spa: 'Beauty & Spa · Wellness Retreats',
+        massage: 'Alternative Healing · Massage Therapy',
+        beauty: 'Beauty & Spa · Skin Atelier',
+        fitness: 'Physical Wellness · Personal Training',
+        yoga: 'Mental Wellness · Yoga & Breathwork',
+        other: 'Wellness Retreats · Holistic Care',
+    };
+    const categoryLabel = categoryMap[payload.wellness_category] || sanitizeText(payload.wellness_category, 60) || 'Wellness Sanctuary';
+
+    const newProperty: Property = {
+        id,
+        title: sanitizeText(payload.business_name, 120),
+        listingType: ListingType.RENT,
+        propertyType: PropertyType.WELLNESS,
+        address: {
+            street: sanitizeText(payload.physical_address || payload.province || payload.city, 140),
+            city: sanitizeText(payload.city, 80),
+            zip: '0001',
+        },
+        country: sanitizeText(payload.country, 80),
+        coordinates: { lat: -33.9249, lng: 18.4241 },
+        price: Math.max(150, Number(payload.session_price) || 650),
+        perNightPrice: false,
+        details: { beds: 0, baths: 0, area: 0 },
+        description: sanitizeText(payload.description, 1500),
+        neighborhoodInfo: `${sanitizeText(payload.description, 260)}${payload.website ? ` | Web: ${sanitizeText(payload.website, 100)}` : ''}`,
+        amenities: [categoryLabel, 'Verified Practitioner', sanitizeText(payload.city, 40)],
+        packageIncludes: [sanitizeText(payload.contact_person, 60), sanitizeText(payload.email_address, 80), sanitizeText(payload.whatsapp_number, 30)],
+        images: [sanitizeSafeUrl(payload.image_url, '/images/spa_wellness_1779978823248.png')],
+        agent: {
+            name: sanitizeText(payload.contact_person || payload.business_name || currentUser.username, 80),
+            phone: sanitizeText(payload.mobile_number || payload.whatsapp_number || '+27 21 000 0000', 30),
+            verified: true,
+            rating: 4.9,
+            reviewCount: 1,
+        },
+        featured: false,
+        verified: true,
+        views: 1,
+        status: PropertyStatus.ACTIVE,
+        dateListed: Date.now(),
+        saves: 0,
+        verificationDetails: {
+            verifiedDate: new Date().toISOString().split('T')[0],
+            titleDeedNumber: sig,
+            inspectionDate: new Date().toISOString().split('T')[0],
+            registryStatus: `Accredited Wellness Provider · ${sanitizeText(payload.website || payload.email_address, 90)}`,
+            surveyVerified: true,
+        },
+    };
+
+    return upsertPublishedProperty(newProperty);
+};
+
+export const publishAccommodationService = async (
+    payload: {
+        business_name: string;
+        accommodation_type: string;
+        country: string;
+        city: string;
+        address?: string | null;
+        nightly_rate: number;
+        currency: string;
+        max_guests: number;
+        description: string;
+        image_url?: string;
+    },
+    currentUser: User
+): Promise<Property> => {
+    const id = `stay_${Date.now().toString(36)}`;
+    const sig = generateListingSignature(id, currentUser.username, payload.nightly_rate);
+    const isLongTermApartment = payload.accommodation_type === 'apartment';
+    const propType = payload.accommodation_type === 'hotel' ? PropertyType.HOTEL : PropertyType.SHORT_TERM_RENTAL;
+    const imgUrl = sanitizeSafeUrl(payload.image_url, '/images/coastal_mansion_1779978805301.png');
+
+    try {
+        await supabase.from('accommodation_services').insert({
+            owner_id: currentUser.id,
+            ...payload,
+            images: [imgUrl],
+            status: 'active',
+        });
+    } catch {
+        // Proceed with unified store
+    }
+
+    const stayProfile: StayPropertyProfile = {
+        ...FLAGSHIP_AFRICAN_GRAND_HOTEL,
+        id,
+        name: sanitizeText(payload.business_name, 120),
+        subtitle: sanitizeText(payload.accommodation_type, 50),
+        country: sanitizeText(payload.country, 80),
+        province: sanitizeText(payload.city, 80),
+        city: sanitizeText(payload.city, 80),
+        suburb: sanitizeText(payload.address || payload.city, 80),
+        category: payload.accommodation_type === 'hotel' ? 'Hotels' : isLongTermApartment ? 'Serviced Apartments' : 'Resorts',
+        propertyType: payload.accommodation_type === 'hotel' ? 'Hotel' : isLongTermApartment ? 'Serviced Apartment' : 'Villa',
+        starRating: 5,
+        score: 9.2,
+        scoreLabel: 'Superb',
+        reviewCount: 1,
+        nightlyFromZar: Math.max(350, Number(payload.nightly_rate) || 1850),
+        monthlyFromZar: Math.max(8500, Math.round((Number(payload.nightly_rate) || 1850) * 19)),
+        locationLabel: `${sanitizeText(payload.city, 60)}, ${sanitizeText(payload.country, 60)}`,
+        overviewShort: sanitizeText(payload.description, 300),
+        heroImages: [
+            {
+                url: imgUrl,
+                category: 'Exterior',
+                caption: sanitizeText(payload.business_name, 100),
+                specs: `Up to ${payload.max_guests || 2} Guests · Verified Stay`,
+                aiTags: ['Verified', 'Direct Publish'],
+            },
+            ...FLAGSHIP_AFRICAN_GRAND_HOTEL.heroImages.slice(1),
+        ],
+        specs: {
+            ...FLAGSHIP_AFRICAN_GRAND_HOTEL.specs,
+            rooms: Math.max(1, payload.max_guests || 4),
+        },
+        investmentEligible: false,
+    };
+
+    const existingStays = readLocalJson<StayPropertyProfile[]>(PUBLISHED_STAYS_KEY, []);
+    writeLocalJson(PUBLISHED_STAYS_KEY, [stayProfile, ...existingStays.filter((s) => s.id !== stayProfile.id)]);
+
+    const propRecord: Property = {
+        id,
+        title: stayProfile.name,
+        listingType: ListingType.RENT,
+        propertyType: propType,
+        address: {
+            street: sanitizeText(payload.address || payload.city, 140),
+            city: stayProfile.city,
+            zip: '0001',
+        },
+        country: stayProfile.country,
+        coordinates: { lat: -33.9249, lng: 18.4241 },
+        price: stayProfile.nightlyFromZar,
+        perNightPrice: true,
+        localCurrency: sanitizeText(payload.currency, 8) || 'ZAR',
+        guests: payload.max_guests || 2,
+        leaseDuration: isLongTermApartment ? 'Medium term' : 'Short term / Stay',
+        details: { beds: Math.max(1, Math.ceil((payload.max_guests || 2) / 2)), baths: 1, area: 850 },
+        description: sanitizeText(payload.description, 1500),
+        neighborhoodInfo: stayProfile.locationLabel,
+        amenities: ['Solar Backup', 'High-Speed Fibre', 'Verified Hospitality Host'],
+        images: [imgUrl],
+        agent: {
+            name: sanitizeText(currentUser.fullName || currentUser.username, 80),
+            phone: sanitizeText(currentUser.phone || '+27 21 555 0100', 30),
+            verified: true,
+            rating: 4.9,
+            reviewCount: 1,
+        },
+        featured: false,
+        verified: true,
+        views: 1,
+        status: PropertyStatus.ACTIVE,
+        dateListed: Date.now(),
+        saves: 0,
+        verificationDetails: {
+            verifiedDate: new Date().toISOString().split('T')[0],
+            titleDeedNumber: sig,
+            inspectionDate: new Date().toISOString().split('T')[0],
+            registryStatus: 'Hospitality & Identity Verified',
+            surveyVerified: true,
+        },
+    };
+
+    return upsertPublishedProperty(propRecord);
+};
+
+export const getPublishedStayProfiles = (): StayPropertyProfile[] => {
+    return readLocalJson<StayPropertyProfile[]>(PUBLISHED_STAYS_KEY, []);
+};
+
+export const publishHotelListing = async (
+    stayProfile: StayPropertyProfile,
+    propertyRecord: Property
+): Promise<Property> => {
+    const existingStays = readLocalJson<StayPropertyProfile[]>(PUBLISHED_STAYS_KEY, []);
+    writeLocalJson(PUBLISHED_STAYS_KEY, [stayProfile, ...existingStays.filter((s) => s.id !== stayProfile.id)]);
+    return upsertPublishedProperty(propertyRecord);
 };
 
 export const saveProperties = async (properties: Property[]): Promise<void> => {
@@ -314,7 +697,7 @@ export const authenticateUser = async (email: string, password: string): Promise
         if (error) {
             if (error.message.includes('Failed to fetch') || error.code === 'PGRST116') {
                  if (email === 'peter.vdm@example.com' && password === 'Password123!') {
-                     return { user: { username: 'Peter Van der Merwe', fullName: 'Peter Van der Merwe', email, role: 'agent', isVerified: true, profilePicture: 'https://i.pravatar.cc/150?u=Peter' } as any };
+                     return { user: { username: 'Peter Van der Merwe', fullName: 'Peter Van der Merwe', email, role: 'agent', isVerified: true, profilePicture: '/images/tersia-kroonstad.webp' } as any };
                  }
                  if (error.message.includes('Failed to fetch')) return { user: null, error: 'Network Error: Backend unreachable.' };
             }

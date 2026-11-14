@@ -3,6 +3,7 @@ import type { SearchFilters } from '../types';
 import { ListingType } from '../types';
 import { MapPinIcon, ArrowUpRightIcon } from '@heroicons/react/24/outline';
 import { AfricanGlobeIcon, YieldTrendingIcon } from './icons/AfricanInfrastructureIcons';
+import { useAdminState } from '../contexts/AdminStateContext';
 
 interface ExploreAfricaMapProps {
   onSelectHub: (city: string, country: string, region: string, listingType?: ListingType) => void;
@@ -128,8 +129,11 @@ const REGIONS = ['All Africa', 'Southern Africa', 'West Africa', 'East Africa', 
 const ExploreAfricaMap: React.FC<ExploreAfricaMapProps> = ({ onSelectHub, activeFilters }) => {
   const [selectedRegion, setSelectedRegion] = useState<string>('All Africa');
   const [activeIntentTab, setActiveIntentTab] = useState<'all' | 'invest' | 'dev'>('all');
+  const { countryConfigs } = useAdminState();
 
   const filteredHubs = AFRICAN_HUBS.filter((hub) => {
+    const countryCfg = countryConfigs.find((c) => c.name.toLowerCase() === hub.country.toLowerCase());
+    if (countryCfg && !countryCfg.enabled) return false;
     if (selectedRegion === 'All Africa') return true;
     return hub.region === selectedRegion;
   });

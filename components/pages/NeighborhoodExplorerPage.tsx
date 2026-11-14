@@ -494,10 +494,17 @@ const NeighborhoodExplorerPage: React.FC<NeighborhoodExplorerPageProps> = ({
       </div>
 
       {/* Editorial Hero Header & Country + Launch Neighbourhood Control Deck */}
-      <section className="w-full bg-[#0B1F1A] text-white border-b border-white/10">
-        <div className="w-full px-4 sm:px-6 lg:px-10 py-10 lg:py-12 space-y-8">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-end">
-            <div className="lg:col-span-7 space-y-3">
+      <section className="relative w-full bg-[#0B1F1A] text-white border-b border-white/10 overflow-hidden">
+        <img
+          src="/images/chicago-2-flats.jpg"
+          alt="African Residential Neighbourhood Panorama"
+          referrerPolicy="no-referrer"
+          className="absolute inset-0 w-full h-full object-cover opacity-50"
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#0B1F1A]/90 via-[#0B1F1A]/70 to-[#0B1F1A]/50" />
+        <div className="relative z-10 w-full px-4 sm:px-6 lg:px-10 py-10 lg:py-12 space-y-8">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+            <div className="lg:col-span-7 space-y-4">
               <div className="flex items-center gap-2 text-xs font-semibold tracking-widest uppercase text-amber-300">
                 <GlobeAltIcon className="w-4 h-4 shrink-0" />
                 <span>African Neighbourhood Intelligence Database</span>
@@ -508,39 +515,65 @@ const NeighborhoodExplorerPage: React.FC<NeighborhoodExplorerPageProps> = ({
               >
                 Pan-African Neighbourhood Explorer
               </h1>
-              <p className="text-sm sm:text-base text-slate-300 max-w-2xl leading-relaxed">
+              <p className="text-sm sm:text-base text-slate-200 max-w-2xl leading-relaxed">
                 Explore structured neighbourhood intelligence across 8 priority African markets—covering South Africa, Nigeria, Kenya, Ghana, Rwanda, Egypt, Morocco, and Angola—from high-yield urban centres to family commuter belts.
               </p>
+
+              {/* Live Neighbourhood Search + Tier Filter */}
+              <div className="pt-2 space-y-3 max-w-2xl">
+                <div className="relative">
+                  <MagnifyingGlassIcon className="w-4 h-4 text-slate-300 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="Search neighbourhood or city (e.g. Goodwood, Yaba, Ngara, Kilamba)..."
+                    className="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-950/65 text-white placeholder:text-slate-400 text-xs sm:text-sm border border-white/20 focus:outline-none focus:ring-2 focus:ring-amber-400 backdrop-blur-sm"
+                  />
+                </div>
+
+                <div className="flex flex-wrap gap-1.5">
+                  {TIER_FILTERS.map((tier) => (
+                    <button
+                      key={tier}
+                      type="button"
+                      onClick={() => setTierFilter(tier)}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors whitespace-nowrap shrink-0 ${
+                        tierFilter === tier
+                          ? 'bg-amber-400 text-slate-950'
+                          : 'bg-slate-950/55 text-slate-200 border border-white/15 hover:bg-white/15'
+                      }`}
+                    >
+                      {tier === 'All' ? 'All Positioning Tiers' : tier}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
 
-            {/* Live Neighbourhood Search + Tier Filter */}
-            <div className="lg:col-span-5 space-y-3">
-              <div className="relative">
-                <MagnifyingGlassIcon className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Search neighbourhood or city (e.g. Goodwood, Yaba, Ngara, Kilamba)..."
-                  className="w-full pl-10 pr-4 py-3 rounded-xl bg-white/10 text-white placeholder:text-slate-400 text-xs sm:text-sm border border-white/15 focus:outline-none focus:ring-2 focus:ring-amber-400"
+            {/* Framed Neighbourhood Hero Photography Showcase */}
+            <div className="lg:col-span-5">
+              <div className="relative rounded-2xl overflow-hidden border border-white/20 shadow-2xl aspect-[16/10] bg-slate-900">
+                <img
+                  src="/images/chicago-2-flats.jpg"
+                  alt={`${profile.neighborhood}, ${profile.city} District View`}
+                  referrerPolicy="no-referrer"
+                  className="w-full h-full object-cover"
                 />
-              </div>
-
-              <div className="flex flex-wrap gap-1.5">
-                {TIER_FILTERS.map((tier) => (
-                  <button
-                    key={tier}
-                    type="button"
-                    onClick={() => setTierFilter(tier)}
-                    className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors whitespace-nowrap shrink-0 ${
-                      tierFilter === tier
-                        ? 'bg-amber-400 text-slate-950'
-                        : 'bg-white/10 text-slate-200 hover:bg-white/15'
-                    }`}
-                  >
-                    {tier === 'All' ? 'All Positioning Tiers' : tier}
-                  </button>
-                ))}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/15 to-transparent" />
+                <div className="absolute bottom-4 left-4 right-4 flex items-end justify-between gap-3">
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-amber-300">
+                      Featured District · {profile.country}
+                    </p>
+                    <p className="font-heading text-lg sm:text-xl font-bold text-white">
+                      {profile.neighborhood}, {profile.city}
+                    </p>
+                  </div>
+                  <span className="px-2.5 py-1 rounded-lg bg-white/15 backdrop-blur-sm text-xs font-mono font-semibold text-white">
+                    {profile.propertyMarket}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
