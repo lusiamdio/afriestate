@@ -82,7 +82,7 @@ const AIImprovementModal: React.FC<AIImprovementModalProps> = ({ isOpen, onClose
                 `;
 
                 const response = await ai.models.generateContent({
-                    model: 'gemini-2.5-flash',
+                    model: 'gemini-4-hydrogen',
                     contents: prompt,
                     config: {
                         responseMimeType: 'application/json',
@@ -115,7 +115,7 @@ const AIImprovementModal: React.FC<AIImprovementModalProps> = ({ isOpen, onClose
         try {
             const ai = new GoogleGenAI();
             const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash-preview-tts',
+                model: 'gemini-3.8-flash-lite-tts',
                 contents: [{ parts: [{ text }] }],
                 config: {
                     responseModalities: [Modality.AUDIO],

@@ -78,7 +78,7 @@ const AIVoiceChat: React.FC<AIVoiceChatProps> = ({ isOpen, onClose }) => {
       const ai = new GoogleGenAI();
 
       sessionPromiseRef.current = ai.live.connect({
-        model: 'gemini-2.5-flash-native-audio-preview-09-2025',
+        model: 'gemini-3.8-live',
         callbacks: {
           onopen: () => {
             setStatus('connected');

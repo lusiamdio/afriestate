@@ -124,7 +124,7 @@ const AIHotspots: React.FC = () => {
       const prompt =
         'Analyze African and global prime real estate trends to identify 3 emerging property investment hotspots. For each, provide location, a concise risk_reward_profile, and brief analysis. Return JSON array.';
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-4-hydrogen',
         contents: prompt,
         config: {
           responseMimeType: 'application/json',
@@ -295,7 +295,7 @@ const CrossBorderAnalysis: React.FC = () => {
       const ai = new GoogleGenAI();
       const prompt = `Compare ${countryA} and ${countryB} for a cross-border real estate investor. Analyze market summary, 2 pros, and 2 cons for each. Return JSON.`;
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-4-hydrogen',
         contents: prompt,
         config: { responseMimeType: 'application/json', responseSchema: comparisonSchema },
       });

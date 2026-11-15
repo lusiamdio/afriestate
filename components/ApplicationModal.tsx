@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { CloseIcon } from './icons/NavIcons';
 import { ArrowUpTrayIcon } from './icons/ActionIcons';
+import { useToast } from '../contexts/ToastContext';
 
 interface ApplicationModalProps {
   isOpen: boolean;
@@ -10,6 +11,7 @@ interface ApplicationModalProps {
 }
 
 const ApplicationModal: React.FC<ApplicationModalProps> = ({ isOpen, onClose, jobTitle, onSubmit }) => {
+    const { addToast } = useToast();
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [coverLetter, setCoverLetter] = useState('');
@@ -24,16 +26,9 @@ const ApplicationModal: React.FC<ApplicationModalProps> = ({ isOpen, onClose, jo
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!cvFile) {
-            alert('Please upload your CV.');
+            addToast('Please upload your CV before submitting.', 'error');
             return;
         }
-        // In a real app, you would handle the form data submission (e.g., via API call)
-        console.log({
-            name,
-            email,
-            coverLetter,
-            cv: cvFile.name,
-        });
         onSubmit();
     };
 

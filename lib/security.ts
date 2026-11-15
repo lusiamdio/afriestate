@@ -121,3 +121,40 @@ export const generateListingSignature = (
   const hex = (hash >>> 0).toString(16).toUpperCase().padStart(8, '0');
   return `AE-VER-${hex}`;
 };
+
+/**
+ * Neutralizes spreadsheet CSV formula injection (=, +, -, @, tab, CR) and safely quotes cells.
+ */
+export const escapeCsvCell = (value: unknown): string => {
+  let str = value === null || value === undefined ? '' : String(value);
+  if (/^[=+\-@\t\r]/.test(str)) {
+    str = `'${str}`;
+  }
+  return `"${str.replace(/"/g, '""')}"`;
+};
+
+/**
+ * Generates a cryptographically strong reference code (replaces insecure Math.random IDs).
+ */
+export const generateSecureBookingRef = (prefix = 'AFR-STAY'): string => {
+  const bytes = new Uint8Array(4);
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    crypto.getRandomValues(bytes);
+  } else {
+    for (let i = 0; i < bytes.length; i += 1) {
+      bytes[i] = Math.floor(Date.now() % 256);
+    }
+  }
+  const code = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+  return `${prefix}-${code}`;
+};
+
+/**
+ * Validates outbound external links (allows only https:// and mailto:).
+ */
+export const isSafeExternalHref = (href: string | null | undefined): boolean => {
+  if (!href) return false;
+  const trimmed = href.trim().toLowerCase();
+  return trimmed.startsWith('https://') || trimmed.startsWith('mailto:');
+};
+

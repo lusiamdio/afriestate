@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { CloseIcon } from './icons/NavIcons';
 import { ArrowUpTrayIcon } from './icons/ActionIcons';
+import { useToast } from '../contexts/ToastContext';
 
 interface ServiceRegistrationModalProps {
   isOpen: boolean;
@@ -30,6 +31,7 @@ const FileInput: React.FC<{ label: string; file: File | null; onFileChange: (fil
 );
 
 const ServiceRegistrationModal: React.FC<ServiceRegistrationModalProps> = ({ isOpen, onClose }) => {
+    const { addToast } = useToast();
     const [selectedServices, setSelectedServices] = useState<Set<string>>(new Set());
     const [files, setFiles] = useState<Record<string, File | null>>({
         credentials: null,
@@ -55,7 +57,7 @@ const ServiceRegistrationModal: React.FC<ServiceRegistrationModalProps> = ({ isO
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        alert('Thank you for registering! Your application will be reviewed and we will get back to you shortly.');
+        addToast('Thank you for registering! Your application will be reviewed shortly.', 'success');
         onClose();
     };
 

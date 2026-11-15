@@ -4,6 +4,7 @@ import type { ProfessionalContact } from '../types';
 import { CloseIcon } from './icons/NavIcons';
 import { CalendarIcon, ClockIcon, CheckBadgeIcon } from './icons/ActionIcons';
 import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/20/solid';
+import { useToast } from '../contexts/ToastContext';
 
 interface BookConsultationModalProps {
   isOpen: boolean;
@@ -12,6 +13,7 @@ interface BookConsultationModalProps {
 }
 
 const BookConsultationModal: React.FC<BookConsultationModalProps> = ({ isOpen, onClose, professional }) => {
+    const { addToast } = useToast();
     const [step, setStep] = useState(1);
     const [currentDate, setCurrentDate] = useState(new Date());
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -154,7 +156,7 @@ const BookConsultationModal: React.FC<BookConsultationModalProps> = ({ isOpen, o
                         <h3 className="text-2xl font-bold text-slate-800 dark:text-white mt-4">Consultation Booked!</h3>
                         <p className="text-slate-500 dark:text-slate-400 mt-2">Your {meetingType} with {professional.name} is confirmed for <br/><span className="font-semibold text-brand-dark dark:text-white">{selectedDate?.toDateString()} at {selectedTime}</span>.</p>
                         <div className="mt-6 flex justify-center gap-3">
-                            <button onClick={() => alert('Adding to calendar...')} className="px-5 py-2.5 font-semibold bg-slate-100 dark:bg-slate-700 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600">Add to Calendar</button>
+                            <button onClick={() => addToast(`Added ${meetingType} (${selectedDate?.toDateString()} ${selectedTime}) to your calendar.`, 'success')} className="px-5 py-2.5 font-semibold bg-slate-100 dark:bg-slate-700 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600">Add to Calendar</button>
                             <button onClick={resetAndClose} className="px-5 py-2.5 font-semibold bg-brand-primary text-white rounded-lg hover:bg-opacity-90">Done</button>
                         </div>
                     </div>

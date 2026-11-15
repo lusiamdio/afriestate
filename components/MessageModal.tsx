@@ -16,6 +16,7 @@ const MessageModal: React.FC<MessageModalProps> = ({ isOpen, onClose, property, 
     const handleSend = () => {
         if (!message.trim()) return;
         onSend(message);
+        setMessage('');
     };
 
     if (!isOpen) return null;

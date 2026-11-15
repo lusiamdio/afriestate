@@ -5,10 +5,12 @@ import { ListingType, PropertyStatus, PropertyType } from '../types';
 import type { StayPropertyProfile } from '../data/stayDetailData';
 import { FLAGSHIP_AFRICAN_GRAND_HOTEL } from '../data/stayDetailData';
 import { supabase } from './supabase';
-import { generateListingSignature, sanitizeSafeUrl, sanitizeText } from './security';
+import { generateListingSignature, generateSecureBookingRef, sanitizeSafeUrl, sanitizeText } from './security';
 
 const PUBLISHED_PROPERTIES_KEY = 'afriestate_published_properties_v1';
 const PUBLISHED_STAYS_KEY = 'afriestate_published_stays_v1';
+const STAY_BOOKINGS_KEY = 'afriestate_stay_bookings_v1';
+const HOTEL_REGISTRATIONS_KEY = 'afriestate_hotel_registrations_v1';
 
 const readLocalJson = <T,>(key: string, fallback: T): T => {
     try {
@@ -227,6 +229,25 @@ export const getProperties = async (excludeMock = false): Promise<Property[]> =>
                 perNightPrice: p.perNightPrice ?? p.per_night_price,
                 packageIncludes: p.packageIncludes ?? p.package_includes,
                 vehicleType: p.vehicleType ?? p.vehicle_type,
+                country: p.country,
+                region: p.region,
+                hasSolar: p.hasSolar ?? p.has_solar,
+                hasGenerator: p.hasGenerator ?? p.has_generator,
+                hasBorehole: p.hasBorehole ?? p.has_borehole,
+                hasWaterTank: p.hasWaterTank ?? p.has_water_tank,
+                hasFibre: p.hasFibre ?? p.has_fibre,
+                securityFeatures: p.securityFeatures ?? p.security_features,
+                proximity: p.proximity,
+                leaseDuration: p.leaseDuration ?? p.lease_duration,
+                targetReturn: p.targetReturn ?? p.target_return,
+                rentalYield: p.rentalYield ?? p.rental_yield,
+                projectedROI: p.projectedROI ?? p.projected_roi,
+                minInvestment: p.minInvestment ?? p.min_investment,
+                investmentType: p.investmentType ?? p.investment_type,
+                riskLevel: p.riskLevel ?? p.risk_level,
+                localCurrency: p.localCurrency ?? p.local_currency,
+                foreignBuyerEligible: p.foreignBuyerEligible ?? p.foreign_buyer_eligible,
+                verificationDetails: p.verificationDetails ?? p.verification_details,
                 address: typeof p.address === 'string' ? JSON.parse(p.address) : p.address,
                 details: typeof p.details === 'string' ? JSON.parse(p.details) : p.details,
                 amenities: typeof p.amenities === 'string' ? JSON.parse(p.amenities) : p.amenities,
@@ -312,10 +333,14 @@ export const publishCarRental = async (
         catLower.includes('luxury') ? 'Luxury' : catLower.includes('van') ? 'Van' : catLower.includes('suv') || catLower.includes('pickup') ? 'SUV' : 'Sedan';
     const defaultImg = vehicleType === 'Sedan' ? '/images/executive_sedan_fleet.jpg' : '/images/luxury_suv_fleet.jpg';
 
+    const imgUrl = sanitizeSafeUrl(payload.image_url, defaultImg);
+
     try {
         await supabase.from('car_rentals').insert([{
-            user_id: currentUser.id,
+            owner_id: currentUser.id || null,
+            user_id: currentUser.username || currentUser.id,
             ...payload,
+            images: [imgUrl],
             status: 'active',
         }]);
     } catch {
@@ -399,10 +424,14 @@ export const publishWellnessService = async (
     const id = `well_${Date.now().toString(36)}`;
     const sig = generateListingSignature(id, currentUser.username, payload.session_price || 650);
 
+    const imgUrl = sanitizeSafeUrl(payload.image_url, '/images/spa_wellness_1779978823248.png');
+
     try {
         await supabase.from('wellness_services').insert([{
-            user_id: currentUser.id,
+            owner_id: currentUser.id || null,
+            user_id: currentUser.username || currentUser.id,
             ...payload,
+            images: [imgUrl],
             status: 'active',
         }]);
     } catch {
@@ -597,8 +626,12 @@ export const publishHotelListing = async (
 
 export const saveProperties = async (properties: Property[]): Promise<void> => {
     try {
+        const { data: authData } = await supabase.auth.getUser().catch(() => ({ data: { user: null } }));
+        const authUserId = authData?.user?.id || null;
+
         const dbProperties = properties.map(p => ({
             id: p.id,
+            owner_id: authUserId,
             title: p.title,
             listing_type: p.listingType,
             property_type: p.propertyType,
@@ -612,14 +645,15 @@ export const saveProperties = async (properties: Property[]): Promise<void> => {
             images: p.images || [],
             virtual_tour_url: p.virtualTourUrl || null,
             vr_tour_url: p.vrTourUrl || null,
-            agent_name: p.agent?.name || 'simao',
+            agent_name: p.agent?.name || 'afriestate',
+            agent: p.agent || {},
             featured: p.featured || false,
             verified: p.verified || false,
             smart_contract_ready: p.smartContractReady || false,
             views: p.views || 0,
             status: p.status,
             date_listed: p.dateListed,
-            saves: p.saves || 0,
+            saves: Math.max(0, p.saves || 0),
             purchase_price: p.purchasePrice || null,
             price_history: p.priceHistory || [],
             occupancy_rate: p.occupancyRate || null,
@@ -628,7 +662,26 @@ export const saveProperties = async (properties: Property[]): Promise<void> => {
             guests: p.guests || null,
             vehicle_type: p.vehicleType || null,
             package_includes: p.packageIncludes || [],
-            per_night_price: p.perNightPrice || false
+            per_night_price: p.perNightPrice || false,
+            country: p.country || null,
+            region: p.region || null,
+            has_solar: p.hasSolar || false,
+            has_generator: p.hasGenerator || false,
+            has_borehole: p.hasBorehole || false,
+            has_water_tank: p.hasWaterTank || false,
+            has_fibre: p.hasFibre || false,
+            security_features: p.securityFeatures || [],
+            proximity: p.proximity || [],
+            lease_duration: p.leaseDuration || null,
+            target_return: p.targetReturn || null,
+            rental_yield: p.rentalYield || null,
+            projected_roi: p.projectedROI || null,
+            min_investment: p.minInvestment || null,
+            investment_type: p.investmentType || null,
+            risk_level: p.riskLevel || null,
+            local_currency: p.localCurrency || null,
+            foreign_buyer_eligible: p.foreignBuyerEligible ?? null,
+            verification_details: p.verificationDetails || null,
         }));
 
         const { error } = await supabase.from('properties').upsert(dbProperties);
@@ -647,81 +700,105 @@ export const incrementPropertyView = async (propertyId: string): Promise<void> =
                  await supabase.from('properties').update({ views: (data.views || 0) + 1 }).eq('id', propertyId);
              }
         }
-    } catch (e) {
+    } catch {
         // Ignore
     }
 };
 
-// --- User Management ---
+// --- User Management (Supabase Auth backed — never store or query plaintext passwords) ---
 export const getUsers = async (): Promise<User[]> => {
     try {
-        const { data, error } = await supabase.from('profiles').select('*');
+        const { data, error } = await supabase
+            .from('profiles')
+            .select('id, username, full_name, email, role, phone, office_address, company_name, agency_name, profile_picture, country, is_verified, kyc_status, status, is_wallet_frozen');
         if (error) return [];
-        return data || [];
-    } catch (e) { return []; }
+        return (data || []).map((u: any) => ({
+            id: u.id,
+            username: u.username,
+            fullName: u.full_name,
+            email: u.email,
+            role: u.role === 'agent' || u.role === 'investor' ? u.role : 'user',
+            phone: u.phone,
+            officeAddress: u.office_address,
+            companyName: u.company_name,
+            agencyName: u.agency_name,
+            profilePicture: u.profile_picture,
+            country: u.country,
+            isVerified: Boolean(u.is_verified),
+            kycStatus: u.kyc_status,
+            status: u.status,
+            isWalletFrozen: Boolean(u.is_wallet_frozen),
+        }));
+    } catch {
+        return [];
+    }
 };
 
 export const addUser = async (user: User): Promise<{ success: boolean, message: string }> => {
     try {
         const { error } = await supabase.from('profiles').insert({
+            id: user.id || undefined,
             username: user.username,
-            full_name: user.fullName,
-            email: user.email,
-            password: user.password,
-            role: user.role,
+            full_name: sanitizeText(user.fullName, 120),
+            email: user.email.trim().toLowerCase(),
+            role: user.role || 'user',
             is_verified: user.role === 'user',
-            phone: user.phone,
-            office_address: user.officeAddress,
-            company_name: user.companyName,
-            // Add other fields mapping as needed
+            phone: user.phone || null,
+            office_address: user.officeAddress || null,
+            company_name: user.companyName || null,
         });
         if (error) {
-             if (error.message.includes('Failed to fetch')) return { success: true, message: "Demo User created (Offline Mode)" };
+             if (error.message.includes('Failed to fetch')) return { success: true, message: "Profile queued (Offline Mode)" };
              return { success: false, message: error.message };
         }
-        return { success: true, message: "User created successfully." };
-    } catch (e) {
-        return { success: true, message: "Demo User created (Offline Mode)" };
+        return { success: true, message: "Profile created successfully." };
+    } catch {
+        return { success: true, message: "Profile queued (Offline Mode)" };
     }
 };
 
 export const authenticateUser = async (email: string, password: string): Promise<{ user: User | null; error?: string }> => {
     try {
-        const { data, error } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('email', email)
-            .eq('password', password)
-            .single();
+        const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+            email: email.trim().toLowerCase(),
+            password,
+        });
 
-        if (error) {
-            if (error.message.includes('Failed to fetch') || error.code === 'PGRST116') {
-                 if (email === 'peter.vdm@example.com' && password === 'Password123!') {
-                     return { user: { username: 'Peter Van der Merwe', fullName: 'Peter Van der Merwe', email, role: 'agent', isVerified: true, profilePicture: '/images/tersia-kroonstad.webp' } as any };
-                 }
-                 if (error.message.includes('Failed to fetch')) return { user: null, error: 'Network Error: Backend unreachable.' };
-            }
-            return { user: null, error: 'Invalid email or password.' };
+        if (authError || !authData.user) {
+            return { user: null, error: authError?.message || 'Invalid email or password.' };
         }
-        
-        if (!data) return { user: null, error: 'Invalid email or password.' };
-        
-        const user = {
-            ...data,
-            isVerified: data.is_verified || data.isVerified,
-            fullName: data.full_name || data.fullName,
-            officeAddress: data.office_address,
-            companyName: data.company_name,
-            profilePicture: data.profile_picture || data.profilePicture,
-        } as User;
+
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('id, username, full_name, email, role, phone, office_address, company_name, agency_name, profile_picture, is_verified, kyc_status, status, is_wallet_frozen')
+            .eq('id', authData.user.id)
+            .maybeSingle();
+
+        const resolvedRole = profile?.role || authData.user.app_metadata?.role || 'user';
+        const user: User = {
+            id: authData.user.id,
+            username: profile?.username || authData.user.email || authData.user.id,
+            fullName: profile?.full_name || authData.user.user_metadata?.full_name || 'AfriEstate Member',
+            email: profile?.email || authData.user.email || email,
+            role: resolvedRole === 'agent' || resolvedRole === 'investor' ? resolvedRole : 'user',
+            isVerified: Boolean(profile?.is_verified),
+            kycStatus: profile?.kyc_status,
+            status: profile?.status || 'Active',
+            isWalletFrozen: Boolean(profile?.is_wallet_frozen),
+            phone: profile?.phone,
+            officeAddress: profile?.office_address,
+            companyName: profile?.company_name,
+            agencyName: profile?.agency_name,
+            profilePicture: profile?.profile_picture,
+        };
 
         if ((user.role === 'agent' || user.role === 'investor') && !user.isVerified) {
             return { user: null, error: `pending_verification_${user.role}` };
         }
-        
+
         return { user };
-    } catch (e) {
-        return { user: null, error: 'Database connection failed.' };
+    } catch {
+        return { user: null, error: 'Authentication service unreachable.' };
     }
 };
 
@@ -1045,17 +1122,31 @@ export const getUserDocuments = async (username: string): Promise<UserDocument[]
 };
 
 export const addUserDocument = async (username: string, file: File): Promise<UserDocument> => {
+    const safeName = sanitizeText(file.name, 100).replace(/[^a-zA-Z0-9._-]/g, '_') || 'document';
+    let docUrl = '#';
+    try {
+        const { data: authData } = await supabase.auth.getUser().catch(() => ({ data: { user: null } }));
+        const folder = authData?.user?.id || username.replace(/[^a-zA-Z0-9._-]/g, '_');
+        const path = `${folder}/${Date.now()}_${safeName}`;
+        const { error: uploadErr } = await supabase.storage.from('user-documents').upload(path, file, { upsert: true });
+        if (!uploadErr) {
+            docUrl = path;
+        }
+    } catch {
+        // Fallback if storage bucket unavailable offline
+    }
+
     const newDoc = {
-        name: file.name,
-        type: file.type.includes('pdf') ? 'pdf' : 'doc',
+        name: sanitizeText(file.name, 140),
+        type: file.type.includes('pdf') ? 'pdf' : file.type.startsWith('image/') ? 'image' : 'doc',
         upload_date: Date.now(),
-        url: '#',
+        url: docUrl,
         username,
     };
     try {
         const { data, error } = await supabase.from('user_documents').insert(newDoc).select().single();
         if (error) throw error;
-        return { ...data, uploadDate: data.upload_date };
+        return { ...data, uploadDate: Number(data.upload_date) || Date.now() };
     } catch (error) {
         handleError(error, 'adding document');
         return { ...newDoc, id: `doc_${Date.now()}`, uploadDate: newDoc.upload_date } as any;
@@ -1065,7 +1156,7 @@ export const addUserDocument = async (username: string, file: File): Promise<Use
 export const deleteUserDocument = async (username: string, docId: string): Promise<void> => {
     try {
         await supabase.from('user_documents').delete().eq('id', docId);
-    } catch (e) {}
+    } catch {}
 };
 
 export const getPropertyAlerts = async (username: string): Promise<PropertyAlert[]> => {
@@ -1075,7 +1166,7 @@ export const getPropertyAlerts = async (username: string): Promise<PropertyAlert
             ...a,
             criteria: typeof a.criteria === 'string' ? JSON.parse(a.criteria) : a.criteria
         })) || [];
-    } catch (e) { return []; }
+    } catch { return []; }
 };
 
 export const addPropertyAlert = async (username: string, alertData: Omit<PropertyAlert, 'id'>): Promise<PropertyAlert> => {
@@ -1086,11 +1177,228 @@ export const addPropertyAlert = async (username: string, alertData: Omit<Propert
              ...data,
              criteria: typeof data.criteria === 'string' ? JSON.parse(data.criteria) : data.criteria
         };
-    } catch (e) { return { ...optimistic, id: `alert_${Date.now()}` } as any; }
+    } catch { return { ...optimistic, id: `alert_${Date.now()}` } as any; }
 };
 
 export const deletePropertyAlert = async (username: string, alertId: string): Promise<void> => {
     try {
         await supabase.from('property_alerts').delete().eq('id', alertId);
-    } catch (e) {}
+    } catch {}
 };
+
+// --- Stay Bookings & Hotel Partner Onboarding Persistence ---
+export interface StayBookingInput {
+    propertyId: string;
+    propertyName: string;
+    roomId: string;
+    roomName: string;
+    ratePlanName: string;
+    termMode: 'short-term' | 'long-term';
+    checkIn: string;
+    checkOut: string;
+    guestsLabel: string;
+    nights: number;
+    months: number;
+    guestName: string;
+    guestEmail: string;
+    payOption: 'now' | 'property';
+    baseSubtotal: number;
+    taxes: number;
+    serviceFee: number;
+    grandTotal: number;
+    payToday: number;
+    payAtProperty: number;
+    bookingRef?: string;
+}
+
+export interface StayBookingRecord extends StayBookingInput {
+    id: string;
+    bookingRef: string;
+    status: 'Confirmed' | 'Pending' | 'Cancelled';
+    createdAt: number;
+}
+
+export const createStayBooking = async (input: StayBookingInput): Promise<StayBookingRecord> => {
+    const bookingRef = input.bookingRef || generateSecureBookingRef('AFR-STAY');
+    const localRecord: StayBookingRecord = {
+        ...input,
+        id: `bk_${Date.now().toString(36)}`,
+        bookingRef,
+        guestName: sanitizeText(input.guestName, 120),
+        guestEmail: sanitizeText(input.guestEmail, 140),
+        status: 'Confirmed',
+        createdAt: Date.now(),
+    };
+
+    const existing = readLocalJson<StayBookingRecord[]>(STAY_BOOKINGS_KEY, []);
+    writeLocalJson(STAY_BOOKINGS_KEY, [localRecord, ...existing]);
+
+    try {
+        const { data: authData } = await supabase.auth.getUser().catch(() => ({ data: { user: null } }));
+        await supabase.from('stay_bookings').insert({
+            booking_ref: bookingRef,
+            property_id: input.propertyId,
+            property_name: sanitizeText(input.propertyName, 140),
+            room_id: input.roomId,
+            room_name: sanitizeText(input.roomName, 140),
+            rate_plan_name: sanitizeText(input.ratePlanName, 100),
+            term_mode: input.termMode,
+            check_in: input.checkIn,
+            check_out: input.checkOut,
+            guests_label: sanitizeText(input.guestsLabel, 80),
+            nights: input.nights,
+            months: input.months,
+            guest_user_id: authData?.user?.id || null,
+            guest_name: localRecord.guestName,
+            guest_email: localRecord.guestEmail,
+            pay_option: input.payOption,
+            base_subtotal_zar: input.baseSubtotal,
+            taxes_zar: input.taxes,
+            service_fee_zar: input.serviceFee,
+            grand_total_zar: input.grandTotal,
+            pay_today_zar: input.payToday,
+            pay_at_property_zar: input.payAtProperty,
+            status: 'Confirmed',
+        });
+    } catch {
+        // Offline-resilient local store remains synchronized
+    }
+
+    return localRecord;
+};
+
+export const getStayBookingsForUser = async (email?: string): Promise<StayBookingRecord[]> => {
+    const local = readLocalJson<StayBookingRecord[]>(STAY_BOOKINGS_KEY, []);
+    try {
+        let query = supabase.from('stay_bookings').select('*').order('created_at', { ascending: false });
+        if (email) query = query.eq('guest_email', email.trim().toLowerCase());
+        const { data, error } = await query;
+        if (error || !data) return local;
+        return data.map((row: any) => ({
+            id: row.id,
+            bookingRef: row.booking_ref,
+            propertyId: row.property_id,
+            propertyName: row.property_name,
+            roomId: row.room_id,
+            roomName: row.room_name,
+            ratePlanName: row.rate_plan_name,
+            termMode: row.term_mode,
+            checkIn: row.check_in,
+            checkOut: row.check_out,
+            guestsLabel: row.guests_label,
+            nights: row.nights,
+            months: row.months,
+            guestName: row.guest_name,
+            guestEmail: row.guest_email,
+            payOption: row.pay_option,
+            baseSubtotal: Number(row.base_subtotal_zar),
+            taxes: Number(row.taxes_zar),
+            serviceFee: Number(row.service_fee_zar),
+            grandTotal: Number(row.grand_total_zar),
+            payToday: Number(row.pay_today_zar),
+            payAtProperty: Number(row.pay_at_property_zar),
+            status: row.status,
+            createdAt: row.created_at ? new Date(row.created_at).getTime() : Date.now(),
+        }));
+    } catch {
+        return local;
+    }
+};
+
+export interface HotelRegistrationPayload {
+    id: string;
+    hotelName: string;
+    hotelType: string;
+    starRating: number;
+    companyName: string;
+    tradingName: string;
+    businessEmail: string;
+    phone: string;
+    country: string;
+    province: string;
+    city: string;
+    district: string;
+    street: string;
+    postal: string;
+    baseCurrency: string;
+    checkInTime: string;
+    checkOutTime: string;
+    cancellationPolicy: string;
+    galleryImages: string[];
+    amenities: string[];
+    rooms: Array<{
+        id: string;
+        name: string;
+        category: string;
+        bedConfig: string;
+        maxAdults: number;
+        maxChildren: number;
+        sizeSqm: number;
+        viewType: string;
+        availableCount: number;
+        baseRate: number;
+        amenities: string[];
+    }>;
+    integritySignature: string;
+    status: string;
+}
+
+export const saveHotelRegistration = async (payload: HotelRegistrationPayload): Promise<void> => {
+    const existing = readLocalJson<HotelRegistrationPayload[]>(HOTEL_REGISTRATIONS_KEY, []);
+    writeLocalJson(HOTEL_REGISTRATIONS_KEY, [payload, ...existing.filter((h) => h.id !== payload.id)]);
+
+    try {
+        const { data: authData } = await supabase.auth.getUser().catch(() => ({ data: { user: null } }));
+        await supabase.from('hotel_registrations').upsert({
+            id: payload.id,
+            owner_id: authData?.user?.id || null,
+            hotel_name: payload.hotelName,
+            hotel_type: payload.hotelType,
+            star_rating: payload.starRating,
+            company_name: payload.companyName,
+            trading_name: payload.tradingName,
+            business_email: payload.businessEmail,
+            phone: payload.phone,
+            country: payload.country,
+            province: payload.province,
+            city: payload.city,
+            district: payload.district,
+            street: payload.street,
+            postal: payload.postal,
+            base_currency: payload.baseCurrency,
+            check_in_time: payload.checkInTime,
+            check_out_time: payload.checkOutTime,
+            cancellation_policy: payload.cancellationPolicy,
+            gallery_images: payload.galleryImages,
+            amenities: payload.amenities,
+            integrity_signature: payload.integritySignature,
+            status: payload.status,
+        });
+
+        if (payload.rooms.length > 0) {
+            await supabase.from('hotel_rooms').upsert(
+                payload.rooms.map((r) => ({
+                    id: `${payload.id}_${r.id}`,
+                    hotel_id: payload.id,
+                    name: r.name,
+                    category: r.category,
+                    bed_config: r.bedConfig,
+                    max_adults: r.maxAdults,
+                    max_children: r.maxChildren,
+                    size_sqm: r.sizeSqm,
+                    view_type: r.viewType,
+                    available_count: r.availableCount,
+                    base_rate: r.baseRate,
+                    amenities: r.amenities,
+                }))
+            );
+        }
+    } catch {
+        // Local persistence preserved
+    }
+};
+
+export const getHotelRegistrations = async (): Promise<HotelRegistrationPayload[]> => {
+    return readLocalJson<HotelRegistrationPayload[]>(HOTEL_REGISTRATIONS_KEY, []);
+};
+

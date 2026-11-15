@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { GoogleGenAI } from "../lib/ai";
 import { CpuChipIcon } from './icons/ActionIcons';
 import ReactMarkdown from 'react-markdown';
-import rehypeRaw from 'rehype-raw';
+import { isSafeExternalHref } from '../lib/security';
 
 interface CustomGroundingChunk {
   web?: {
@@ -29,7 +29,7 @@ const RealTimeNews: React.FC = () => {
           const ai = new GoogleGenAI();
           
           const response = await ai.models.generateContent({
-              model: "gemini-2.5-flash",
+              model: "gemini-4-hydrogen",
               contents: query,
               config: {
                  tools: [{googleSearch: {}}],
@@ -92,13 +92,13 @@ const RealTimeNews: React.FC = () => {
         {result && (
             <div className="max-w-3xl mx-auto bg-slate-50 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700 rounded-xl p-8 transform transition-all duration-500 opacity-0 animate-fade-in-up">
                 <div className="prose dark:prose-invert max-w-none">
-                    <ReactMarkdown rehypePlugins={[rehypeRaw]}>{result.text}</ReactMarkdown>
+                    <ReactMarkdown>{result.text}</ReactMarkdown>
                 </div>
                 {result.sources.length > 0 && (
                     <div className="mt-6 pt-4 border-t border-slate-200 dark:border-slate-700">
                         <h4 className="font-semibold text-sm text-slate-600 dark:text-slate-300 mb-2">Sources:</h4>
                         <ul className="list-decimal list-inside space-y-1">
-                            {result.sources.map((source, index) => source.web && (
+                            {result.sources.map((source, index) => source.web && isSafeExternalHref(source.web.uri) && (
                                 <li key={index} className="text-xs">
                                     <a href={source.web.uri} target="_blank" rel="noopener noreferrer" className="text-brand-primary hover:underline">
                                         {source.web.title || source.web.uri}

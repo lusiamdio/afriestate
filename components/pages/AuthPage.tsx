@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { sanitizeText } from '../../lib/security';
+import { createKycVerification } from '../../lib/kyc';
 import { GmailIcon, OutlookIcon } from '../icons/SocialIcons';
 import {
   EyeIcon,
@@ -428,20 +430,35 @@ const AuthPage: React.FC<AuthPageProps> = ({
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-
-    if (loginEmail === 'simao@neurogrowthlabs.co.za' && loginPassword === 'AfriEstate2@') {
-      if (onSuperAdminLogin) onSuperAdminLogin();
-      return;
-    }
-
     setSubmitting(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email: loginEmail,
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: loginEmail.trim().toLowerCase(),
         password: loginPassword,
       });
       if (error) throw error;
-      onLogin();
+
+      const user = data.user;
+      let dbRole = user?.app_metadata?.role;
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role, status')
+          .eq('id', user.id)
+          .maybeSingle();
+        if (profile?.status === 'Suspended') {
+          await supabase.auth.signOut();
+          setError('This account has been suspended by Platform Administration.');
+          return;
+        }
+        if (profile?.role) dbRole = profile.role;
+      }
+
+      if (dbRole === 'super_admin' && onSuperAdminLogin) {
+        onSuperAdminLogin();
+      } else {
+        onLogin();
+      }
     } catch (err: any) {
       if (err.message === 'Email not confirmed') {
         setError('Please verify your email address. Check your inbox for the confirmation link.');
@@ -496,6 +513,18 @@ const AuthPage: React.FC<AuthPageProps> = ({
     }
   };
 
+  const uploadKycDocument = async (userId: string, file: File, docKind: string): Promise<string | undefined> => {
+    try {
+      const safeName = sanitizeText(file.name, 80).replace(/[^a-zA-Z0-9._-]/g, '_');
+      const path = `${userId}/${docKind}_${Date.now()}_${safeName}`;
+      const { error: uploadErr } = await supabase.storage.from('kyc-documents').upload(path, file, { upsert: true });
+      if (uploadErr) return undefined;
+      return path;
+    } catch {
+      return undefined;
+    }
+  };
+
   const handleAgentSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -514,17 +543,19 @@ const AuthPage: React.FC<AuthPageProps> = ({
 
     setSubmitting(true);
     try {
+      const cleanedEmail = agentForm.email.trim().toLowerCase();
+      const cleanedName = sanitizeText(agentForm.fullName, 120);
       const { data, error } = await supabase.auth.signUp({
-        email: agentForm.email,
+        email: cleanedEmail,
         password: agentForm.password,
         options: {
           data: {
-            full_name: agentForm.fullName,
+            full_name: cleanedName,
             role: 'agent',
-            phone: agentForm.phone,
-            officeAddress: agentForm.officeAddress,
-            businessRegNumber: agentForm.businessRegNumber,
-            agentLicense: agentForm.agentLicense,
+            phone: sanitizeText(agentForm.phone, 40),
+            officeAddress: sanitizeText(agentForm.officeAddress, 200),
+            businessRegNumber: sanitizeText(agentForm.businessRegNumber, 80),
+            agentLicense: sanitizeText(agentForm.agentLicense, 80),
           },
         },
       });
@@ -532,6 +563,13 @@ const AuthPage: React.FC<AuthPageProps> = ({
       if (data.user && data.user.identities && data.user.identities.length === 0) {
         setError('This email is already in use. Please sign in instead.');
         return;
+      }
+      if (data.session && data.user) {
+        const docPath = await uploadKycDocument(data.user.id, agentIdDoc, 'agent_license_or_id');
+        await createKycVerification(
+          { id: data.user.id, username: cleanedEmail, role: 'agent' },
+          docPath ? `Agent License / ID (${docPath})` : 'Agent License / ID',
+        ).catch(() => undefined);
       }
       switchView('pendingVerificationAgent');
     } catch (err: any) {
@@ -564,16 +602,18 @@ const AuthPage: React.FC<AuthPageProps> = ({
 
     setSubmitting(true);
     try {
+      const cleanedEmail = investorForm.email.trim().toLowerCase();
+      const cleanedName = sanitizeText(investorForm.fullName, 120);
       const { data, error } = await supabase.auth.signUp({
-        email: investorForm.email,
+        email: cleanedEmail,
         password: investorForm.password,
         options: {
           data: {
-            full_name: investorForm.fullName,
+            full_name: cleanedName,
             role: 'investor',
-            phone: investorForm.phone,
-            investment_type: investorForm.investmentType,
-            company_name: investorForm.companyName,
+            phone: sanitizeText(investorForm.phone, 40),
+            investment_type: sanitizeText(investorForm.investmentType, 40),
+            company_name: sanitizeText(investorForm.companyName, 120),
           },
         },
       });
@@ -582,6 +622,13 @@ const AuthPage: React.FC<AuthPageProps> = ({
         setError('This email is already in use. Please sign in instead.');
         setInvestorStep(1);
         return;
+      }
+      if (data.session && data.user) {
+        const docPath = await uploadKycDocument(data.user.id, investorIdDoc, 'investor_proof_of_identity');
+        await createKycVerification(
+          { id: data.user.id, username: cleanedEmail, role: 'investor' },
+          docPath ? `Investor Identity (${docPath})` : 'Investor Identity',
+        ).catch(() => undefined);
       }
       switchView('pendingVerificationInvestor');
     } catch (err: any) {

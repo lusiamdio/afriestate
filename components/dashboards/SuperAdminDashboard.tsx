@@ -831,21 +831,26 @@ export default function SuperAdminDashboard({
   };
 
   const handleExportCountryCsv = () => {
+    const escapeCell = (val: unknown) => {
+      let str = val === null || val === undefined ? '' : String(val);
+      if (/^[=+\-@\t\r]/.test(str)) str = `'${str}`;
+      return `"${str.replace(/"/g, '""')}"`;
+    };
     const header = ['Code', 'Country', 'Region', 'Currency', 'Enabled', 'Listings', 'Verified', 'Gross Asset Value (ZAR)', 'Monthly Commission (ZAR)', 'VAT %', 'Est VAT (ZAR)'];
     const rows = countryMetrics.map((c) => [
-      c.code,
-      `"${c.name}"`,
-      `"${c.region}"`,
-      c.currency,
-      c.enabled ? 'Active' : 'Paused',
-      String(c.listingCount),
-      String(c.verifiedCount),
-      String(Math.round(c.grossAssetValue)),
-      String(c.monthlyCommissionZar),
-      String(c.vatRatePct),
-      String(c.estimatedVatZar),
+      escapeCell(c.code),
+      escapeCell(c.name),
+      escapeCell(c.region),
+      escapeCell(c.currency),
+      escapeCell(c.enabled ? 'Active' : 'Paused'),
+      escapeCell(c.listingCount),
+      escapeCell(c.verifiedCount),
+      escapeCell(Math.round(c.grossAssetValue)),
+      escapeCell(c.monthlyCommissionZar),
+      escapeCell(c.vatRatePct),
+      escapeCell(c.estimatedVatZar),
     ]);
-    const csv = [header.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const csv = [header.map(escapeCell).join(','), ...rows.map((r) => r.join(','))].join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -2884,14 +2889,14 @@ export default function SuperAdminDashboard({
                             ...draftSettings,
                             securityPolicies: {
                               ...draftSettings.securityPolicies,
-                              aiModel: e.target.value as 'gemini-2.5-flash' | 'gemini-2.5-pro',
+                              aiModel: e.target.value as 'gemini-4-hydrogen' | 'gemini-4-argon',
                             },
                           })
                         }
                         className="w-full px-3.5 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-semibold"
                       >
-                        <option value="gemini-2.5-flash">gemini-2.5-flash (Fast Marketplace)</option>
-                        <option value="gemini-2.5-pro">gemini-2.5-pro (Deep Valuation)</option>
+                        <option value="gemini-4-hydrogen">gemini-4-hydrogen (Fast Marketplace)</option>
+                        <option value="gemini-4-argon">gemini-4-argon (Deep Valuation)</option>
                       </select>
                     </div>
                   </div>

@@ -91,7 +91,7 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           let translatedJson: any;
           try {
               const response = await ai.models.generateContent({
-                  model: "gemini-2.5-flash",
+                  model: "gemini-4-hydrogen",
                   contents: prompt,
                   config: {
                       responseMimeType: 'application/json',
@@ -129,10 +129,8 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           setLanguageState(lang);
 
       } catch (error) {
-          console.error(`Failed to translate to ${lang}:`, error);
-          // Fallback to English if translation fails
+          console.warn(`Failed to translate to ${lang}, falling back to English.`, error);
           setLanguageState(Language.EN);
-          alert(`Sorry, we couldn't switch to that language. Please try again later.`);
       } finally {
           setIsTranslating(false);
       }

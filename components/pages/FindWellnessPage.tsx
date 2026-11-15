@@ -258,7 +258,7 @@ const FindWellnessPage: React.FC<FindWellnessPageProps> = ({ properties = [], on
     try {
       const ai = new GoogleGenAI();
       const res = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-4-hydrogen',
         contents: `Suggest a short wellness program title and 2-sentence bespoke retreat/practitioner match in South Africa for someone focused on: ${goalText}.`,
       });
       const text = res.text || '';

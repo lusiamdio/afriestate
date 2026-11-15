@@ -102,7 +102,7 @@ const DescriptionGenerator: React.FC = () => {
                 - Key Features: ${descInputs.beds} bed, ${descInputs.baths} bath, ${descInputs.area} sqm
                 - Top Amenities: ${descInputs.amenities}
                 - Neighborhood Highlights: ${descInputs.neighborhood}`;
-      const result = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt });
+      const result = await ai.models.generateContent({ model: 'gemini-4-hydrogen', contents: prompt });
       setGeneratedDesc(result.text || '');
     } catch {
       setGeneratedDesc(
@@ -185,7 +185,7 @@ const PricingRecommender: React.FC = () => {
                 - Size: ${priceInputs.beds} beds, ${priceInputs.baths} baths, ${priceInputs.area} sqm
                 - Condition: ${priceInputs.condition}`;
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-4-hydrogen',
         contents: prompt,
         config: { responseMimeType: 'application/json', responseSchema: pricingRecommenderSchema },
       });
@@ -358,7 +358,7 @@ const ContentAnalyzer: React.FC = () => {
         frames.forEach((frame) => contentParts.push({ inlineData: { mimeType: 'image/jpeg', data: frame } }));
       }
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-4-hydrogen',
         contents: [{ parts: contentParts }],
       });
       setAnalysis(response.text || '');

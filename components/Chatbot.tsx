@@ -35,7 +35,7 @@ const Chatbot: React.FC = () => {
     const [isOpen, setIsOpen] = useState(false);
     const { t } = useTranslations();
     const { settings } = useAdminState();
-    const activeAiModel = settings.securityPolicies?.aiModel || 'gemini-2.5-flash';
+    const activeAiModel = settings.securityPolicies?.aiModel || 'gemini-4-hydrogen';
     const [messages, setMessages] = useState<ChatbotMessage[]>([
         {
             sender: 'ai',
@@ -78,7 +78,15 @@ const Chatbot: React.FC = () => {
     }, [messages, isLoading]);
 
     const handleSendMessage = async () => {
-        if (!inputValue.trim() || isLoading || !chatRef.current) return;
+        if (!inputValue.trim() || isLoading) return;
+
+        if (!chatRef.current) {
+            const ai = new GoogleGenAI();
+            chatRef.current = ai.chats.create({
+                model: activeAiModel,
+                config: { systemInstruction },
+            });
+        }
 
         const userMessage: ChatbotMessage = { sender: 'user', text: inputValue };
         setMessages(prev => [...prev, userMessage]);

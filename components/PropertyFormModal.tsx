@@ -158,7 +158,7 @@ const PropertyFormModal: React.FC<PropertyFormModalProps> = ({ isOpen, onClose, 
                 Write only concise luxury copy under 120 words.
             `;
             const result = await ai.models.generateContent({
-                model: 'gemini-3-flash-preview',
+                model: 'gemini-4-hydrogen',
                 contents: prompt,
             });
             setProperty(prev => ({ ...prev, description: sanitizeText(result.text || '', 1500) }));
@@ -178,7 +178,7 @@ const PropertyFormModal: React.FC<PropertyFormModalProps> = ({ isOpen, onClose, 
         try {
             const ai = new GoogleGenAI();
             const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash-preview-tts',
+                model: 'gemini-3.8-flash-lite-tts',
                 contents: [{ parts: [{ text }] }],
                 config: {
                     responseModalities: [Modality.AUDIO],

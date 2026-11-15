@@ -12,8 +12,42 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const server = http.createServer(app);
 
+// Security headers for production hardening
+app.use((_req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(self), microphone=(self), geolocation=(self)');
+  next();
+});
+
+// Simple sliding-window per-IP rate limiter for AI proxy endpoints
+const apiRateBuckets = new Map<string, number[]>();
+const API_WINDOW_MS = 60_000;
+const API_MAX_REQUESTS = 90;
+
+app.use('/api/gemini', (req, res, next) => {
+  const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
+  const now = Date.now();
+  const timestamps = (apiRateBuckets.get(clientIp) || []).filter((ts) => now - ts < API_WINDOW_MS);
+  if (timestamps.length >= API_MAX_REQUESTS) {
+    return res.status(429).json({ error: 'Rate limit exceeded. Please wait a moment before retrying.' });
+  }
+  timestamps.push(now);
+  apiRateBuckets.set(clientIp, timestamps);
+  // Periodic pruning to avoid unbounded memory growth
+  if (apiRateBuckets.size > 5000) {
+    for (const [key, list] of apiRateBuckets.entries()) {
+      if (list.every((ts) => now - ts >= API_WINDOW_MS)) {
+        apiRateBuckets.delete(key);
+      }
+    }
+  }
+  next();
+});
+
 // Enable JSON parsing with large body support for image/video base64 frames
-app.use(express.json({ limit: '50mb' }));
+app.use(express.json({ limit: '25mb' }));
 
 // Initialize server-side Gemini client
 const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY || '';
@@ -30,23 +64,26 @@ const ai = new GoogleGenAI({
   },
 });
 
-// Model normalizer ensuring only active, supported models are called
+// Model normalizer ensuring only active, supported Gemini models are called
 function mapModel(modelName?: string): string {
-  if (!modelName) return 'gemini-2.5-flash';
+  if (!modelName) return 'gemini-4-hydrogen';
   const lower = modelName.toLowerCase();
-  if (lower.includes('live-translate')) return 'gemini-2.5-flash';
-  if (lower.includes('transcribe-live')) return 'gemini-2.5-flash';
-  if (lower.includes('live')) return 'gemini-2.5-flash';
-  if (lower.includes('tts')) return 'gemini-2.5-flash';
-  if (lower.includes('pro')) return 'gemini-2.5-pro';
-  if (lower.includes('imagen')) return 'imagen-3.0-generate-002';
-  return 'gemini-2.5-flash';
+  if (lower.includes('live')) return 'gemini-3.8-live';
+  if (lower.includes('tts')) return 'gemini-3.8-flash-lite-tts';
+  if (lower.includes('argon') || lower.includes('pro') || lower.includes('carbon')) return 'gemini-4-argon';
+  if (lower.includes('image') || lower.includes('banana') || lower.includes('imagen')) return 'gemini-nano-banana-2.1';
+  if (lower.includes('veo')) return 'veo-3.1-fast-generate-preview';
+  return 'gemini-4-hydrogen';
 }
 
 function sanitizeConfig(config: any = {}) {
+  if (!config || typeof config !== 'object') return {};
   const clean = { ...config };
-  if (clean.thinkingConfig?.thinkingBudget) {
+  if (clean.thinkingConfig?.thinkingBudget !== undefined) {
     delete clean.thinkingConfig.thinkingBudget;
+    if (Object.keys(clean.thinkingConfig).length === 0) {
+      delete clean.thinkingConfig;
+    }
   }
   return clean;
 }
@@ -54,7 +91,10 @@ function sanitizeConfig(config: any = {}) {
 // 1. Generate content (Text, Structured JSON, Multimodal analysis, Audio/TTS, Search Grounding)
 app.post('/api/gemini/generate', async (req, res) => {
   try {
-    const { model, contents, config } = req.body;
+    const { model, contents, config } = req.body || {};
+    if (!contents) {
+      return res.status(400).json({ error: 'Missing contents payload' });
+    }
     const targetModel = mapModel(model);
     const sanitizedConfig = sanitizeConfig(config);
 
@@ -78,7 +118,10 @@ app.post('/api/gemini/generate', async (req, res) => {
 // 2. Chat Streaming (SSE)
 app.post('/api/gemini/chat-stream', async (req, res) => {
   try {
-    const { model, message, history, systemInstruction, config } = req.body;
+    const { model, message, history, systemInstruction, config } = req.body || {};
+    if (typeof message !== 'string' || !message.trim()) {
+      return res.status(400).json({ error: 'Message text is required' });
+    }
     const targetModel = mapModel(model);
 
     res.setHeader('Content-Type', 'text/event-stream');
@@ -90,16 +133,16 @@ app.post('/api/gemini/chat-stream', async (req, res) => {
     if (Array.isArray(history) && history.length > 0) {
       const parts: any[] = [];
       if (systemInstruction) {
-        parts.push({ text: `System Instruction:\n${systemInstruction}\n\n` });
+        parts.push({ text: `System Instruction:\n${String(systemInstruction)}\n\n` });
       }
-      for (const h of history) {
-        parts.push({ text: `${h.role === 'user' ? 'User' : 'Assistant'}: ${h.text || h.content}` });
+      for (const h of history.slice(-20)) {
+        parts.push({ text: `${h.role === 'user' ? 'User' : 'Assistant'}: ${String(h.text || h.content || '')}` });
       }
       parts.push({ text: `User: ${message}` });
       contents = [{ parts }];
     } else if (systemInstruction) {
       contents = [
-        { parts: [{ text: `System Instruction:\n${systemInstruction}\n\nUser: ${message}` }] }
+        { parts: [{ text: `System Instruction:\n${String(systemInstruction)}\n\nUser: ${message}` }] },
       ];
     } else {
       contents = message;
@@ -112,24 +155,34 @@ app.post('/api/gemini/chat-stream', async (req, res) => {
     });
 
     for await (const chunk of responseStream) {
+      if (res.writableEnded) break;
       const text = chunk.text || '';
       res.write(`data: ${JSON.stringify({ text })}\n\n`);
     }
 
-    res.write('data: [DONE]\n\n');
-    res.end();
+    if (!res.writableEnded) {
+      res.write('data: [DONE]\n\n');
+      res.end();
+    }
   } catch (error: any) {
     console.error('[API /api/gemini/chat-stream error]:', error);
-    res.write(`data: ${JSON.stringify({ error: error.message || 'Streaming failed' })}\n\n`);
-    res.end();
+    if (!res.headersSent) {
+      res.status(502).json({ error: error?.message || 'Streaming failed' });
+    } else if (!res.writableEnded) {
+      res.write(`data: ${JSON.stringify({ error: error?.message || 'Streaming failed' })}\n\n`);
+      res.end();
+    }
   }
 });
 
 // 3. Image Generation
 app.post('/api/gemini/generate-images', async (req, res) => {
   try {
-    const { prompt, model, config } = req.body;
-    const targetModel = model || 'imagen-3.0-generate-002';
+    const { prompt, model, config } = req.body || {};
+    if (typeof prompt !== 'string' || !prompt.trim()) {
+      return res.status(400).json({ error: 'Prompt is required' });
+    }
+    const targetModel = mapModel(model || 'gemini-nano-banana-2.1');
     const response = await ai.models.generateImages({
       model: targetModel,
       prompt,
@@ -138,14 +191,17 @@ app.post('/api/gemini/generate-images', async (req, res) => {
     res.json(response);
   } catch (error: any) {
     console.error('[API /api/gemini/generate-images error]:', error);
-    res.status(500).json({ error: error.message || 'Image generation failed' });
+    res.status(500).json({ error: error?.message || 'Image generation failed' });
   }
 });
 
 // 4. Video Generation & Operations
 app.post('/api/gemini/generate-videos', async (req, res) => {
   try {
-    const { prompt, model, config } = req.body;
+    const { prompt, model, config } = req.body || {};
+    if (typeof prompt !== 'string' || !prompt.trim()) {
+      return res.status(400).json({ error: 'Prompt is required' });
+    }
     const targetModel = model || 'veo-3.1-fast-generate-preview';
     const operation = await ai.models.generateVideos({
       model: targetModel,
@@ -155,30 +211,57 @@ app.post('/api/gemini/generate-videos', async (req, res) => {
     res.json(operation);
   } catch (error: any) {
     console.error('[API /api/gemini/generate-videos error]:', error);
-    res.status(500).json({ error: error.message || 'Video generation failed' });
+    res.status(500).json({ error: error?.message || 'Video generation failed' });
   }
 });
 
 app.post('/api/gemini/get-videos-operation', async (req, res) => {
   try {
-    const { operation } = req.body;
+    const { operation } = req.body || {};
+    if (!operation) {
+      return res.status(400).json({ error: 'Missing operation payload' });
+    }
     const updatedOperation = await ai.operations.getVideosOperation({ operation });
     res.json(updatedOperation);
   } catch (error: any) {
     console.error('[API /api/gemini/get-videos-operation error]:', error);
-    res.status(500).json({ error: error.message || 'Failed to poll video operation' });
+    res.status(500).json({ error: error?.message || 'Failed to poll video operation' });
   }
 });
 
-// 5. Video Secure Proxy (avoids leaking API key to client)
+// 5. Video Secure Proxy (strict Google APIs host allowlist prevents SSRF & key exfiltration)
 app.get('/api/gemini/video-proxy', async (req, res) => {
   try {
     const { uri } = req.query;
     if (!uri || typeof uri !== 'string') {
       return res.status(400).send('Missing uri query parameter');
     }
-    const fetchUrl = `${uri}&key=${apiKey}`;
-    const videoRes = await fetch(fetchUrl);
+
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(uri);
+    } catch {
+      return res.status(400).send('Invalid URI');
+    }
+
+    const isAllowedHost =
+      parsedUrl.protocol === 'https:' &&
+      (parsedUrl.hostname === 'generativelanguage.googleapis.com' ||
+        parsedUrl.hostname.endsWith('.googleapis.com'));
+
+    if (!isAllowedHost) {
+      return res.status(403).send('Disallowed video proxy target host');
+    }
+
+    const videoRes = await fetch(parsedUrl.toString(), {
+      headers: {
+        'x-goog-api-key': apiKey,
+        'User-Agent': 'aistudio-build',
+      },
+    });
+    if (!videoRes.ok) {
+      return res.status(videoRes.status).send('Upstream video fetch failed');
+    }
     const contentType = videoRes.headers.get('content-type') || 'video/mp4';
     res.setHeader('Content-Type', contentType);
     const buffer = await videoRes.arrayBuffer();

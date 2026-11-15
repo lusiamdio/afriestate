@@ -450,7 +450,7 @@ const TaxLegalHub: React.FC = () => {
       const ai = new GoogleGenAI();
       const prompt = `Generate a concise tax and legal brief for foreign real estate investors in ${country}. Provide JSON with arrays for tax_benefits, legal_restrictions, and common ownership_structures (max 3 concise points each).`;
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-4-hydrogen',
         contents: prompt,
         config: { responseMimeType: 'application/json', responseSchema: taxLegalSchema },
       });

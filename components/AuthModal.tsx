@@ -129,21 +129,34 @@ const LoginView: React.FC<{onLoginSuccess: () => void, onSwitchToSignup: () => v
         e.preventDefault();
         setError('');
 
-        if (email === 'simao@neurogrowthlabs.co.za' && password === 'AfriEstate2@') {
-            if (onSuperAdminLogin) onSuperAdminLogin();
-            return;
-        }
-
         try {
             const { data, error } = await supabase.auth.signInWithPassword({
-                email,
+                email: email.trim().toLowerCase(),
                 password,
             });
             if (error) throw error;
-            onLoginSuccess();
-            // The onAuthStateChange event in App.tsx will handle updating the user context
+
+            let dbRole = data.user?.app_metadata?.role;
+            if (data.user) {
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('role, status')
+                    .eq('id', data.user.id)
+                    .maybeSingle();
+                if (profile?.status === 'Suspended') {
+                    await supabase.auth.signOut();
+                    setError('This account has been suspended by Platform Administration.');
+                    return;
+                }
+                if (profile?.role) dbRole = profile.role;
+            }
+
+            if (dbRole === 'super_admin' && onSuperAdminLogin) {
+                onSuperAdminLogin();
+            } else {
+                onLoginSuccess();
+            }
         } catch (error: any) {
-            console.error("Supabase Email Login Error", error);
             if (error.message === "Email not confirmed") {
                 setError("Please verify your email address. Check your inbox for the confirmation link.");
             } else if (error.message === "Invalid login credentials") {

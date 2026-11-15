@@ -21,6 +21,13 @@ export enum Modality {
   VIDEO = "VIDEO",
 }
 
+export enum ThinkingLevel {
+  MINIMAL = "MINIMAL",
+  LOW = "LOW",
+  MEDIUM = "MEDIUM",
+  HIGH = "HIGH",
+}
+
 export interface Blob {
   data: string;
   mimeType: string;

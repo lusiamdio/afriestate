@@ -193,7 +193,7 @@ const KnowledgeBase: React.FC = () => {
     try {
       const ai = new GoogleGenAI();
       const prompt = `Write a concise, actionable real estate agent playbook note on: "${aiTopic}".`;
-      const result = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt });
+      const result = await ai.models.generateContent({ model: 'gemini-4-hydrogen', contents: prompt });
       setGeneratedArticle({ title: `Playbook: ${aiTopic}`, content: result.text || '' });
     } catch {
       setGeneratedArticle({

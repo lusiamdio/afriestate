@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import type { Review } from '../types';
 import { CloseIcon } from './icons/NavIcons';
 import { StarIcon } from './icons/ActionIcons';
+import { useToast } from '../contexts/ToastContext';
 
 interface AgentReviewModalProps {
   isOpen: boolean;
@@ -12,6 +13,7 @@ interface AgentReviewModalProps {
 }
 
 const AgentReviewModal: React.FC<AgentReviewModalProps> = ({ isOpen, onClose, agentName, onSubmit }) => {
+    const { addToast } = useToast();
     const [rating, setRating] = useState(0);
     const [hoverRating, setHoverRating] = useState(0);
     const [comment, setComment] = useState('');
@@ -19,7 +21,7 @@ const AgentReviewModal: React.FC<AgentReviewModalProps> = ({ isOpen, onClose, ag
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (rating === 0) {
-            alert("Please select a star rating.");
+            addToast("Please select a star rating.", "error");
             return;
         }
         onSubmit({ rating, comment });

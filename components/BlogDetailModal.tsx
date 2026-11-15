@@ -4,9 +4,9 @@ import type { BlogPost } from '../types';
 import { CloseIcon } from './icons/NavIcons';
 import { EnvelopeIcon, SpeakerWaveIcon, PauseIcon } from './icons/ActionIcons';
 import ReactMarkdown from 'react-markdown';
-import rehypeRaw from 'rehype-raw';
 import { GoogleGenAI, Modality } from '../lib/ai';
 import { decode, decodeAudioData } from '../lib/audioUtils';
+import { useToast } from '../contexts/ToastContext';
 
 interface BlogDetailModalProps {
   isOpen: boolean;
@@ -16,6 +16,7 @@ interface BlogDetailModalProps {
 }
 
 const BlogDetailModal: React.FC<BlogDetailModalProps> = ({ isOpen, onClose, post, onContactClick }) => {
+  const { addToast } = useToast();
   const [speechState, setSpeechState] = useState<'stopped' | 'loading' | 'playing'>('stopped');
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);
@@ -58,7 +59,7 @@ const BlogDetailModal: React.FC<BlogDetailModalProps> = ({ isOpen, onClose, post
         const textToSpeak = `${post.title}. By ${post.author}. ${cleanContent}`;
         
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash-preview-tts',
+            model: 'gemini-3.8-flash-lite-tts',
             contents: [{ parts: [{ text: textToSpeak }] }],
             config: {
                 responseModalities: [Modality.AUDIO],
@@ -86,7 +87,7 @@ const BlogDetailModal: React.FC<BlogDetailModalProps> = ({ isOpen, onClose, post
         }
     } catch (e) {
         console.error("TTS Error:", e);
-        alert("Sorry, text-to-speech is currently unavailable.");
+        addToast("Sorry, text-to-speech is currently unavailable.", "error");
         setSpeechState('stopped');
     }
   };
@@ -124,7 +125,7 @@ const BlogDetailModal: React.FC<BlogDetailModalProps> = ({ isOpen, onClose, post
                 </div>
             </div>
             <div className="p-8 prose dark:prose-invert max-w-none">
-                <ReactMarkdown rehypePlugins={[rehypeRaw]}>
+                <ReactMarkdown>
                     {post.content}
                 </ReactMarkdown>
             </div>

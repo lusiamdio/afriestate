@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { GoogleGenAI, Type } from '../lib/ai';
+import { GoogleGenAI, ThinkingLevel, Type } from '../lib/ai';
 import { TrendingUpIcon } from './icons/NavIcons';
 import { MagnifyingGlassIcon, ArrowTopRightOnSquareIcon } from '@heroicons/react/24/outline';
 import ReactMarkdown from 'react-markdown';
-import rehypeRaw from 'rehype-raw';
 import { useTranslations } from '../contexts/LanguageContext';
+import { isSafeExternalHref } from '../lib/security';
 
 interface CustomGroundingChunk {
   web?: {
@@ -143,13 +143,13 @@ const MarketInsights: React.FC = () => {
       const ai = new GoogleGenAI();
       const prompt = `Generate a concise real estate market insights report for ${queryCity}. Focus on current residential and investment trends, power/water resilience premiums, and buyer demand. Provide a market summary, 3 key bullet-point trends, and a brief investment outlook.`;
 
-      const model = isDeepAnalysis ? 'gemini-2.5-pro' : 'gemini-2.5-flash';
+      const model = isDeepAnalysis ? 'gemini-4-argon' : 'gemini-4-hydrogen';
       const config: any = {
         responseMimeType: 'application/json',
         responseSchema,
       };
       if (isDeepAnalysis) {
-        config.thinkingConfig = { thinkingBudget: 8192 };
+        config.thinkingConfig = { thinkingLevel: ThinkingLevel.HIGH };
       }
 
       const response = await ai.models.generateContent({
@@ -179,7 +179,7 @@ const MarketInsights: React.FC = () => {
     try {
       const ai = new GoogleGenAI();
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-4-hydrogen',
         contents: q,
         config: {
           tools: [{ googleSearch: {} }],
@@ -473,7 +473,7 @@ const MarketInsights: React.FC = () => {
                   </span>
                 </div>
                 <div className="prose prose-sm dark:prose-invert max-w-none text-slate-700 dark:text-slate-300">
-                  <ReactMarkdown rehypePlugins={[rehypeRaw]}>{newsResult.text}</ReactMarkdown>
+                  <ReactMarkdown>{newsResult.text}</ReactMarkdown>
                 </div>
                 {newsResult.sources.length > 0 && (
                   <div className="mt-6 pt-4">
@@ -483,16 +483,16 @@ const MarketInsights: React.FC = () => {
                     <ul className="space-y-1.5">
                       {newsResult.sources.map(
                         (source, idx) =>
-                          source.web && (
+                          source.web && isSafeExternalHref(source.web.uri) && (
                             <li key={idx} className="text-xs">
                               <a
                                 href={source.web.uri}
-                                target={source.web.uri?.startsWith('http') ? '_blank' : undefined}
-                                rel={source.web.uri?.startsWith('http') ? 'noopener noreferrer' : undefined}
+                                target="_blank"
+                                rel="noopener noreferrer"
                                 className="inline-flex items-center gap-1.5 text-emerald-700 dark:text-amber-300 hover:underline"
                               >
                                 <span>{source.web.title || source.web.uri}</span>
-                                {source.web.uri?.startsWith('http') && <ArrowTopRightOnSquareIcon className="w-3.5 h-3.5" />}
+                                <ArrowTopRightOnSquareIcon className="w-3.5 h-3.5" />
                               </a>
                             </li>
                           )

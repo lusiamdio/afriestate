@@ -5,6 +5,7 @@ import { CloseIcon, GlobeAltIcon } from './icons/NavIcons';
 import { LocationPinIcon } from './icons/NavIcons';
 import { EnvelopeIcon, PhoneIcon } from './icons/ActionIcons';
 import { useTranslations } from '../contexts/LanguageContext';
+import { useToast } from '../contexts/ToastContext';
 
 interface ContactModalProps {
   isOpen: boolean;
@@ -26,11 +27,12 @@ const ContactInfoItem: React.FC<{ icon: React.ElementType, title: string, childr
 
 const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) => {
   const { t } = useTranslations();
+  const { addToast } = useToast();
   if (!isOpen) return null;
   
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    alert('Thank you for your message! We will get back to you shortly.');
+    addToast('Thank you for your message! We will get back to you shortly.', 'success');
     onClose();
   };
 

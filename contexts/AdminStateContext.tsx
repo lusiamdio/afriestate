@@ -45,7 +45,7 @@ export interface SecurityPoliciesConfig {
   strictTitleDeedVerification: boolean;
   sessionTimeoutMinutes: number;
   autoThrottleCooldownSeconds: number;
-  aiModel: 'gemini-2.5-flash' | 'gemini-2.5-pro';
+  aiModel: 'gemini-4-hydrogen' | 'gemini-4-argon';
 }
 
 export interface AnnouncementBannerConfig {
@@ -173,7 +173,7 @@ export const DEFAULT_PLATFORM_SETTINGS: PlatformSettings = {
     strictTitleDeedVerification: true,
     sessionTimeoutMinutes: 15,
     autoThrottleCooldownSeconds: 15,
-    aiModel: 'gemini-2.5-flash',
+    aiModel: 'gemini-4-hydrogen',
   },
   updatedAt: Date.now(),
 };
@@ -449,6 +449,11 @@ function loadInitialGovernanceState(): PlatformGovernanceState {
         securityPolicies: {
           ...DEFAULT_PLATFORM_SETTINGS.securityPolicies,
           ...(parsed.settings?.securityPolicies || {}),
+          aiModel:
+            parsed.settings?.securityPolicies?.aiModel === 'gemini-4-argon' ||
+            (parsed.settings?.securityPolicies?.aiModel as string) === 'gemini-2.5-pro'
+              ? 'gemini-4-argon'
+              : 'gemini-4-hydrogen',
         },
       },
       roleControls: {
@@ -520,9 +525,62 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     } catch {
       // Ignore storage quota errors
     }
+    // Best-effort sync to Supabase platform_governance table when Super Admin session is active
+    Promise.resolve(
+      supabase.from('platform_governance').upsert({
+        id: 'global',
+        settings: next.settings,
+        role_controls: next.roleControls,
+        country_configs: next.countryConfigs,
+        user_overrides: next.userOverrides,
+        listing_overrides: next.listingOverrides,
+        updated_at: new Date().toISOString(),
+      })
+    ).catch(() => {
+      // Non-blocking in demo/offline or non-admin contexts
+    });
   }, []);
 
   useEffect(() => {
+    let active = true;
+    // Hydrate persisted platform governance from Supabase if available
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from('platform_governance')
+          .select('settings, role_controls, country_configs, user_overrides, listing_overrides')
+          .eq('id', 'global')
+          .maybeSingle();
+        if (!active || !data) return;
+        setGovernance((prev) => ({
+          ...prev,
+          settings: data.settings
+            ? {
+                ...DEFAULT_PLATFORM_SETTINGS,
+                ...data.settings,
+                securityPolicies: {
+                  ...DEFAULT_PLATFORM_SETTINGS.securityPolicies,
+                  ...(data.settings.securityPolicies || {}),
+                  aiModel:
+                    data.settings.securityPolicies?.aiModel === 'gemini-4-argon'
+                      ? 'gemini-4-argon'
+                      : 'gemini-4-hydrogen',
+                },
+              }
+            : prev.settings,
+          roleControls: data.role_controls ? { ...DEFAULT_ROLE_CONTROLS, ...data.role_controls } : prev.roleControls,
+          countryConfigs:
+            Array.isArray(data.country_configs) && data.country_configs.length > 0
+              ? data.country_configs
+              : prev.countryConfigs,
+          userOverrides: data.user_overrides || prev.userOverrides,
+          listingOverrides: data.listing_overrides || prev.listingOverrides,
+        }));
+      } catch {
+        // Offline / table not provisioned yet
+      }
+    })();
+
     const channel = supabase.channel('admin-state-broadcast', {
       config: {
         broadcast: { self: true },

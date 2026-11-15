@@ -14,7 +14,6 @@ import {
   SparklesIcon,
   BookmarkIcon,
   CalculatorIcon,
-  VideoCameraIcon,
   EyeIcon,
   StarIcon,
   EnvelopeIcon,
@@ -63,49 +62,46 @@ const ShareMenu: React.FC<ShareMenuProps> = ({ propertyTitle, propertyUrl }) => 
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleSocialClick = (e: React.MouseEvent, url: string) => {
-    e.stopPropagation();
-    if (url.startsWith('mailto:')) {
-      window.location.href = url;
-      return;
-    }
-    window.open(url, '_blank', 'noopener,noreferrer');
-  };
-
   return (
     <div className="absolute top-full right-0 mt-2 w-48 bg-white dark:bg-slate-900 rounded-xl shadow-2xl py-2 z-30">
-      <button
-        type="button"
-        onClick={(e) => handleSocialClick(e, socialLinks.whatsapp)}
+      <a
+        href={socialLinks.whatsapp}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={(e) => e.stopPropagation()}
         className="w-full text-left px-4 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-3"
       >
         <WhatsAppIcon className="w-4 h-4 text-emerald-500" />
         <span>WhatsApp</span>
-      </button>
-      <button
-        type="button"
-        onClick={(e) => handleSocialClick(e, socialLinks.email)}
+      </a>
+      <a
+        href={socialLinks.email}
+        onClick={(e) => e.stopPropagation()}
         className="w-full text-left px-4 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-3"
       >
         <EnvelopeIcon className="w-4 h-4 text-amber-500" />
         <span>Email</span>
-      </button>
-      <button
-        type="button"
-        onClick={(e) => handleSocialClick(e, socialLinks.facebook)}
+      </a>
+      <a
+        href={socialLinks.facebook}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={(e) => e.stopPropagation()}
         className="w-full text-left px-4 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-3"
       >
         <FacebookIcon className="w-4 h-4 text-blue-600" />
         <span>Facebook</span>
-      </button>
-      <button
-        type="button"
-        onClick={(e) => handleSocialClick(e, socialLinks.twitter)}
+      </a>
+      <a
+        href={socialLinks.twitter}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={(e) => e.stopPropagation()}
         className="w-full text-left px-4 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-3"
       >
         <TwitterIcon className="w-4 h-4 text-slate-700 dark:text-slate-300" />
         <span>X (Twitter)</span>
-      </button>
+      </a>
       <div className="h-px bg-slate-100 dark:bg-slate-800 my-1" />
       <button
         type="button"
@@ -140,7 +136,6 @@ interface PropertyDetailPageProps {
   onToggleCompare: (property: Property) => void;
   onOpenCalculator: (property: Property) => void;
   onOpenTourModal: (property: Property) => void;
-  onOpenAgentContact: (mode: 'chat' | 'video', agentName: string) => void;
   onOpenVRTour: (url: string) => void;
   onMessageAgent: (property: Property) => void;
   onLeaveReview: (agent: Property['agent']) => void;
@@ -168,7 +163,6 @@ const PropertyDetailPage: React.FC<PropertyDetailPageProps> = ({
   onToggleCompare,
   onOpenCalculator,
   onOpenTourModal,
-  onOpenAgentContact,
   onOpenVRTour,
   onMessageAgent,
   onLeaveReview,
@@ -234,7 +228,7 @@ Infrastructure: Solar=${property.hasSolar}, Generator=${property.hasGenerator}, 
 Provide estimated_value, confidence, and concise rationale.`;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-4-hydrogen',
         contents: prompt,
       });
 
@@ -1060,22 +1054,14 @@ Provide estimated_value, confidence, and concise rationale.`;
                 )}
               </div>
 
-              <div className="pt-4 grid grid-cols-2 gap-2.5">
+              <div className="pt-4">
                 <button
                   type="button"
-                  onClick={() => onOpenAgentContact('chat', property.agent.name)}
-                  className="py-2.5 px-3 rounded-xl bg-[#081713] hover:bg-slate-900 text-xs font-semibold text-slate-200 flex items-center justify-center gap-1.5 transition-colors"
+                  onClick={() => onMessageAgent(property)}
+                  className="w-full py-3 px-4 rounded-xl bg-[#081713] hover:bg-slate-900 text-xs font-semibold text-slate-100 flex items-center justify-center gap-2 transition-colors border border-white/10"
                 >
                   <ChatBubbleLeftRightIcon className="w-4 h-4 text-emerald-300" />
-                  <span>Live Chat</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onOpenAgentContact('video', property.agent.name)}
-                  className="py-2.5 px-3 rounded-xl bg-[#081713] hover:bg-slate-900 text-xs font-semibold text-slate-200 flex items-center justify-center gap-1.5 transition-colors"
-                >
-                  <VideoCameraIcon className="w-4 h-4 text-amber-300" />
-                  <span>Video Call</span>
+                  <span>Message Now</span>
                 </button>
               </div>
             </div>

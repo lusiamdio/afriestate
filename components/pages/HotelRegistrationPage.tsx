@@ -29,7 +29,7 @@ import {
 import { CheckBadgeIcon, StarIcon } from '@heroicons/react/24/solid';
 import { ListingType, PropertyStatus, PropertyType, type Property } from '../../types';
 import { FLAGSHIP_AFRICAN_GRAND_HOTEL, type StayPropertyProfile } from '../../data/stayDetailData';
-import { publishHotelListing } from '../../lib/data';
+import { publishHotelListing, saveHotelRegistration } from '../../lib/data';
 import { generateListingSignature, sanitizeText } from '../../lib/security';
 
 interface HotelRegistrationPageProps {
@@ -866,10 +866,12 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({
   const handleVerifyCodes = () => {
     const emailCode = emailOtp.join('').trim();
     const phoneCodeVal = phoneOtp.join('').trim();
-    if (emailCode.length < 6 || phoneCodeVal.length < 6) {
+    const isEmailValid = /^\d{6}$/.test(emailCode);
+    const isPhoneValid = /^\d{6}$/.test(phoneCodeVal);
+    if (!isEmailValid || !isPhoneValid) {
       const errs = [
-        ...(emailCode.length < 6 ? ['Enter the 6-digit Email verification code.'] : []),
-        ...(phoneCodeVal.length < 6 ? ['Enter the 6-digit Phone verification code.'] : []),
+        ...(!isEmailValid ? ['Enter a valid 6-digit numeric Email verification code.'] : []),
+        ...(!isPhoneValid ? ['Enter a valid 6-digit numeric Phone verification code.'] : []),
       ];
       setStageErrors(errs);
       addToast(errs[0], 'error');
@@ -956,6 +958,34 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({
     const parsedStars = Math.min(5, Math.max(3, parseInt(starRating, 10) || 5));
     const sig = generateListingSignature(hotelId, businessEmail || cleanName, lowestRate);
 
+    const heroUrls = galleryImages.length > 0 ? galleryImages : ['/images/coastal_mansion_1779978805301.png', '/images/loft_interior_1779978697203.png'];
+    const primaryImage = heroUrls[0];
+
+    const mapToStayCategory = (
+      cat: string
+    ): StayPropertyProfile['heroImages'][number]['category'] => {
+      switch (cat) {
+        case 'Rooms':
+          return 'Rooms';
+        case 'Suites':
+          return 'Suites';
+        case 'Pool':
+          return 'Pool';
+        case 'Restaurant':
+        case 'Dining':
+          return 'Dining';
+        case 'Spa':
+          return 'Spa';
+        case 'Views':
+          return 'Views';
+        case 'Conference Rooms':
+        case 'Amenities':
+          return 'Amenities';
+        default:
+          return 'Exterior';
+      }
+    };
+
     const stayProfile: StayPropertyProfile = {
       ...FLAGSHIP_AFRICAN_GRAND_HOTEL,
       id: hotelId,
@@ -978,16 +1008,15 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({
       overviewExtended:
         sanitizeText(fullDesc || shortDesc, 900) ||
         `${cleanName} welcomes travelers and corporate guests to ${cleanCity}, ${cleanCountry}.`,
-      heroImages: [
-        {
-          url: '/images/coastal_mansion_1779978805301.png',
-          category: 'Exterior',
-          caption: `${cleanName} · Flagship Exterior`,
-          specs: `${roomTypes.length} Room Categories · Verified Partner`,
-          aiTags: ['Verified Partner', cleanCity],
-        },
-        ...FLAGSHIP_AFRICAN_GRAND_HOTEL.heroImages.slice(1),
-      ],
+      heroImages: heroUrls.map((url, idx) => ({
+        url,
+        category: mapToStayCategory(
+          selectedGalleryCats[idx % Math.max(1, selectedGalleryCats.length)] || 'Exterior'
+        ),
+        caption: `${cleanName} · ${idx === 0 ? 'Flagship Exterior' : `Gallery View ${idx + 1}`}`,
+        specs: `${roomTypes.length} Room Categories · Verified Partner`,
+        aiTags: ['Verified Partner', cleanCity],
+      })),
       specs: {
         ...FLAGSHIP_AFRICAN_GRAND_HOTEL.specs,
         rooms: roomTypes.reduce((sum, r) => sum + (Number(r.availableCount) || 10), 0),
@@ -1020,7 +1049,7 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({
       description: stayProfile.overviewShort,
       neighborhoodInfo: `${stayProfile.locationLabel} · ${roomTypes.length} Verified Room Categories`,
       amenities: selectedAmenities.length > 0 ? selectedAmenities.slice(0, 8) : ['Solar Backup', 'High-Speed Fibre', '24/7 Reception'],
-      images: ['/images/coastal_mansion_1779978805301.png', '/images/loft_interior_1779978697203.png'],
+      images: heroUrls.slice(0, 6),
       agent: {
         name: sanitizeText(companyName || cleanName, 80),
         phone: sanitizeText(`${phoneCode} ${phoneNumber}`, 30),
@@ -1044,6 +1073,44 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({
         surveyVerified: true,
       },
     };
+
+    await saveHotelRegistration({
+      id: hotelId,
+      hotelName: cleanName,
+      hotelType: sanitizeText(hotelType, 40),
+      starRating: parsedStars,
+      companyName: sanitizeText(companyName, 120),
+      tradingName: sanitizeText(tradingName || cleanName, 120),
+      businessEmail: sanitizeText(businessEmail, 120),
+      phone: sanitizeText(`${phoneCode} ${phoneNumber}`, 40),
+      country: cleanCountry,
+      province: sanitizeText(hotelProvince, 80),
+      city: cleanCity,
+      district: sanitizeText(hotelDistrict, 80),
+      street: sanitizeText(hotelStreet, 140),
+      postal: sanitizeText(hotelPostal, 20),
+      baseCurrency: baseCurrency || 'ZAR',
+      checkInTime,
+      checkOutTime,
+      cancellationPolicy,
+      galleryImages: [primaryImage, ...heroUrls.slice(1)],
+      amenities: selectedAmenities,
+      rooms: roomTypes.map((r) => ({
+        id: r.id,
+        name: r.name,
+        category: r.category,
+        bedConfig: r.bedConfig,
+        maxAdults: r.maxAdults,
+        maxChildren: r.maxChildren,
+        sizeSqm: r.sizeSqm,
+        viewType: r.viewType,
+        availableCount: r.availableCount,
+        baseRate: r.baseRate,
+        amenities: r.amenities,
+      })),
+      integritySignature: sig,
+      status: 'active',
+    });
 
     const published = await publishHotelListing(stayProfile, propertyRecord);
     onPublishHotel?.(stayProfile, published);

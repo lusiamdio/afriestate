@@ -5,6 +5,7 @@ import { CloseIcon } from './icons/NavIcons';
 import { useCurrency } from '../contexts/CurrencyContext';
 import { DocumentTextIcon, ChartBarIcon } from './icons/ActionIcons';
 import { BriefcaseIcon } from './icons/InvestorDashboardIcons';
+import { useToast } from '../contexts/ToastContext';
 
 interface DealWithProperty {
     id: string;
@@ -23,6 +24,7 @@ interface CoInvestmentDealModalProps {
 
 const CoInvestmentDealModal: React.FC<CoInvestmentDealModalProps> = ({ isOpen, onClose, deal }) => {
     const { formatCurrency } = useCurrency();
+    const { addToast } = useToast();
     const [activeTab, setActiveTab] = useState<'financials' | 'structure' | 'documents'>('financials');
 
     if (!isOpen) return null;
@@ -117,7 +119,7 @@ const CoInvestmentDealModal: React.FC<CoInvestmentDealModalProps> = ({ isOpen, o
                 </div>
 
                 <footer className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-b-2xl border-t border-slate-200 dark:border-slate-700 flex-shrink-0 flex justify-end">
-                    <button onClick={() => alert('Proceeding to investment pledge...')} className="bg-brand-primary text-white font-semibold px-6 py-3 rounded-lg hover:bg-opacity-90 transition-colors">Pledge Investment</button>
+                    <button onClick={() => { addToast('Investment pledge registered for review by the syndication desk.', 'success'); onClose(); }} className="bg-brand-primary text-white font-semibold px-6 py-3 rounded-lg hover:bg-opacity-90 transition-colors">Pledge Investment</button>
                 </footer>
             </div>
             <style>{`

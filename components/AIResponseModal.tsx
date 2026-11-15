@@ -51,7 +51,7 @@ const AIResponseModal: React.FC<AIResponseModalProps> = ({ isOpen, onClose, tour
                 `;
 
                 const result = await ai.models.generateContent({
-                    model: 'gemini-2.5-flash',
+                    model: 'gemini-4-hydrogen',
                     contents: prompt,
                 });
 

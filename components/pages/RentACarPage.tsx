@@ -317,7 +317,7 @@ const RentACarPage: React.FC<RentACarPageProps> = ({ properties = [], onListFlee
     try {
       const ai = new GoogleGenAI();
       const res = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-4-hydrogen',
         contents: `Recommend one vehicle (e.g. Range Rover Autobiography, Mercedes S-Class, BMW X5, or Audi A6) and a 1-sentence route insight in South Africa/Africa for: "${q}". Keep it under 40 words.`,
       });
       const text = res.text || '';

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   XMarkIcon,
   CheckIcon,
@@ -27,6 +27,8 @@ import {
   type StayTermMode,
 } from '../../data/stayDetailData';
 import { GoogleGenAI } from '../../lib/ai';
+import { createStayBooking } from '../../lib/data';
+import { generateSecureBookingRef, isValidEmail, sanitizeText } from '../../lib/security';
 import { useToast } from '../../contexts/ToastContext';
 
 interface VerificationModalProps {
@@ -853,6 +855,16 @@ export const TransparentBookingModal: React.FC<{
   const [guestEmail, setGuestEmail] = useState('');
   const [payOption, setPayOption] = useState<'now' | 'property'>('now');
   const [confirmed, setConfirmed] = useState(false);
+  const [bookingRef, setBookingRef] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setConfirmed(false);
+      setBookingRef('');
+      setIsSubmitting(false);
+    }
+  }, [isOpen]);
 
   if (!isOpen || !room || !ratePlan) return null;
 
@@ -862,6 +874,53 @@ export const TransparentBookingModal: React.FC<{
   const grandTotal = baseSubtotal + taxes + serviceFee;
   const payToday = payOption === 'now' ? grandTotal : serviceFee + Math.round(taxes * 0.5);
   const payAtProperty = grandTotal - payToday;
+
+  const handleConfirmBooking = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanedName = sanitizeText(guestName, 120);
+    const cleanedEmail = guestEmail.trim().toLowerCase();
+    if (!cleanedName || cleanedName.length < 2) {
+      addToast('Please enter a valid full guest name.', 'error');
+      return;
+    }
+    if (!isValidEmail(cleanedEmail)) {
+      addToast('Please enter a valid guest email address.', 'error');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const ref = generateSecureBookingRef('AFR-STAY');
+      await createStayBooking({
+        propertyId: property.id,
+        propertyName: property.name,
+        roomId: room.id,
+        roomName: room.name,
+        ratePlanName: ratePlan.name,
+        termMode,
+        checkIn,
+        checkOut,
+        guestsLabel,
+        nights,
+        months,
+        guestName: cleanedName,
+        guestEmail: cleanedEmail,
+        payOption,
+        baseSubtotal,
+        taxes,
+        serviceFee,
+        grandTotal,
+        payToday,
+        payAtProperty,
+        bookingRef: ref,
+      });
+      setBookingRef(ref);
+      setConfirmed(true);
+      addToast(`Booking confirmed for ${room.name} (${ref})!`, 'success');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -919,20 +978,13 @@ export const TransparentBookingModal: React.FC<{
         {confirmed ? (
           <div className="p-5 rounded-xl bg-[#123B2A] text-white space-y-2">
             <p className="text-xs font-bold uppercase tracking-wider text-[#C99A3D]">AfriEstate Booking Reference</p>
-            <p className="font-mono text-lg font-bold">AFR-STAY-{Math.floor(100000 + Math.random() * 900000)}</p>
+            <p className="font-mono text-lg font-bold">{bookingRef}</p>
             <p className="text-xs text-slate-200">
               Instant confirmation sent to {guestEmail || 'your account email'}. Covered by AfriEstate Booking Protection.
             </p>
           </div>
         ) : (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              setConfirmed(true);
-              addToast(`Booking confirmed for ${room.name}!`, 'success');
-            }}
-            className="space-y-4"
-          >
+          <form onSubmit={handleConfirmBooking} className="space-y-4">
             <div className="grid grid-cols-2 gap-2 text-xs font-semibold">
               <button
                 type="button"
@@ -986,10 +1038,11 @@ export const TransparentBookingModal: React.FC<{
 
             <button
               type="submit"
-              className="w-full py-3.5 rounded-xl bg-[#123B2A] hover:bg-[#0d2a1e] text-white text-sm font-bold flex items-center justify-center gap-2"
+              disabled={isSubmitting}
+              className="w-full py-3.5 rounded-xl bg-[#123B2A] hover:bg-[#0d2a1e] text-white text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-60"
             >
               <CurrencyDollarIcon className="w-4 h-4 text-[#C99A3D]" />
-              <span>Confirm Reservation · R{payToday.toLocaleString()} Due Today</span>
+              <span>{isSubmitting ? 'Processing Reservation...' : `Confirm Reservation · R${payToday.toLocaleString()} Due Today`}</span>
             </button>
           </form>
         )}

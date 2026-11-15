@@ -42,7 +42,7 @@ const AIPortfolioSummary: React.FC<AIPortfolioSummaryProps> = ({ userProperties 
 Portfolio Data:
 ${JSON.stringify(simplifiedPortfolio, null, 2)}`;
 
-      const result = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt });
+      const result = await ai.models.generateContent({ model: 'gemini-4-hydrogen', contents: prompt });
       setSummary(result.text || buildFallbackSummary());
     } catch {
       setSummary(buildFallbackSummary());

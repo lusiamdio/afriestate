@@ -56,30 +56,21 @@ const ShareMenu: React.FC<ShareMenuProps> = ({ propertyTitle, propertyUrl }) => 
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
-  
-  const handleSocialClick = (e: React.MouseEvent, url: string) => {
-    e.stopPropagation();
-    if (url.startsWith('mailto:')) {
-      window.location.href = url;
-      return;
-    }
-    window.open(url, '_blank', 'noopener,noreferrer');
-  };
 
   return (
     <div className="absolute top-full right-0 mt-2 w-48 bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200 dark:border-slate-800 py-2 z-30 animate-fade-in">
-      <button onClick={(e) => handleSocialClick(e, socialLinks.whatsapp)} className="w-full text-left px-4 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-3">
+      <a href={socialLinks.whatsapp} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="w-full text-left px-4 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-3">
         <WhatsAppIcon className="w-4 h-4 text-emerald-500" /><span>WhatsApp</span>
-      </button>
-      <button onClick={(e) => handleSocialClick(e, socialLinks.email)} className="w-full text-left px-4 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-3">
+      </a>
+      <a href={socialLinks.email} onClick={(e) => e.stopPropagation()} className="w-full text-left px-4 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-3">
         <EnvelopeIcon className="w-4 h-4 text-amber-500" /><span>Email</span>
-      </button>
-      <button onClick={(e) => handleSocialClick(e, socialLinks.facebook)} className="w-full text-left px-4 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-3">
+      </a>
+      <a href={socialLinks.facebook} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="w-full text-left px-4 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-3">
         <FacebookIcon className="w-4 h-4 text-blue-600" /><span>Facebook</span>
-      </button>
-      <button onClick={(e) => handleSocialClick(e, socialLinks.twitter)} className="w-full text-left px-4 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-3">
+      </a>
+      <a href={socialLinks.twitter} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="w-full text-left px-4 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-3">
         <TwitterIcon className="w-4 h-4 text-slate-700 dark:text-slate-300" /><span>X (Twitter)</span>
-      </button>
+      </a>
       <div className="border-t border-slate-100 dark:border-slate-800 my-1"></div>
       <button onClick={handleCopy} className="w-full text-left px-4 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-3">
         {copied ? <><CheckIcon className="w-4 h-4 text-green-500"/><span>Copied!</span></> : <><LinkIcon className="w-4 h-4 text-slate-400" /><span>Copy Link</span></>}
@@ -149,7 +140,7 @@ Infrastructure: Solar=${property.hasSolar}, Generator=${property.hasGenerator}, 
 Provide estimated_value, confidence, and concise rationale.`;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
+        model: 'gemini-4-hydrogen',
         contents: prompt,
       });
 

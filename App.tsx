@@ -80,6 +80,7 @@ import BlogDetailModal from './components/BlogDetailModal';
 import SessionTimeoutModal from './components/SessionTimeoutModal';
 import { useToast } from './contexts/ToastContext';
 import { useAdminState, type SovereignRoleKey } from './contexts/AdminStateContext';
+import { sanitizeSafeUrl, sanitizeText } from './lib/security';
 import MapInterface from './components/MapInterface';
 import ExploreAfricaMap from './components/ExploreAfricaMap';
 import BookingStyleFilterSidebar from './components/BookingStyleFilterSidebar';
@@ -299,7 +300,16 @@ const App: React.FC = () => {
       const cached = localStorage.getItem('blogPosts');
       if (cached) {
         const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map((post: any) => ({
+            title: sanitizeText(post?.title, 180) || 'African Real Estate Insight',
+            author: sanitizeText(post?.author, 80) || 'AfriEstate Research',
+            date: sanitizeText(post?.date, 40) || 'Recent',
+            image: sanitizeSafeUrl(post?.image, '/images/house_suburbs_1779978598551.png'),
+            summary: sanitizeText(post?.summary, 400),
+            content: String(post?.content || '').slice(0, 12000),
+          }));
+        }
       }
     } catch {
       // ignore JSON errors
@@ -337,21 +347,77 @@ const App: React.FC = () => {
   const WARNING_TIMEOUT = Math.max(60 * 1000, INACTIVITY_TIMEOUT - 60 * 1000);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session?.user) {
-        setCurrentUser({
-          id: session.user.id,
-          username: session.user.email || session.user.id,
-          fullName: session.user.user_metadata?.full_name || 'Supabase User',
-          email: session.user.email || '',
-          role: session.user.user_metadata?.role || 'user',
-        });
-      } else {
+    let active = true;
+
+    const hydrateAuthenticatedUser = async (session: any) => {
+      if (!active) return;
+      if (!session?.user) {
         setCurrentUser(null);
+        setIsSuperAdminLoggedIn(false);
+        return;
       }
+
+      const authUser = session.user;
+      const appRole = authUser.app_metadata?.role;
+      let profile: any = null;
+      try {
+        const { data } = await supabase
+          .from('profiles')
+          .select('id, username, full_name, email, role, phone, profile_picture, country, is_verified, kyc_status, status, is_wallet_frozen, agency_name, company_name')
+          .eq('id', authUser.id)
+          .maybeSingle();
+        profile = data;
+      } catch {
+        // Offline / pre-schema fallback
+      }
+
+      if (!active) return;
+
+      const resolvedDbRole = profile?.role || appRole || 'user';
+      if (profile?.status === 'Suspended') {
+        await supabase.auth.signOut().catch(() => undefined);
+        setCurrentUser(null);
+        setIsSuperAdminLoggedIn(false);
+        return;
+      }
+
+      const uiRole: User['role'] =
+        resolvedDbRole === 'agent' || resolvedDbRole === 'investor' ? resolvedDbRole : 'user';
+
+      if (resolvedDbRole === 'super_admin') {
+        setIsSuperAdminLoggedIn(true);
+      }
+
+      setCurrentUser({
+        id: authUser.id,
+        username: profile?.username || authUser.email || authUser.id,
+        fullName: profile?.full_name || authUser.user_metadata?.full_name || 'AfriEstate Member',
+        email: profile?.email || authUser.email || '',
+        role: uiRole,
+        phone: profile?.phone || undefined,
+        profilePicture: profile?.profile_picture || undefined,
+        country: profile?.country || undefined,
+        isVerified: Boolean(profile?.is_verified),
+        kycStatus: profile?.kyc_status || undefined,
+        status: profile?.status || 'Active',
+        isWalletFrozen: Boolean(profile?.is_wallet_frozen),
+        agencyName: profile?.agency_name || undefined,
+        companyName: profile?.company_name || undefined,
+      });
+    };
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      hydrateAuthenticatedUser(session);
     });
 
-    return () => subscription.unsubscribe();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      hydrateAuthenticatedUser(session);
+    });
+
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   // Real-time properties subscription
@@ -859,7 +925,7 @@ const App: React.FC = () => {
         Query: "${query}"`;
         
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: settings.securityPolicies.aiModel || 'gemini-4-hydrogen',
             contents: prompt,
             config: {
                 responseMimeType: 'application/json',
@@ -935,16 +1001,14 @@ const App: React.FC = () => {
         let updatedProperties = [...allProperties];
         if (newSaved.has(id)) {
             newSaved.delete(id);
-            updatedProperties = updatedProperties.map(p => p.id === id ? {...p, saves: p.saves - 1} : p);
+            updatedProperties = updatedProperties.map(p => p.id === id ? { ...p, saves: Math.max(0, (p.saves || 0) - 1) } : p);
         } else {
             newSaved.add(id);
-            updatedProperties = updatedProperties.map(p => p.id === id ? {...p, saves: p.saves + 1} : p);
+            updatedProperties = updatedProperties.map(p => p.id === id ? { ...p, saves: (p.saves || 0) + 1 } : p);
         }
         setSavedPropertyIds(newSaved);
-        // FIX: Added explicit type cast to string[] for Array.from result to fix line 460 error
-        await savePropertiesForUser(currentUser.username, Array.from(newSaved) as string[]);
-        await saveProperties(updatedProperties);
         setAllProperties(updatedProperties);
+        await savePropertiesForUser(currentUser.username, Array.from(newSaved) as string[]);
     });
   };
 
@@ -1003,10 +1067,11 @@ const App: React.FC = () => {
   const handleLogout = async () => {
     try {
         await supabase.auth.signOut();
-    } catch (error) {
-        console.error("Error signing out", error);
+    } catch {
+        // Proceed clearing client session state
     }
     setCurrentUser(null);
+    setIsSuperAdminLoggedIn(false);
     setIsDashboardOpen(false);
     setIsSessionWarningOpen(false);
   };
@@ -1445,11 +1510,6 @@ const App: React.FC = () => {
                 onToggleCompare={handleToggleCompare}
                 onOpenCalculator={handleOpenCalculator}
                 onOpenTourModal={handleOpenTourModal}
-                onOpenAgentContact={(mode, name) => {
-                  setAgentContactMode(mode);
-                  setAgentContactName(name);
-                  setIsAgentContactModalOpen(true);
-                }}
                 onOpenVRTour={handleOpenVRTour}
                 onMessageAgent={handleMessageAgent}
                 onLeaveReview={handleLeaveReview}
