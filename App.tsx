@@ -18,7 +18,6 @@ import PropertyDetailPage from './components/pages/PropertyDetailPage';
 import CompareBar from './components/CompareBar';
 import CompareModal from './components/CompareModal';
 import AuthPage, { type AuthView } from './components/pages/AuthPage';
-import UserDashboardModal from './components/UserDashboardModal';
 import PropertyFormModal from './components/PropertyFormModal';
 import ServiceListingFormModal from './components/ServiceListingFormModal';
 import FinancialServices from './components/FinancialServices';
@@ -99,8 +98,10 @@ import BookAStayPage from './components/pages/BookAStayPage';
 import NeighborhoodExplorerPage from './components/pages/NeighborhoodExplorerPage';
 import FindProfessionalPage from './components/pages/FindProfessionalPage';
 import HotelRegistrationPage from './components/pages/HotelRegistrationPage';
+import ServiceListingPage from './components/pages/ServiceListingPage';
+import DashboardPortalPage from './components/pages/DashboardPortalPage';
 
-type Page = 'home' | 'about' | 'services' | 'contact' | 'pricing' | 'rent-a-car' | 'find-wellness' | 'book-a-stay' | 'long-term-stays' | 'auth' | 'property-detail' | 'neighborhood-explorer' | 'find-professional' | 'hotel-registration';
+type Page = 'home' | 'about' | 'services' | 'contact' | 'pricing' | 'rent-a-car' | 'find-wellness' | 'book-a-stay' | 'long-term-stays' | 'auth' | 'property-detail' | 'neighborhood-explorer' | 'find-professional' | 'hotel-registration' | 'list-service' | 'list-transport' | 'list-wellness' | 'dashboard' | 'seeker-dashboard' | 'agent-platform' | 'investor-platform';
 
 const initialFilters: SearchFilters = {
     location: '',
@@ -150,7 +151,7 @@ const blogSchema = {
             title: { type: Type.STRING, description: "A catchy, SEO-friendly title for the blog post." },
             author: { type: Type.STRING, description: "A realistic-sounding author name." },
             date: { type: Type.STRING, description: "A recent date in the format 'Month Day, Year'." },
-            image: { type: Type.STRING, description: "A verified local image path under /images/, e.g., /images/house_suburbs_1779978598551.png." },
+            image: { type: Type.STRING, description: "A verified local image path under /images/, e.g., /images/383842941.jpg." },
             summary: { type: Type.STRING, description: "A concise, one-sentence summary of the article." },
             content: { type: Type.STRING, description: "The full content of the blog post, formatted in Markdown with headings (e.g., ## My Heading), lists, and paragraphs. It should be 3-4 paragraphs long." },
         },
@@ -269,8 +270,11 @@ const App: React.FC = () => {
     setPage('auth');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
-  const [isDashboardOpen, setIsDashboardOpen] = useState(false);
+  const openDashboardPage = (target: 'dashboard' | 'seeker-dashboard' | 'agent-platform' | 'investor-platform' = 'dashboard') => {
+    scrollToSection(target);
+  };
   const [isPropertyFormOpen, setIsPropertyFormOpen] = useState(false);
+  const [propertyFormInitialListingType, setPropertyFormInitialListingType] = useState<ListingType | undefined>(undefined);
   const [isServiceListingFormOpen, setIsServiceListingFormOpen] = useState(false);
   const [isAIResponseModalOpen, setIsAIResponseModalOpen] = useState(false);
   const [isAgentContactModalOpen, setIsAgentContactModalOpen] = useState(false);
@@ -305,7 +309,7 @@ const App: React.FC = () => {
             title: sanitizeText(post?.title, 180) || 'African Real Estate Insight',
             author: sanitizeText(post?.author, 80) || 'AfriEstate Research',
             date: sanitizeText(post?.date, 40) || 'Recent',
-            image: sanitizeSafeUrl(post?.image, '/images/house_suburbs_1779978598551.png'),
+            image: sanitizeSafeUrl(post?.image, '/images/383842941.jpg'),
             summary: sanitizeText(post?.summary, 400),
             content: String(post?.content || '').slice(0, 12000),
           }));
@@ -574,7 +578,9 @@ const App: React.FC = () => {
     if (currentUserOverride?.status === 'Suspended' || effectiveRolePolicy?.canLogin === false) {
       addToast('Account access has been suspended by Platform Administration.', 'error');
       setCurrentUser(null);
-      setIsDashboardOpen(false);
+      if (['dashboard', 'seeker-dashboard', 'agent-platform', 'investor-platform'].includes(page)) {
+        setPage('home');
+      }
     }
   }, [currentUser, currentUserOverride?.status, effectiveRolePolicy?.canLogin, addToast]);
 
@@ -974,7 +980,6 @@ const App: React.FC = () => {
 
   const handleOpenDetailModal = async (property: Property) => {
     withRoleGate(property, async (p) => {
-        setIsDashboardOpen(false);
         setSelectedProperty(p);
         setPage('property-detail');
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1072,7 +1077,9 @@ const App: React.FC = () => {
     }
     setCurrentUser(null);
     setIsSuperAdminLoggedIn(false);
-    setIsDashboardOpen(false);
+    if (['dashboard', 'seeker-dashboard', 'agent-platform', 'investor-platform'].includes(page)) {
+      setPage('home');
+    }
     setIsSessionWarningOpen(false);
   };
 
@@ -1114,17 +1121,29 @@ const App: React.FC = () => {
         }
         setIsInvestmentRequestModalOpen(true);
     } else if (effectiveUserRoleKey === 'user') {
-        setIsServiceListingFormOpen(true);
+        scrollToSection('list-service');
     } else {
         setPropertyToEdit(null);
+        setPropertyFormInitialListingType(undefined);
         setIsPropertyFormOpen(true);
     }
+  };
+
+  const handleListLongTermPropertyClick = () => {
+    if (!currentUser) {
+      setPage('pricing');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    if (!canCurrentUserPublish()) return;
+    setPropertyToEdit(null);
+    setPropertyFormInitialListingType(ListingType.RENT);
+    setIsPropertyFormOpen(true);
   };
 
   const handleEditProperty = (property: Property) => {
     setPropertyToEdit(property);
     setIsPropertyFormOpen(true);
-    setIsDashboardOpen(false);
   };
 
   const handleDeleteProperty = async (propertyId: string) => {
@@ -1155,11 +1174,10 @@ const App: React.FC = () => {
     setAllProperties(newProperties);
     setInvestmentProperties(newProperties.filter(p => p.listingType === ListingType.FOR_INVESTMENT));
     setIsPropertyFormOpen(false);
-    setIsDashboardOpen(false);
 
     if (shouldQueueModeration) {
       addToast(`"${savedRecord.title}" queued in Super Admin moderation before public release.`, 'info');
-      setIsDashboardOpen(true);
+      openDashboardPage('dashboard');
       return;
     }
 
@@ -1180,7 +1198,7 @@ const App: React.FC = () => {
       scrollToSection('long-term-stays');
     } else {
       addToast(`Published "${savedRecord.title}" to live marketplace.`, 'success');
-      setIsDashboardOpen(true);
+      openDashboardPage('dashboard');
     }
   };
   
@@ -1213,8 +1231,8 @@ const App: React.FC = () => {
   };
   
   const handleRunSearch = (searchToRun: SearchFilters) => {
-    setIsDashboardOpen(false);
     setFilters(searchToRun);
+    scrollToSection('home', 'all-listings');
   };
   
   const handleMessageAgent = (property: Property) => {
@@ -1228,18 +1246,19 @@ const App: React.FC = () => {
       });
   };
 
-  const handleSendMessage = async (text: string) => {
-      if(currentUser && selectedProperty) {
+  const handleSendMessage = async (text: string, targetProp?: Property) => {
+      const prop = targetProp || selectedProperty;
+      if(currentUser && prop) {
           const newMessage = await sendMessage({
-              propertyId: selectedProperty.id,
-              propertyTitle: selectedProperty.title,
+              propertyId: prop.id,
+              propertyTitle: prop.title,
               senderUsername: currentUser.username,
-              receiverUsername: selectedProperty.agent.name,
+              receiverUsername: prop.agent.name,
               text: text,
           });
           setMessages(prev => [...prev, newMessage]);
-          recordPropertyEnquiry(selectedProperty.id);
-          setIsMessageModalOpen(false);
+          recordPropertyEnquiry(prop.id);
+          if (!targetProp) setIsMessageModalOpen(false);
       }
   };
   
@@ -1404,7 +1423,7 @@ const App: React.FC = () => {
           }
       }
       if (notification.type === NotificationType.INQUIRY) {
-          setIsDashboardOpen(true);
+          openDashboardPage('dashboard');
       }
   };
   
@@ -1535,7 +1554,7 @@ const App: React.FC = () => {
                 if (!currentUser) {
                   openAuthPage('login');
                 } else if (canCurrentUserPublish()) {
-                  setIsServiceListingFormOpen(true);
+                  scrollToSection('list-transport');
                 }
               }}
             />
@@ -1550,8 +1569,33 @@ const App: React.FC = () => {
                 if (!currentUser) {
                   openAuthPage('login');
                 } else if (canCurrentUserPublish()) {
-                  setIsServiceListingFormOpen(true);
+                  scrollToSection('list-wellness');
                 }
+              }}
+            />
+          );
+      case 'list-service':
+      case 'list-transport':
+      case 'list-wellness':
+          return (
+            <ServiceListingPage
+              mode={page === 'list-transport' ? 'transport' : page === 'list-wellness' ? 'wellness' : 'hub'}
+              currentUser={currentUser}
+              onSelectMode={(nextMode) =>
+                scrollToSection(
+                  nextMode === 'transport' ? 'list-transport' : nextMode === 'wellness' ? 'list-wellness' : 'list-service'
+                )
+              }
+              onRedirectToHotelRegistration={() => scrollToSection('hotel-registration')}
+              onRequireAuth={() => openAuthPage('login')}
+              onBack={() =>
+                scrollToSection(
+                  page === 'list-transport' ? 'rent-a-car' : page === 'list-wellness' ? 'find-wellness' : 'home'
+                )
+              }
+              onListingPublished={(publishedProperty, targetRoute) => {
+                setAllProperties(prev => [publishedProperty, ...prev.filter(p => p.id !== publishedProperty.id)]);
+                scrollToSection(targetRoute);
               }}
             />
           );
@@ -1573,13 +1617,8 @@ const App: React.FC = () => {
               onGoHome={() => scrollToSection('home')}
               onOpenAuth={() => openAuthPage('login')}
               onNavigate={(target) => scrollToSection(target as Page)}
-              onListProperty={() => {
-                if (!currentUser) {
-                  openAuthPage('login');
-                } else if (canCurrentUserPublish()) {
-                  setIsServiceListingFormOpen(true);
-                }
-              }}
+              onListProperty={() => scrollToSection('hotel-registration')}
+              onListLongTermProperty={handleListLongTermPropertyClick}
             />
           );
       case 'neighborhood-explorer':
@@ -1608,6 +1647,75 @@ const App: React.FC = () => {
               onExploreNeighborhood={(neighborhoodId) =>
                 handleOpenNeighborhoodExplorer(neighborhoodId)
               }
+            />
+          );
+      case 'dashboard':
+      case 'seeker-dashboard':
+      case 'agent-platform':
+      case 'investor-platform':
+          return (
+            <DashboardPortalPage
+              portalMode={
+                page === 'seeker-dashboard'
+                  ? 'seeker'
+                  : page === 'agent-platform'
+                  ? 'agent'
+                  : page === 'investor-platform'
+                  ? 'investor'
+                  : 'auto'
+              }
+              user={currentUser}
+              allProperties={governedProperties}
+              investmentProperties={investmentProperties}
+              tourRequests={tourRequests}
+              receivedInquiries={receivedInquiries}
+              savedSearches={savedSearches}
+              savedProperties={savedProperties}
+              propertiesToCompare={compareList}
+              messages={messages}
+              calendarEvents={calendarEvents}
+              agentProfile={agentProfile}
+              agentReviews={agentReviews}
+              leads={leads}
+              agentAchievements={agentAchievements}
+              investorAchievements={investorAchievements}
+              investmentRequests={investmentRequests}
+              investorSettings={investorSettings}
+              currency={currency}
+              theme={theme}
+              onBackToMarketplace={() => scrollToSection('home')}
+              onOpenAuth={() => openAuthPage('login')}
+              onLogout={handleLogout}
+              onEditProperty={handleEditProperty}
+              onDeleteProperty={handleDeleteProperty}
+              onDraftReply={(inquiry) => {
+                setInquiryForResponse(inquiry);
+                setIsAIResponseModalOpen(true);
+              }}
+              onRunSearch={handleRunSearch}
+              onDeleteSearch={handleDeleteSearch}
+              onListPropertyClick={handleListPropertyClick}
+              onAddEvent={handleAddEvent}
+              onUpdateEvent={handleUpdateEvent}
+              onDeleteEvent={handleDeleteEvent}
+              onOpenAIImprovementModal={handleOpenAIImprovementModal}
+              onUpdateAgentProfile={handleUpdateAgentProfile}
+              onUpdateAgentAchievements={setAgentAchievements}
+              onUpdateInvestorAchievements={setInvestorAchievements}
+              onUpdateInvestorSettings={handleUpdateInvestorSettings}
+              onThemeToggle={handleThemeToggle}
+              onCompareClick={() => setIsCompareModalOpen(true)}
+              onCurrencyChange={setCurrency}
+              onUpgradeAccountRequest={handleUpgradeAccountRequest}
+              onSaveToggle={handleSaveToggle}
+              savedPropertyIds={savedPropertyIds}
+              onOpenCalculator={handleOpenCalculator}
+              onOpenTourModal={handleOpenTourModal}
+              onFindSimilar={handleFindSimilar}
+              onOpenDetailModal={handleOpenDetailModal}
+              onToggleCompare={handleToggleCompare}
+              onOpenVRTour={handleOpenVRTour}
+              onSendMessage={(prop, text) => handleSendMessage(text, prop)}
             />
           );
       case 'hotel-registration':
@@ -1724,7 +1832,7 @@ const App: React.FC = () => {
                                 { image: '/images/2a47542b078d54560485a1e72a5373aa9c3a4a48-800x535.avif', actionLabel: 'Explore Vehicles', onClick: () => scrollToSection('rent-a-car') },
                                 { image: '/images/getlstd-property-photo.jpg', actionLabel: 'Discover Retreats', onClick: () => scrollToSection('find-wellness') },
                                 { image: '/images/2ec34ce4ca57aef13fc8b3239a99345e.jpg', actionLabel: 'Search Long-Term', onClick: () => scrollToSection('long-term-stays') },
-                              ][idx] || { image: '/images/house_suburbs_1779978598551.png', actionLabel: 'Explore', onClick: () => scrollToSection('home', 'all-listings') };
+                              ][idx] || { image: '/images/383842941.jpg', actionLabel: 'Explore', onClick: () => scrollToSection('home', 'all-listings') };
 
                               return (
                                 <CategoryCard
@@ -2118,7 +2226,7 @@ const App: React.FC = () => {
             readNotificationIds={readNotificationIds}
             onLoginClick={() => openAuthPage('login')}
             onSignUpClick={() => setPage('pricing')}
-            onDashboardClick={() => setIsDashboardOpen(true)}
+            onDashboardClick={() => openDashboardPage('dashboard')}
             onListPropertyClick={handleListPropertyClick}
             onNotificationClick={handleNotificationClick}
             onMarkAllNotificationsAsRead={handleMarkAllAsRead}
@@ -2164,7 +2272,7 @@ const App: React.FC = () => {
           <main className="flex-grow">
             {renderPage()}
           </main>
-          {page !== 'auth' && (
+          {page !== 'auth' && !['dashboard', 'seeker-dashboard', 'agent-platform', 'investor-platform'].includes(page) && (
             <Footer 
               onAboutClick={() => scrollToSection('about', 'about')}
               onContactClick={() => scrollToSection('contact', 'contact')}
@@ -2195,64 +2303,25 @@ const App: React.FC = () => {
       {selectedProperty && <ScheduleTourModal isOpen={isTourModalOpen} onClose={() => setIsTourModalOpen(false)} propertyTitle={selectedProperty.title} propertyId={selectedProperty.id} agentName={selectedProperty.agent.name} onSubmit={handleScheduleTour} />}
       {compareList.length > 0 && <CompareBar properties={compareList} onCompare={() => setIsCompareModalOpen(true)} onClear={() => setCompareList([])} onRemove={(p) => setCompareList(prev => prev.filter(item => item.id !== p.id))} />}
       <CompareModal isOpen={isCompareModalOpen} onClose={() => setIsCompareModalOpen(false)} properties={compareList} />
-      {currentUser && 
-          <UserDashboardModal
-            isOpen={isDashboardOpen}
-            onClose={() => setIsDashboardOpen(false)}
-            user={currentUser}
-            allProperties={governedProperties}
-            investmentProperties={investmentProperties}
-            tourRequests={tourRequests}
-            receivedInquiries={receivedInquiries}
-            savedSearches={savedSearches}
-            savedProperties={savedProperties}
-            propertiesToCompare={compareList}
-            messages={messages}
-            calendarEvents={calendarEvents}
-            agentProfile={agentProfile}
-            agentReviews={agentReviews}
-            leads={leads}
-            agentAchievements={agentAchievements}
-            investorAchievements={investorAchievements}
-            investmentRequests={investmentRequests}
-            investorSettings={investorSettings}
-            currency={currency}
-            theme={theme}
-            onLogout={handleLogout}
-            onEditProperty={handleEditProperty}
-            onDeleteProperty={handleDeleteProperty}
-            onDraftReply={(inquiry) => {setInquiryForResponse(inquiry); setIsAIResponseModalOpen(true);}}
-            onRunSearch={handleRunSearch}
-            onDeleteSearch={handleDeleteSearch}
-            onListPropertyClick={handleListPropertyClick}
-            onAddEvent={handleAddEvent}
-            onUpdateEvent={handleUpdateEvent}
-            onDeleteEvent={handleDeleteEvent}
-            onOpenAIImprovementModal={handleOpenAIImprovementModal}
-            onUpdateAgentProfile={handleUpdateAgentProfile}
-            onUpdateAgentAchievements={setAgentAchievements}
-            onUpdateInvestorAchievements={setInvestorAchievements}
-            onUpdateInvestorSettings={handleUpdateInvestorSettings}
-            onThemeToggle={handleThemeToggle}
-            onCompareClick={() => setIsCompareModalOpen(true)}
-            onCurrencyChange={setCurrency}
-            onUpgradeAccountRequest={handleUpgradeAccountRequest}
-            onSaveToggle={handleSaveToggle}
-            savedPropertyIds={savedPropertyIds}
-            onOpenCalculator={handleOpenCalculator}
-            onOpenTourModal={handleOpenTourModal}
-            onFindSimilar={handleFindSimilar}
-            onOpenDetailModal={handleOpenDetailModal}
-            onToggleCompare={handleToggleCompare}
-            onOpenVRTour={handleOpenVRTour}
-          />
-      }
-      {currentUser && <PropertyFormModal isOpen={isPropertyFormOpen} onClose={() => setIsPropertyFormOpen(false)} onSave={handleSaveProperty} propertyToEdit={propertyToEdit} currentUser={currentUser} />}
+      {currentUser && (
+        <PropertyFormModal
+          isOpen={isPropertyFormOpen}
+          onClose={() => {
+            setIsPropertyFormOpen(false);
+            setPropertyFormInitialListingType(undefined);
+          }}
+          onSave={handleSaveProperty}
+          propertyToEdit={propertyToEdit}
+          currentUser={currentUser}
+          initialListingType={propertyFormInitialListingType}
+        />
+      )}
       {currentUser && (
         <ServiceListingFormModal
           currentUser={currentUser}
           isOpen={isServiceListingFormOpen}
           onClose={() => setIsServiceListingFormOpen(false)}
+          onOpenWebPage={(target) => scrollToSection(target)}
           onListingPublished={(publishedProperty, targetRoute) => {
             setAllProperties(prev => [publishedProperty, ...prev.filter(p => p.id !== publishedProperty.id)]);
             if (targetRoute === 'book-a-stay') {

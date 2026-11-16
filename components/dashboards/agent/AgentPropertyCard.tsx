@@ -58,7 +58,8 @@ const AgentPropertyCard: React.FC<AgentPropertyCardProps> = ({
           className="h-4 w-4 rounded border-slate-300 text-[#0F2D25] focus:ring-[#0F2D25] mt-1 cursor-pointer"
         />
         <img
-          src={property.images[0] || '/images/house_suburbs_1779978598551.png'}
+          src={property.images[0] || '/images/383842941.jpg'}
+          referrerPolicy="no-referrer"
           alt={property.title}
           className="w-full sm:w-28 h-40 sm:h-24 object-cover rounded-lg flex-shrink-0 border border-slate-100 dark:border-slate-800"
         />

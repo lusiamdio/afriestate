@@ -11,6 +11,7 @@ interface ServiceListingFormModalProps {
   isOpen: boolean;
   onClose: () => void;
   currentUser: User;
+  onOpenWebPage?: (target: 'list-transport' | 'list-wellness' | 'hotel-registration') => void;
   onListingPublished?: (publishedProperty: Property, targetRoute?: 'rent-a-car' | 'find-wellness' | 'book-a-stay') => void;
 }
 
@@ -18,6 +19,7 @@ const ServiceListingFormModal: React.FC<ServiceListingFormModalProps> = ({
   isOpen,
   onClose,
   currentUser,
+  onOpenWebPage,
   onListingPublished,
 }) => {
   const [serviceType, setServiceType] = useState<'none' | 'car' | 'wellness' | 'stay'>('none');
@@ -55,6 +57,18 @@ const ServiceListingFormModal: React.FC<ServiceListingFormModalProps> = ({
   const handleClose = () => {
     setServiceType('none');
     onClose();
+  };
+
+  const handleSelectTarget = (target: 'list-transport' | 'list-wellness' | 'hotel-registration', fallback: 'car' | 'wellness') => {
+    if (onOpenWebPage) {
+      setServiceType('none');
+      onClose();
+      onOpenWebPage(target);
+      return;
+    }
+    if (target !== 'hotel-registration') {
+      setServiceType(fallback);
+    }
   };
 
   return (
@@ -102,7 +116,7 @@ const ServiceListingFormModal: React.FC<ServiceListingFormModalProps> = ({
                 {settings.featureFlags.transport && (
                   <button
                     type="button"
-                    onClick={() => setServiceType('car')}
+                    onClick={() => handleSelectTarget('list-transport', 'car')}
                     className="p-6 border-2 border-slate-200 dark:border-slate-700 rounded-2xl hover:border-emerald-700 dark:hover:border-amber-300 hover:bg-emerald-50/40 dark:hover:bg-slate-800 transition-all font-semibold text-base text-slate-800 dark:text-slate-200 flex flex-col items-center gap-3 text-center"
                   >
                     <TruckIcon className="w-8 h-8 text-emerald-700 dark:text-amber-300" />
@@ -115,7 +129,7 @@ const ServiceListingFormModal: React.FC<ServiceListingFormModalProps> = ({
                 {settings.featureFlags.wellness && (
                   <button
                     type="button"
-                    onClick={() => setServiceType('wellness')}
+                    onClick={() => handleSelectTarget('list-wellness', 'wellness')}
                     className="p-6 border-2 border-slate-200 dark:border-slate-700 rounded-2xl hover:border-emerald-700 dark:hover:border-amber-300 hover:bg-emerald-50/40 dark:hover:bg-slate-800 transition-all font-semibold text-base text-slate-800 dark:text-slate-200 flex flex-col items-center gap-3 text-center"
                   >
                     <SparklesIcon className="w-8 h-8 text-emerald-700 dark:text-amber-300" />
@@ -128,13 +142,13 @@ const ServiceListingFormModal: React.FC<ServiceListingFormModalProps> = ({
                 {(settings.featureFlags.shortStays || settings.featureFlags.longTerm) && (
                   <button
                     type="button"
-                    onClick={() => setServiceType('stay')}
+                    onClick={() => handleSelectTarget('hotel-registration', 'car')}
                     className="p-6 border-2 border-slate-200 dark:border-slate-700 rounded-2xl hover:border-emerald-700 dark:hover:border-amber-300 hover:bg-emerald-50/40 dark:hover:bg-slate-800 transition-all font-semibold text-base text-slate-800 dark:text-slate-200 flex flex-col items-center gap-3 text-center"
                   >
                     <BuildingStorefrontIcon className="w-8 h-8 text-emerald-700 dark:text-amber-300" />
-                    <span>Short or Long Stay</span>
+                    <span>Short Stay</span>
                     <span className="text-xs font-normal text-slate-500 dark:text-slate-400">
-                      Syncs to Stays &amp; Accommodation
+                      Syncs to Stays &amp; Accommodation · List Hotel Page
                     </span>
                   </button>
                 )}

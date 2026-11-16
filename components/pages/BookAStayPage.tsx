@@ -43,6 +43,7 @@ interface BookAStayPageProps {
   onOpenAuth?: () => void;
   onNavigate?: (page: string) => void;
   onListProperty?: () => void;
+  onListLongTermProperty?: () => void;
 }
 
 const STAY_STYLES = [
@@ -68,6 +69,7 @@ const BookAStayPage: React.FC<BookAStayPageProps> = ({
   onOpenAuth,
   onNavigate,
   onListProperty,
+  onListLongTermProperty,
 }) => {
   const { addToast } = useToast();
   const [selectedStay, setSelectedStay] = useState<StayPropertyProfile | null>(null);
@@ -288,7 +290,7 @@ const BookAStayPage: React.FC<BookAStayPageProps> = ({
           <img
             src={
               termMode === 'long-term'
-                ? '/images/apartment_block_1779978678706.png'
+                ? '/images/280162474.jpg'
                 : '/images/3zn_EkVTc6_QyptGfC9riJuiVbXsOnZlnNvKdCvSkQrpuj4PhovEAaX72CuasaF61v6l4JVHJ6h5Rvn9POlvySiLgZxfK2CHe4z1WawKYa34Mjcj8httsWa0IVJCbpgrtIwuSqzVbR17aorv96Z6D1STZYGR0kqvwSnX81F5nEFKbVo8-Qb01CM5FKe8oAD4.jpg'
             }
             alt={termMode === 'long-term' ? 'AfriEstate Long-Term African Residence' : 'African Short-Term Luxury Escape'}
@@ -336,10 +338,16 @@ const BookAStayPage: React.FC<BookAStayPageProps> = ({
                     Long-Term (1–12+ Months)
                   </button>
                 </div>
-                {onListProperty && (
+                {(onListLongTermProperty || onListProperty) && (
                   <button
                     type="button"
-                    onClick={onListProperty}
+                    onClick={() => {
+                      if (termMode === 'long-term' && onListLongTermProperty) {
+                        onListLongTermProperty();
+                      } else if (onListProperty) {
+                        onListProperty();
+                      }
+                    }}
                     className="inline-flex items-center gap-1.5 px-4 py-3 rounded-xl bg-white/15 hover:bg-white/25 text-white text-xs font-bold border border-white/20 transition-colors whitespace-nowrap"
                   >
                     <PlusIcon className="w-4 h-4 text-[#C99A3D]" />
@@ -351,29 +359,64 @@ const BookAStayPage: React.FC<BookAStayPageProps> = ({
 
             {/* Framed Hero Visual Card */}
             <div className="lg:col-span-5">
-              <div className="relative rounded-2xl overflow-hidden border border-white/20 shadow-2xl aspect-[16/10] bg-slate-900">
-                <img
-                  src={
-                    termMode === 'long-term'
-                      ? '/images/luxury_kitchen_living_1779978720358.png'
-                      : '/images/S5AW63xLpS5OInt3q7b2VfysVJZWUgL_mA50RmD3XPIDOg6FweUaBTyD2D55tZpB00mFfWJpOaM7y51sawZ95XIy0eckan_AR9cwNRlzXYNo8omw6E0jLV0-YEdLcA237iyhzwWVPPfb99eJb5FOkA-h5zNJ3Q4YSw2vtWqoUZNhTJV3_qUS2aKUV1ys1UEF.jpg'
-                  }
-                  alt={termMode === 'long-term' ? 'Long-Term Serviced Apartment Living Room' : 'Featured Short-Term Retreat & Hotel'}
-                  referrerPolicy="no-referrer"
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/15 to-transparent" />
-                <div className="absolute bottom-4 left-4 right-4 flex items-end justify-between gap-3">
-                  <div>
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-[#C99A3D]">
-                      {termMode === 'long-term' ? 'Extended Leases · Verified Landlords' : 'Curated Hospitality · Instant Book'}
-                    </p>
-                    <p className="font-heading text-lg sm:text-xl font-bold text-white">
-                      {termMode === 'long-term' ? 'Move-In Ready Homes & Executive Flats' : 'Villas, Safari Lodges & Boutique Hotels'}
-                    </p>
+              {termMode === 'long-term' ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <div className="relative rounded-2xl overflow-hidden border border-white/20 shadow-2xl aspect-[4/3] sm:aspect-[4/5] bg-slate-900">
+                    <img
+                      src="/images/841376502.webp"
+                      alt="Furnished Long-Term Executive Apartment Interior"
+                      referrerPolicy="no-referrer"
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/15 to-transparent" />
+                    <div className="absolute bottom-3.5 left-3.5 right-3.5">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-[#C99A3D]">
+                        Extended Leases
+                      </p>
+                      <p className="font-heading text-sm sm:text-base font-bold text-white leading-snug">
+                        Move-In Ready Executive Flats
+                      </p>
+                    </div>
+                  </div>
+                  <div className="relative rounded-2xl overflow-hidden border border-white/20 shadow-2xl aspect-[4/3] sm:aspect-[4/5] bg-slate-900">
+                    <img
+                      src="/images/2ec34ce4ca57aef13fc8b3239a99345e.jpg"
+                      alt="Modern Architectural Long-Term Residence"
+                      referrerPolicy="no-referrer"
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/15 to-transparent" />
+                    <div className="absolute bottom-3.5 left-3.5 right-3.5">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-[#C99A3D]">
+                        Verified Landlords
+                      </p>
+                      <p className="font-heading text-sm sm:text-base font-bold text-white leading-snug">
+                        Family Homes &amp; Estate Villas
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
+              ) : (
+                <div className="relative rounded-2xl overflow-hidden border border-white/20 shadow-2xl aspect-[16/10] bg-slate-900">
+                  <img
+                    src="/images/S5AW63xLpS5OInt3q7b2VfysVJZWUgL_mA50RmD3XPIDOg6FweUaBTyD2D55tZpB00mFfWJpOaM7y51sawZ95XIy0eckan_AR9cwNRlzXYNo8omw6E0jLV0-YEdLcA237iyhzwWVPPfb99eJb5FOkA-h5zNJ3Q4YSw2vtWqoUZNhTJV3_qUS2aKUV1ys1UEF.jpg"
+                    alt="Featured Short-Term Retreat & Hotel"
+                    referrerPolicy="no-referrer"
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/15 to-transparent" />
+                  <div className="absolute bottom-4 left-4 right-4 flex items-end justify-between gap-3">
+                    <div>
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-[#C99A3D]">
+                        Curated Hospitality · Instant Book
+                      </p>
+                      <p className="font-heading text-lg sm:text-xl font-bold text-white">
+                        Villas, Safari Lodges &amp; Boutique Hotels
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

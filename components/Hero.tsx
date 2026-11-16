@@ -177,7 +177,7 @@ const Hero: React.FC<HeroProps> = ({
   const currentBackdrop = HERO_BACKDROPS[activeBackdropIndex];
 
   return (
-    <div className="relative pt-10 pb-16 md:pt-16 md:pb-20 text-white overflow-hidden min-h-[640px] flex flex-col justify-between">
+    <div className="relative pt-12 pb-16 md:pt-16 md:pb-20 text-white overflow-hidden min-h-[640px] flex flex-col items-center justify-center">
       {/* 1. Dynamic Background Image Layer with Luxury Dark Scrim */}
       <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
         <img
@@ -192,7 +192,7 @@ const Hero: React.FC<HeroProps> = ({
       </div>
 
       {/* 2. Main Hero Content Container */}
-      <div className="relative z-10 w-full px-4 sm:px-6 lg:px-10">
+      <div className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 flex flex-col items-center text-center">
         {/* Eyebrow & Market Coverage Line */}
         <div className="flex flex-wrap items-center justify-center gap-3 text-xs text-slate-300 mb-5">
           <span className="font-semibold text-amber-300 tracking-wide">
@@ -221,7 +221,7 @@ const Hero: React.FC<HeroProps> = ({
         </div>
 
         {/* Interactive Backdrop Switcher */}
-        <div className="mb-4 flex items-center justify-center gap-2 overflow-x-auto pb-1 text-xs">
+        <div className="mb-5 flex flex-wrap items-center justify-center gap-2 pb-1 text-xs">
           <span className="text-[11px] text-slate-400 flex items-center gap-1 mr-1 whitespace-nowrap">
             <PhotoIcon className="w-3.5 h-3.5 text-amber-400" />
             <span>Featured View:</span>
@@ -243,7 +243,7 @@ const Hero: React.FC<HeroProps> = ({
         </div>
 
         {/* The 3-Mode Intent Search Card (Compact) */}
-        <div className="max-w-4xl mx-auto w-full bg-white/95 dark:bg-slate-900/95 backdrop-blur-md text-slate-900 dark:text-white rounded-xl p-3 sm:p-4 shadow-xl">
+        <div className="max-w-4xl mx-auto w-full bg-white/95 dark:bg-slate-900/95 backdrop-blur-md text-slate-900 dark:text-white rounded-xl p-3 sm:p-4 shadow-xl text-left">
           <SearchBar
             onSearch={onSearch}
             isSearchingAI={isSearchingAI}
@@ -254,18 +254,13 @@ const Hero: React.FC<HeroProps> = ({
 
         {/* 3. Dynamic Trending Section: Ranked Automatically by Most Views & Enquiries */}
         <div className="mt-10 w-full">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 px-1">
-            <div>
-              <p className="text-xs uppercase tracking-wider font-semibold text-amber-300">
-                Trending Pan-African Properties
-              </p>
-              <p className="text-[11px] text-slate-300/90 mt-0.5">
-                Automatically ranked by highest buyer views and direct enquiries
-              </p>
-            </div>
-            <span className="text-[11px] text-slate-400 hidden sm:inline">
-              Select any trending listing to inspect details
-            </span>
+          <div className="flex flex-col items-center justify-center text-center gap-1 mb-4 px-1">
+            <p className="text-xs uppercase tracking-wider font-semibold text-amber-300">
+              Trending Pan-African Properties
+            </p>
+            <p className="text-[11px] text-slate-300/90">
+              Automatically ranked by highest buyer views and direct enquiries · Select any listing to inspect details
+            </p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
@@ -403,18 +398,18 @@ const Hero: React.FC<HeroProps> = ({
         </div>
 
         {/* 5. Trust Badges Adjacency */}
-        <div className="mt-10 pt-6 grid grid-cols-1 sm:grid-cols-3 gap-4 w-full text-slate-300 text-xs sm:text-sm">
-          <div className="flex items-center gap-2.5">
+        <div className="mt-10 pt-6 grid grid-cols-1 sm:grid-cols-3 gap-4 w-full max-w-5xl mx-auto text-slate-300 text-xs sm:text-sm">
+          <div className="flex items-center justify-center text-center gap-2.5">
             <ShieldCheckIcon className="w-5 h-5 text-emerald-400 shrink-0" />
-            <span className="text-xs">Title-Deed & Land Registry Cadastre Checks</span>
+            <span className="text-xs">Title-Deed &amp; Land Registry Cadastre Checks</span>
           </div>
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center justify-center text-center gap-2.5">
             <AfricanGlobeIcon className="w-5 h-5 text-amber-400 shrink-0" />
             <span className="text-xs">Cross-Border Foreign Buyer Support in 54 Countries</span>
           </div>
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center justify-center text-center gap-2.5">
             <SolarIcon className="w-5 h-5 text-sky-400 shrink-0" />
-            <span className="text-xs">Power & Water Resilience (Solar, Borehole, Gen)</span>
+            <span className="text-xs">Power &amp; Water Resilience (Solar, Borehole, Gen)</span>
           </div>
         </div>
       </div>

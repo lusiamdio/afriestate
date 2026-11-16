@@ -3,6 +3,7 @@ import { ShieldCheckIcon } from '@heroicons/react/24/outline';
 import { publishWellnessService } from '../lib/data';
 import type { Property, User } from '../types';
 import { useToast } from '../contexts/ToastContext';
+import ImageDropzoneUploader, { type PresetImageOption } from './ImageDropzoneUploader';
 import {
   assertCanPublish,
   checkSubmissionThrottle,
@@ -18,17 +19,17 @@ interface WellnessListingFormProps {
   onBack: () => void;
 }
 
-const WELLNESS_IMAGES = [
-  { label: 'Thermal Spa Retreat', url: '/images/spa_wellness_1779978823248.png' },
+const WELLNESS_IMAGES: PresetImageOption[] = [
+  { label: 'Thermal Spa Sanctuary', url: '/images/getlstd-property-photo.jpg' },
   { label: 'Safari Lodge Sanctuary', url: '/images/safari_lodge_retreat.jpg' },
-  { label: 'Garden Pool Villa', url: '/images/house_pool_1779978750296.png' },
+  { label: 'Garden Pool Villa', url: '/images/383842941.jpg' },
 ];
 
 const WellnessListingForm: React.FC<WellnessListingFormProps> = ({ currentUser, onSuccess, onBack }) => {
   const { addToast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedImage, setSelectedImage] = useState(WELLNESS_IMAGES[0].url);
+  const [uploadedImages, setUploadedImages] = useState<string[]>([WELLNESS_IMAGES[0].url]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -63,7 +64,7 @@ const WellnessListingForm: React.FC<WellnessListingFormProps> = ({ currentUser, 
 
     setIsSubmitting(true);
     try {
-      const customImage = String(formData.get('imageUrl') || '').trim();
+      const gallery = uploadedImages.length > 0 ? uploadedImages : [WELLNESS_IMAGES[0].url];
       const published = await publishWellnessService(
         {
           business_name: sanitizeText(String(formData.get('businessName')), 100),
@@ -81,7 +82,8 @@ const WellnessListingForm: React.FC<WellnessListingFormProps> = ({ currentUser, 
           physical_address: sanitizeText(String(formData.get('physicalAddress')), 140) || null,
           description: sanitizeText(String(formData.get('description')), 1500),
           session_price: Number.isFinite(sessionPrice) && sessionPrice > 0 ? sessionPrice : 650,
-          image_url: sanitizeSafeUrl(customImage, selectedImage),
+          image_url: gallery[0],
+          images: gallery,
         },
         currentUser
       );
@@ -198,24 +200,17 @@ const WellnessListingForm: React.FC<WellnessListingFormProps> = ({ currentUser, 
           </div>
         </div>
         <div className="space-y-2">
-          <label className="block text-xs font-semibold">Sanctuary Photo URL (Optional)</label>
-          <input type="text" name="imageUrl" placeholder={selectedImage} className="w-full p-3 bg-gray-50 dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 text-sm outline-none focus:ring-2 focus:ring-emerald-700" />
-          <div className="flex flex-wrap gap-2">
-            {WELLNESS_IMAGES.map((img) => (
-              <button
-                key={img.url}
-                type="button"
-                onClick={() => setSelectedImage(img.url)}
-                className={`px-3 py-1 rounded-lg text-[11px] font-semibold border ${
-                  selectedImage === img.url
-                    ? 'bg-[#0B1F1A] text-white border-[#0B1F1A]'
-                    : 'bg-gray-50 dark:bg-slate-800 border-gray-200 dark:border-slate-700'
-                }`}
-              >
-                {img.label}
-              </button>
-            ))}
-          </div>
+          <label className="block text-xs font-semibold">Sanctuary &amp; Spa Photos (Upload / Drag &amp; Drop)</label>
+          <ImageDropzoneUploader
+            images={uploadedImages}
+            onChange={setUploadedImages}
+            bucket="service-images"
+            folderPrefix="wellness"
+            maxImages={8}
+            title="Upload Retreat &amp; Spa Photos"
+            subtitle="Drag & drop spa suites, treatment rooms, pools, or retreat gardens here, or browse from your device."
+            presets={WELLNESS_IMAGES}
+          />
         </div>
       </section>
 
@@ -235,7 +230,7 @@ const WellnessListingForm: React.FC<WellnessListingFormProps> = ({ currentUser, 
         </div>
       </section>
 
-      <div className="p-5 border-t border-gray-100 dark:border-slate-800 bg-gray-50 dark:bg-slate-800/50 flex flex-wrap gap-3 items-center justify-between -mx-6 -mb-6">
+      <div className="p-5 rounded-2xl border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-800/50 flex flex-wrap gap-3 items-center justify-between">
         <span className="text-[11px] text-slate-500 inline-flex items-center gap-1.5">
           <ShieldCheckIcon className="w-4 h-4 text-emerald-600" />
           Protected by AfriEstate Verification Hash

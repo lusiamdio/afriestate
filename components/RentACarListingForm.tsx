@@ -3,6 +3,7 @@ import { ShieldCheckIcon } from '@heroicons/react/24/outline';
 import { publishCarRental } from '../lib/data';
 import type { Property, User } from '../types';
 import { useToast } from '../contexts/ToastContext';
+import ImageDropzoneUploader, { type PresetImageOption } from './ImageDropzoneUploader';
 import {
   assertCanPublish,
   checkSubmissionThrottle,
@@ -18,7 +19,7 @@ interface RentACarListingFormProps {
   onBack: () => void;
 }
 
-const FLEET_IMAGES = [
+const FLEET_IMAGES: PresetImageOption[] = [
   { label: 'Luxury SUV Fleet', url: '/images/luxury_suv_fleet.jpg' },
   { label: 'Executive Sedan', url: '/images/executive_sedan_fleet.jpg' },
   { label: 'Premier Touring SUV', url: '/images/2a47542b078d54560485a1e72a5373aa9c3a4a48-800x535.avif' },
@@ -28,7 +29,7 @@ const RentACarListingForm: React.FC<RentACarListingFormProps> = ({ currentUser, 
   const { addToast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedImage, setSelectedImage] = useState(FLEET_IMAGES[0].url);
+  const [uploadedImages, setUploadedImages] = useState<string[]>([FLEET_IMAGES[0].url]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -72,7 +73,7 @@ const RentACarListingForm: React.FC<RentACarListingFormProps> = ({ currentUser, 
 
     setIsSubmitting(true);
     try {
-      const customImageUrl = String(formData.get('imageUrl') || '').trim();
+      const gallery = uploadedImages.length > 0 ? uploadedImages : [FLEET_IMAGES[0].url];
       const published = await publishCarRental(
         {
           business_name: sanitizeText(String(formData.get('businessName')), 100),
@@ -97,7 +98,8 @@ const RentACarListingForm: React.FC<RentACarListingFormProps> = ({ currentUser, 
           daily_rate: dailyRate,
           currency: sanitizeText(String(formData.get('currency')), 10) || 'ZAR',
           description: sanitizeText(String(formData.get('description')), 1500),
-          image_url: sanitizeSafeUrl(customImageUrl, selectedImage),
+          image_url: gallery[0],
+          images: gallery,
         },
         currentUser
       );
@@ -249,24 +251,17 @@ const RentACarListingForm: React.FC<RentACarListingFormProps> = ({ currentUser, 
             </div>
           </div>
           <div className="md:col-span-2 space-y-2">
-            <label className="block text-xs font-semibold">Vehicle Photo URL (Optional)</label>
-            <input type="text" name="imageUrl" placeholder={selectedImage} className="w-full p-3 bg-gray-50 dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 text-sm outline-none focus:ring-2 focus:ring-emerald-700" />
-            <div className="flex flex-wrap gap-2">
-              {FLEET_IMAGES.map((img) => (
-                <button
-                  key={img.url}
-                  type="button"
-                  onClick={() => setSelectedImage(img.url)}
-                  className={`px-3 py-1 rounded-lg text-[11px] font-semibold border ${
-                    selectedImage === img.url
-                      ? 'bg-[#0B1F1A] text-white border-[#0B1F1A]'
-                      : 'bg-gray-50 dark:bg-slate-800 border-gray-200 dark:border-slate-700'
-                  }`}
-                >
-                  {img.label}
-                </button>
-              ))}
-            </div>
+            <label className="block text-xs font-semibold">Vehicle Photos (Upload / Drag &amp; Drop)</label>
+            <ImageDropzoneUploader
+              images={uploadedImages}
+              onChange={setUploadedImages}
+              bucket="service-images"
+              folderPrefix="transport"
+              maxImages={8}
+              title="Upload Vehicle &amp; Fleet Photos"
+              subtitle="Drag & drop exterior, interior, or chauffeur photos here, or click to select files from your device."
+              presets={FLEET_IMAGES}
+            />
           </div>
         </div>
       </section>
@@ -309,7 +304,7 @@ const RentACarListingForm: React.FC<RentACarListingFormProps> = ({ currentUser, 
         </div>
       </section>
 
-      <div className="p-5 border-t border-gray-100 dark:border-slate-800 bg-gray-50 dark:bg-slate-800/50 flex flex-wrap gap-3 items-center justify-between -mx-6 -mb-6">
+      <div className="p-5 rounded-2xl border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-800/50 flex flex-wrap gap-3 items-center justify-between">
         <span className="text-[11px] text-slate-500 inline-flex items-center gap-1.5">
           <ShieldCheckIcon className="w-4 h-4 text-emerald-600" />
           Protected by AfriEstate Verification Hash

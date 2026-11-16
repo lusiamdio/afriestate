@@ -255,7 +255,8 @@ const AgentProfilePage: React.FC<AgentProfilePageProps> = ({
             {(activePropertyTab === 'active' ? activeProperties : soldProperties).map((prop) => (
               <div key={prop.id} className="flex items-center gap-4 py-3 first:pt-0 last:pb-0">
                 <img
-                  src={prop.images[0] || '/images/house_suburbs_1779978598551.png'}
+                  src={prop.images[0] || '/images/383842941.jpg'}
+                  referrerPolicy="no-referrer"
                   alt={prop.title}
                   className="w-14 h-12 object-cover rounded-lg shrink-0 border border-slate-200 dark:border-slate-700"
                 />

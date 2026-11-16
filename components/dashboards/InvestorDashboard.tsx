@@ -201,18 +201,18 @@ const InvestorDashboard: React.FC<InvestorDashboardProps> = (props) => {
   };
 
   return (
-    <div className="flex h-full font-sans text-slate-800 dark:text-slate-200 relative bg-slate-50 dark:bg-slate-950">
+    <div className="flex flex-1 min-h-[calc(100vh-8rem)] font-sans text-slate-800 dark:text-slate-200 relative bg-slate-50 dark:bg-slate-950">
       {isSidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-20 lg:hidden"
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
 
       <div
-        className={`fixed lg:static inset-y-0 left-0 z-30 transform transition-transform duration-200 ${
+        className={`fixed lg:sticky lg:top-16 inset-y-0 left-0 z-50 lg:z-30 transform transition-transform duration-200 ${
           isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        } lg:translate-x-0 flex-shrink-0 h-full`}
+        } lg:translate-x-0 flex-shrink-0 h-screen lg:h-[calc(100vh-4rem)]`}
       >
         <Sidebar
           activeView={activeView}
@@ -222,8 +222,8 @@ const InvestorDashboard: React.FC<InvestorDashboardProps> = (props) => {
         />
       </div>
 
-      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
-        <div className="h-14 px-4 sm:px-6 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-4 shrink-0">
+      <div className="flex-1 flex flex-col min-w-0">
+        <div className="h-14 px-4 sm:px-6 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-4 sticky top-16 z-10">
           <div className="flex items-center gap-3 min-w-0">
             <button
               onClick={() => setIsSidebarOpen(true)}
@@ -251,7 +251,7 @@ const InvestorDashboard: React.FC<InvestorDashboardProps> = (props) => {
           </div>
         </div>
 
-        <main className="flex-1 overflow-y-auto">{renderContent()}</main>
+        <main className="flex-1">{renderContent()}</main>
       </div>
     </div>
   );

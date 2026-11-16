@@ -9,6 +9,7 @@ import { decode, decodeAudioData } from '../lib/audioUtils';
 import { useCurrency } from '../contexts/CurrencyContext';
 import { useToast } from '../contexts/ToastContext';
 import { useAdminState, type SovereignRoleKey } from '../contexts/AdminStateContext';
+import ImageDropzoneUploader, { type PresetImageOption } from './ImageDropzoneUploader';
 import {
   assertCanPublish,
   checkSubmissionThrottle,
@@ -23,16 +24,17 @@ interface PropertyFormModalProps {
   onSave: (property: Property) => void;
   propertyToEdit: Property | null;
   currentUser: User;
+  initialListingType?: ListingType;
 }
 
-const IMAGE_PRESETS = [
-  { label: 'Coastal Mansion', url: '/images/coastal_mansion_1779978805301.png' },
-  { label: 'Modern Estate', url: '/images/modern_house_tan_1779978632706.png' },
-  { label: 'Urban Apartment', url: '/images/apartment_block_1779978678706.png' },
-  { label: 'Luxury Interior', url: '/images/luxury_kitchen_living_1779978720358.png' },
-  { label: 'Executive Suite', url: '/images/loft_interior_1779978697203.png' },
+const IMAGE_PRESETS: PresetImageOption[] = [
+  { label: 'Luxury Resort Villa', url: '/images/50_88d3447798594a3781403aa23f0baf00_t_w_1440_h_900.jpg' },
+  { label: 'Modern Estate', url: '/images/565600_H_39.jpg' },
+  { label: 'Contemporary Home', url: '/images/2ec34ce4ca57aef13fc8b3239a99345e.jpg' },
+  { label: 'Furnished Studio', url: '/images/841376502.webp' },
+  { label: 'Executive Suite', url: '/images/bQpZBCFZhwE8O_cs7mNAwkaUM8W3jpm_4o1EJoHW6CGw7RXnjNWQ4gX3DfiZQ6GxCxJqkk20Qg5bXqnlWqaI92-MaZ8a8Xmce7-Cu87PNH1kCvSJ58uf9qG4HPAkgSNvwht2w7D-62vuOPfMKOF4mrLv86eLr0x1s2VjH82vOpSiRnY3HbLAXkL6ghFJL81S.jpg' },
   { label: 'Safari Retreat', url: '/images/safari_lodge_retreat.jpg' },
-  { label: 'Wellness Spa', url: '/images/spa_wellness_1779978823248.png' },
+  { label: 'Wellness Spa', url: '/images/getlstd-property-photo.jpg' },
   { label: 'Executive SUV', url: '/images/luxury_suv_fleet.jpg' },
 ];
 
@@ -49,7 +51,7 @@ const emptyProperty: Omit<Property, 'id' | 'agent' | 'featured' | 'smartContract
   description: '',
   neighborhoodInfo: '',
   amenities: [],
-  images: ['/images/coastal_mansion_1779978805301.png'],
+  images: ['/images/50_88d3447798594a3781403aa23f0baf00_t_w_1440_h_900.jpg'],
   virtualTourUrl: '',
   vrTourUrl: '',
   verified: true,
@@ -66,7 +68,14 @@ const emptyProperty: Omit<Property, 'id' | 'agent' | 'featured' | 'smartContract
   leaseDuration: 'Long term',
 };
 
-const PropertyFormModal: React.FC<PropertyFormModalProps> = ({ isOpen, onClose, onSave, propertyToEdit, currentUser }) => {
+const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
+  isOpen,
+  onClose,
+  onSave,
+  propertyToEdit,
+  currentUser,
+  initialListingType,
+}) => {
     const [property, setProperty] = useState(emptyProperty);
     const [isGenerating, setIsGenerating] = useState(false);
     const [isListening, setIsListening] = useState(false);
@@ -82,18 +91,22 @@ const PropertyFormModal: React.FC<PropertyFormModalProps> = ({ isOpen, onClose, 
                 ...propertyToEdit,
                 country: propertyToEdit.country || 'South Africa',
                 region: propertyToEdit.region || 'Southern Africa',
-                images: propertyToEdit.images?.length ? propertyToEdit.images : ['/images/coastal_mansion_1779978805301.png'],
+                images: propertyToEdit.images?.length ? propertyToEdit.images : ['/images/50_88d3447798594a3781403aa23f0baf00_t_w_1440_h_900.jpg'],
             });
         } else {
+            const defaultListing =
+                initialListingType ||
+                (currentUser.role === 'investor' ? ListingType.FOR_INVESTMENT : ListingType.SALE);
             setProperty({
                 ...emptyProperty,
                 dateListed: Date.now(),
-                propertyType: currentUser.role === 'user' ? PropertyType.TRANSPORT : PropertyType.APARTMENT,
-                listingType: currentUser.role === 'investor' ? ListingType.FOR_INVESTMENT : ListingType.SALE,
+                propertyType: PropertyType.APARTMENT,
+                listingType: defaultListing,
+                leaseDuration: defaultListing === ListingType.RENT ? 'Long term' : emptyProperty.leaseDuration,
             });
         }
         setFormError(null);
-    }, [propertyToEdit, isOpen, currentUser]);
+    }, [propertyToEdit, isOpen, currentUser, initialListingType]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
@@ -257,7 +270,13 @@ const PropertyFormModal: React.FC<PropertyFormModalProps> = ({ isOpen, onClose, 
 
         const id = propertyToEdit?.id || `prop_${Date.now().toString(36)}`;
         const sig = generateListingSignature(id, currentUser.username, Number(property.price));
-        const cleanImage = sanitizeSafeUrl(property.images?.[0], '/images/coastal_mansion_1779978805301.png');
+        const sanitizedImages = (property.images || [])
+            .map((img) => sanitizeSafeUrl(img, ''))
+            .filter(Boolean);
+        const resolvedImages =
+            sanitizedImages.length > 0
+                ? sanitizedImages
+                : ['/images/50_88d3447798594a3781403aa23f0baf00_t_w_1440_h_900.jpg'];
 
         const isDraft = property.status === PropertyStatus.DRAFT;
         const holdForModeration = !isDraft && !propertyToEdit && settings.securityPolicies.autoModerateListings;
@@ -280,7 +299,7 @@ const PropertyFormModal: React.FC<PropertyFormModalProps> = ({ isOpen, onClose, 
             price: Number(property.price),
             description: sanitizeText(property.description, 2000),
             neighborhoodInfo: sanitizeText(property.neighborhoodInfo, 1000),
-            images: [cleanImage],
+            images: resolvedImages,
             vrTourUrl: property.vrTourUrl ? sanitizeSafeUrl(property.vrTourUrl, '') : '',
             status: resolvedStatus,
             dateListed: property.dateListed || Date.now(),
@@ -366,7 +385,6 @@ const PropertyFormModal: React.FC<PropertyFormModalProps> = ({ isOpen, onClose, 
                             <select name="propertyType" value={property.propertyType} onChange={handleChange} className="w-full input">
                                 {Object.values(PropertyType)
                                     .filter(t => t !== PropertyType.ALL)
-                                    .filter(t => currentUser?.role === 'user' ? [PropertyType.TRANSPORT, PropertyType.WELLNESS, PropertyType.SHORT_TERM_RENTAL, PropertyType.HOTEL].includes(t) : true)
                                     .map(type => <option key={type} value={type}>{type}</option>)}
                             </select>
                         </div>
@@ -503,42 +521,25 @@ const PropertyFormModal: React.FC<PropertyFormModalProps> = ({ isOpen, onClose, 
                     </div>
 
                     {/* Media */}
-                    <div className="space-y-3">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1">Primary Photo URL</label>
-                              <input
-                                type="text"
-                                name="images"
-                                value={(property.images && property.images[0]) || ''}
-                                onChange={(e) => setProperty(p => ({...p, images: [e.target.value]}))}
-                                placeholder="/images/coastal_mansion_1779978805301.png"
-                                className="w-full input"
-                              />
-                          </div>
-                          <div>
-                              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1">VR / Video Tour URL (Optional)</label>
-                              <input type="text" name="vrTourUrl" value={property.vrTourUrl || ''} onChange={handleChange} placeholder="https://youtube.com/embed/..." className="w-full input"/>
-                          </div>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1.5">
+                          Property Photos (Upload / Drag &amp; Drop)
+                        </label>
+                        <ImageDropzoneUploader
+                          images={property.images || []}
+                          onChange={(nextImages) => setProperty((p) => ({ ...p, images: nextImages }))}
+                          bucket="property-media"
+                          folderPrefix="properties"
+                          maxImages={8}
+                          title="Upload Listing Photos"
+                          subtitle="Drag & drop property photos here, or browse from your device."
+                          presets={IMAGE_PRESETS}
+                        />
                       </div>
                       <div>
-                        <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1.5">Or choose a verified studio showcase image:</p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {IMAGE_PRESETS.map((preset) => (
-                            <button
-                              key={preset.url}
-                              type="button"
-                              onClick={() => setProperty((p) => ({ ...p, images: [preset.url] }))}
-                              className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-colors ${
-                                property.images?.[0] === preset.url
-                                  ? 'bg-[#0B1F1A] text-white border-[#0B1F1A]'
-                                  : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300'
-                              }`}
-                            >
-                              {preset.label}
-                            </button>
-                          ))}
-                        </div>
+                          <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1">VR / Video Tour URL (Optional)</label>
+                          <input type="text" name="vrTourUrl" value={property.vrTourUrl || ''} onChange={handleChange} placeholder="https://youtube.com/embed/..." className="w-full input"/>
                       </div>
                     </div>
 

@@ -302,6 +302,21 @@ const Footer: React.FC<FooterProps> = ({
                       Plans &amp; Pricing
                     </button>
                   </li>
+                  <li>
+                    <button type="button" onClick={() => onPageJump('seeker-dashboard')} className="text-slate-300 hover:text-amber-300 transition-colors font-normal">
+                      Property Seeker Hub
+                    </button>
+                  </li>
+                  <li>
+                    <button type="button" onClick={() => onPageJump('agent-platform')} className="text-slate-300 hover:text-amber-300 transition-colors font-normal">
+                      Agent Platform
+                    </button>
+                  </li>
+                  <li>
+                    <button type="button" onClick={() => onPageJump('investor-platform')} className="text-slate-300 hover:text-amber-300 transition-colors font-normal">
+                      Investor Platform
+                    </button>
+                  </li>
                   {flags.hotelRegistration && (
                     <li>
                       <button type="button" onClick={() => onPageJump('hotel-registration')} className="text-slate-300 hover:text-amber-300 transition-colors font-normal">

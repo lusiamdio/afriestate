@@ -71,7 +71,7 @@ const fallbackProviders = [
     location: 'Johannesburg',
     rating: 4.8,
     category: 'Medical Wellness · Preventive Care',
-    image: '/images/spa_wellness_1779978823248.png',
+    image: '/images/ciGI9jt_sGVPxiolPnhsy4lAgRDH_3j8eZMJxZIm97d_f65lcSHw26Eo1j98ieeBwr8GwTqFdYVrQxmycHYskbBo00ycrJusnkMalqSQ6xAVOdjkMa2TbZEkfwgILcYox9fLkhguJe46qif3N1OguJwZXehGdCmtWgd4E974iGSybhRE-PvS7RwPu3YvkhSr.jpg',
     notes: 'Diagnostics-led preventive health center specializing in stress recovery, sleep medicine, and metabolic care.',
     phone: '+27 11 444 8888',
     website: 'vitallongevity.co.za',
@@ -81,7 +81,7 @@ const fallbackProviders = [
     location: 'Garden Route',
     rating: 5.0,
     category: 'Wellness Retreats · Thermal Hydrotherapy',
-    image: '/images/house_pool_1779978750296.png',
+    image: '/images/383842941.jpg',
     notes: 'Private teak pavilion retreat with mineral pools, guided yoga sessions, and farm-to-table botanical menus.',
     phone: '+27 44 333 9999',
     website: 'wildernessretreat.co.za',
@@ -152,7 +152,7 @@ const FindWellnessPage: React.FC<FindWellnessPageProps> = ({ properties = [], on
       location: String(item.location || 'South Africa'),
       rating: Number(item.rating || 4.8),
       category: String(item.category || 'Holistic Care'),
-      image: String(item.image || '/images/spa_wellness_1779978823248.png'),
+      image: String(item.image || fallbackProviders[idx % fallbackProviders.length].image),
       notes: String(item.notes || item.description || 'Verified AfriEstate wellness practitioner and retreat sanctuary.'),
       phone: String(item.phone || 'N/A'),
       website: String(item.website || 'N/A'),
@@ -461,6 +461,13 @@ const FindWellnessPage: React.FC<FindWellnessPageProps> = ({ properties = [], on
                     <img
                       src={company.image}
                       alt={company.name}
+                      onError={(e) => {
+                        const target = e.currentTarget;
+                        if (!target.dataset.fallbackApplied) {
+                          target.dataset.fallbackApplied = '1';
+                          target.src = '/images/getlstd-property-photo.jpg';
+                        }
+                      }}
                       className="w-full h-full object-cover"
                       referrerPolicy="no-referrer"
                     />

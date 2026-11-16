@@ -223,8 +223,9 @@ const AgentListingsManagement: React.FC<AgentListingsManagementProps> = ({
                       <td className="py-2.5 px-3">
                         <div className="flex items-center gap-3 min-w-[220px]">
                           <img
-                            src={property.images[0] || '/images/house_suburbs_1779978598551.png'}
+                            src={property.images[0] || '/images/383842941.jpg'}
                             alt={property.title}
+                            referrerPolicy="no-referrer"
                             className="w-11 h-9 rounded-md object-cover shrink-0 border border-slate-200 dark:border-slate-700"
                           />
                           <div className="min-w-0">

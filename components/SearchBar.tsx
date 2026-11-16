@@ -46,7 +46,7 @@ const SearchBar: React.FC<SearchBarProps> = ({ onSearch, isSearchingAI, filters,
   return (
     <div className="w-full">
       {/* 1. Intent Mode Tabs */}
-      <div className="flex items-center gap-1 pb-2">
+      <div className="flex flex-wrap items-center justify-center gap-1.5 pb-2">
         <button
           type="button"
           onClick={() => handleModeSwitch('buy')}

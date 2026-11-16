@@ -31,6 +31,7 @@ import { ListingType, PropertyStatus, PropertyType, type Property } from '../../
 import { FLAGSHIP_AFRICAN_GRAND_HOTEL, type StayPropertyProfile } from '../../data/stayDetailData';
 import { publishHotelListing, saveHotelRegistration } from '../../lib/data';
 import { generateListingSignature, sanitizeText } from '../../lib/security';
+import ImageDropzoneUploader, { type PresetImageOption } from '../ImageDropzoneUploader';
 
 interface HotelRegistrationPageProps {
   onBack: () => void;
@@ -88,7 +89,15 @@ interface CopilotCard {
   status: 'active' | 'applied' | 'dismissed';
 }
 
-const DRAFT_STORAGE_KEY = 'afriestate_hotel_reg_draft_v1';
+const DRAFT_STORAGE_KEY = 'afriestate_hotel_reg_draft_v2';
+
+const HOTEL_GALLERY_PRESETS: PresetImageOption[] = [
+  { label: 'Luxury Resort Exterior', url: '/images/50_88d3447798594a3781403aa23f0baf00_t_w_1440_h_900.jpg' },
+  { label: 'Canopy Suite', url: '/images/bQpZBCFZhwE8O_cs7mNAwkaUM8W3jpm_4o1EJoHW6CGw7RXnjNWQ4gX3DfiZQ6GxCxJqkk20Qg5bXqnlWqaI92-MaZ8a8Xmce7-Cu87PNH1kCvSJ58uf9qG4HPAkgSNvwht2w7D-62vuOPfMKOF4mrLv86eLr0x1s2VjH82vOpSiRnY3HbLAXkL6ghFJL81S.jpg' },
+  { label: 'Garden Pool & Lounge', url: '/images/383842941.jpg' },
+  { label: 'Thermal Spa Deck', url: '/images/getlstd-property-photo.jpg' },
+  { label: 'Executive Suite Interior', url: '/images/841376502.webp' },
+];
 
 const STAGES = [
   { num: 1, key: 'Account', label: 'Account Creation' },
@@ -263,167 +272,102 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({
   const [accountVerified, setAccountVerified] = useState<boolean>(Boolean(savedDraft?.accountVerified));
 
   // Stage 2 State
-  const [operatorType, setOperatorType] = useState<string>(savedDraft?.operatorType || 'Company');
-  const [companyName, setCompanyName] = useState<string>(savedDraft?.companyName || 'Meridian Hospitality Group (Pty) Ltd');
-  const [tradingName, setTradingName] = useState<string>(savedDraft?.tradingName || 'The Cape Meridian Hotel');
-  const [regNumber, setRegNumber] = useState<string>(savedDraft?.regNumber || '2018/442190/07');
+  const [operatorType, setOperatorType] = useState<string>(savedDraft?.operatorType || '');
+  const [companyName, setCompanyName] = useState<string>(savedDraft?.companyName || '');
+  const [tradingName, setTradingName] = useState<string>(savedDraft?.tradingName || '');
+  const [regNumber, setRegNumber] = useState<string>(savedDraft?.regNumber || '');
   const [regCountry, setRegCountry] = useState<string>(savedDraft?.regCountry || 'South Africa');
-  const [taxNumber, setTaxNumber] = useState<string>(savedDraft?.taxNumber || '4490281912');
+  const [taxNumber, setTaxNumber] = useState<string>(savedDraft?.taxNumber || '');
   const [businessType, setBusinessType] = useState<string>(savedDraft?.businessType || 'Private Company');
-  const [regProvince, setRegProvince] = useState<string>(savedDraft?.regProvince || 'Western Cape');
-  const [regCity, setRegCity] = useState<string>(savedDraft?.regCity || 'Cape Town');
-  const [regStreet, setRegStreet] = useState<string>(savedDraft?.regStreet || '128 Beach Road, Sea Point');
-  const [regPostal, setRegPostal] = useState<string>(savedDraft?.regPostal || '8005');
-  const [relationship, setRelationship] = useState<string>(savedDraft?.relationship || 'General Manager');
+  const [regProvince, setRegProvince] = useState<string>(savedDraft?.regProvince || '');
+  const [regCity, setRegCity] = useState<string>(savedDraft?.regCity || '');
+  const [regStreet, setRegStreet] = useState<string>(savedDraft?.regStreet || '');
+  const [regPostal, setRegPostal] = useState<string>(savedDraft?.regPostal || '');
+  const [relationship, setRelationship] = useState<string>(savedDraft?.relationship || '');
   const [uploadedDocs, setUploadedDocs] = useState<Record<string, boolean>>(
     savedDraft?.uploadedDocs || {
-      'Certificate of incorporation': true,
-      'Tax certificate': true,
-      'Business registration': true,
+      'Certificate of incorporation': false,
+      'Tax certificate': false,
+      'Business registration': false,
       'Operating license': false,
-      'Authorization evidence': true,
+      'Authorization evidence': false,
     }
   );
 
   // Stage 3 State
-  const [hotelName, setHotelName] = useState<string>(savedDraft?.hotelName || 'The Cape Meridian Hotel');
+  const [hotelName, setHotelName] = useState<string>(savedDraft?.hotelName || '');
   const [hotelType, setHotelType] = useState<string>(savedDraft?.hotelType || 'Hotel');
   const [starRating, setStarRating] = useState<string>(savedDraft?.starRating || '5 Star');
-  const [officiallyAccredited, setOfficiallyAccredited] = useState<'Yes' | 'No'>(savedDraft?.officiallyAccredited || 'Yes');
+  const [officiallyAccredited, setOfficiallyAccredited] = useState<'Yes' | 'No'>(savedDraft?.officiallyAccredited || 'No');
   const [accreditingAuthority, setAccreditingAuthority] = useState<string>(
-    savedDraft?.accreditingAuthority || 'Tourism Grading Council of South Africa (TGCSA)'
+    savedDraft?.accreditingAuthority || ''
   );
-  const [certificateNumber, setCertificateNumber] = useState<string>(savedDraft?.certificateNumber || 'TGCSA-WC-88412');
-  const [certificateExpiry, setCertificateExpiry] = useState<string>(savedDraft?.certificateExpiry || '2027-12-31');
-  const [shortDesc, setShortDesc] = useState<string>(
-    savedDraft?.shortDesc ||
-      'Coastal five-star retreat overlooking the Atlantic Seaboard in Cape Town with conference suites, spa wellness floor, and 24-hour concierge.'
-  );
-  const [fullDesc, setFullDesc] = useState<string>(
-    savedDraft?.fullDesc ||
-      `About the Hotel\nPositioned along Cape Town’s scenic Atlantic corridor, The Cape Meridian Hotel blends coastal architecture with executive hospitality.\n\nRooms & Accommodation\n• 142 sunlit suites & rooms with private balconies and soundproofed glazing\n• High-speed fibre connectivity and smart workspace desks\n\nDining & Wellness\n• Signature ocean-view restaurant, rooftop terrace bar, heated lap pool, and full spa\n\nBusiness Facilities\n• 400-seat conference center and private boardrooms minutes from the CBD`
-  );
+  const [certificateNumber, setCertificateNumber] = useState<string>(savedDraft?.certificateNumber || '');
+  const [certificateExpiry, setCertificateExpiry] = useState<string>(savedDraft?.certificateExpiry || '');
+  const [shortDesc, setShortDesc] = useState<string>(savedDraft?.shortDesc || '');
+  const [fullDesc, setFullDesc] = useState<string>(savedDraft?.fullDesc || '');
   const [aiCopyLoading, setAiCopyLoading] = useState<boolean>(false);
-  const [hasLogo, setHasLogo] = useState<boolean>(savedDraft?.hasLogo ?? true);
-  const [hasCoverImage, setHasCoverImage] = useState<boolean>(savedDraft?.hasCoverImage ?? true);
+  const [hasLogo, setHasLogo] = useState<boolean>(savedDraft?.hasLogo ?? false);
+  const [hasCoverImage, setHasCoverImage] = useState<boolean>(savedDraft?.hasCoverImage ?? false);
   const [stageErrors, setStageErrors] = useState<string[]>([]);
-  const [selectedGalleryCats, setSelectedGalleryCats] = useState<string[]>(['Exterior', 'Lobby', 'Rooms', 'Pool', 'Restaurant']);
-  const [galleryImages, setGalleryImages] = useState<string[]>([
-    '/images/coastal_mansion_1779978805301.png',
-    '/images/house_pool_1779978750296.png',
-    '/images/loft_interior_1779978697203.png',
-    '/images/apartment_block_1779978678706.png',
-    '/images/living_room_1779978722558.png',
-  ]);
+  const [selectedGalleryCats, setSelectedGalleryCats] = useState<string[]>(savedDraft?.selectedGalleryCats || []);
+  const [galleryImages, setGalleryImages] = useState<string[]>(savedDraft?.galleryImages || []);
 
   // Stage 4 State
   const [hotelCountry, setHotelCountry] = useState<string>(savedDraft?.hotelCountry || 'South Africa');
-  const [hotelProvince, setHotelProvince] = useState<string>(savedDraft?.hotelProvince || 'Western Cape');
-  const [hotelCity, setHotelCity] = useState<string>(savedDraft?.hotelCity || 'Cape Town');
-  const [hotelDistrict, setHotelDistrict] = useState<string>(savedDraft?.hotelDistrict || 'Sea Point / Atlantic Seaboard');
-  const [hotelStreet, setHotelStreet] = useState<string>(savedDraft?.hotelStreet || '128 Beach Road');
-  const [hotelPostal, setHotelPostal] = useState<string>(savedDraft?.hotelPostal || '8005');
-  const [locationConfirmed, setLocationConfirmed] = useState<boolean>(savedDraft?.locationConfirmed ?? true);
-  const [publicAddress, setPublicAddress] = useState<string>('128 Beach Road, Sea Point, Cape Town');
-  const [operationalAddress, setOperationalAddress] = useState<string>('Service Entrance, 42 Regent Lane, Sea Point');
-  const [billingAddress, setBillingAddress] = useState<string>('128 Beach Road, Cape Town, 8005');
-  const [emergencyAddress, setEmergencyAddress] = useState<string>('24h Security Desk, Gate B, 128 Beach Road');
+  const [hotelProvince, setHotelProvince] = useState<string>(savedDraft?.hotelProvince || '');
+  const [hotelCity, setHotelCity] = useState<string>(savedDraft?.hotelCity || '');
+  const [hotelDistrict, setHotelDistrict] = useState<string>(savedDraft?.hotelDistrict || '');
+  const [hotelStreet, setHotelStreet] = useState<string>(savedDraft?.hotelStreet || '');
+  const [hotelPostal, setHotelPostal] = useState<string>(savedDraft?.hotelPostal || '');
+  const [locationConfirmed, setLocationConfirmed] = useState<boolean>(savedDraft?.locationConfirmed ?? false);
+  const [publicAddress, setPublicAddress] = useState<string>(savedDraft?.publicAddress || '');
+  const [operationalAddress, setOperationalAddress] = useState<string>(savedDraft?.operationalAddress || '');
+  const [billingAddress, setBillingAddress] = useState<string>(savedDraft?.billingAddress || '');
+  const [emergencyAddress, setEmergencyAddress] = useState<string>(savedDraft?.emergencyAddress || '');
 
   // Stage 5 State (Property Physical + Rooms)
-  const [buildingsCount, setBuildingsCount] = useState<number>(1);
-  const [floorsCount, setFloorsCount] = useState<number>(8);
-  const [totalRoomsCount, setTotalRoomsCount] = useState<number>(142);
-  const [yearOpened, setYearOpened] = useState<number>(2018);
-  const [lastRenovation, setLastRenovation] = useState<number>(2025);
-  const [totalCapacity, setTotalCapacity] = useState<number>(284);
-  const [roomTypes, setRoomTypes] = useState<RoomTypeDraft[]>(
-    savedDraft?.roomTypes || [
-      {
-        id: 'room-1',
-        name: 'Deluxe King Room',
-        category: 'Deluxe',
-        bedConfig: 'King',
-        maxAdults: 2,
-        maxChildren: 1,
-        sizeSqm: 42,
-        hasBalcony: true,
-        viewType: 'Ocean',
-        availableCount: 24,
-        baseRate: 2450,
-        amenities: ['Air conditioning', 'Smart TV', 'Mini bar', 'Safe', 'Coffee machine', 'Desk', 'Shower'],
-        photoCount: 6,
-      },
-      {
-        id: 'room-2',
-        name: 'Executive Ocean Suite',
-        category: 'Executive',
-        bedConfig: 'Super King',
-        maxAdults: 2,
-        maxChildren: 2,
-        sizeSqm: 68,
-        hasBalcony: true,
-        viewType: 'Ocean',
-        availableCount: 12,
-        baseRate: 3890,
-        amenities: ['Air conditioning', 'Smart TV', 'Mini bar', 'Safe', 'Coffee machine', 'Bathtub', 'Shower', 'Kitchenette'],
-        photoCount: 8,
-      },
-    ]
-  );
+  const [buildingsCount, setBuildingsCount] = useState<number>(savedDraft?.buildingsCount ?? 0);
+  const [floorsCount, setFloorsCount] = useState<number>(savedDraft?.floorsCount ?? 0);
+  const [totalRoomsCount, setTotalRoomsCount] = useState<number>(savedDraft?.totalRoomsCount ?? 0);
+  const [yearOpened, setYearOpened] = useState<number>(savedDraft?.yearOpened ?? 0);
+  const [lastRenovation, setLastRenovation] = useState<number>(savedDraft?.lastRenovation ?? 0);
+  const [totalCapacity, setTotalCapacity] = useState<number>(savedDraft?.totalCapacity ?? 0);
+  const [roomTypes, setRoomTypes] = useState<RoomTypeDraft[]>(savedDraft?.roomTypes || []);
 
   // Stage 6 State (Accessibility & Amenities)
-  const [selectedAccessibility, setSelectedAccessibility] = useState<string[]>([
-    'Wheelchair accessible entrance',
-    'Accessible rooms',
-    'Elevator',
-    'Accessible parking',
-  ]);
-  const [selectedAmenities, setSelectedAmenities] = useState<string[]>([
-    'Wi-Fi',
-    'Parking',
-    '24-hour reception',
-    'Concierge',
-    'Gym',
-    'Spa',
-    'Swimming pool',
-    'Restaurant',
-    'Bar',
-    'Breakfast',
-    'Meeting rooms',
-    'Conference center',
-    'High-speed internet',
-    'Family rooms',
-  ]);
+  const [selectedAccessibility, setSelectedAccessibility] = useState<string[]>(savedDraft?.selectedAccessibility || []);
+  const [selectedAmenities, setSelectedAmenities] = useState<string[]>(savedDraft?.selectedAmenities || []);
 
   // Stage 7 State (Rates, Dynamic Pricing, Availability & Policies)
-  const [baseCurrency, setBaseCurrency] = useState<string>('ZAR');
-  const [flexibleRate, setFlexibleRate] = useState<number>(2450);
-  const [nonRefundableRate, setNonRefundableRate] = useState<number>(2150);
-  const [breakfastRate, setBreakfastRate] = useState<number>(2650);
-  const [halfBoardRate, setHalfBoardRate] = useState<number>(2950);
-  const [smartPricingEnabled, setSmartPricingEnabled] = useState<boolean>(true);
+  const [baseCurrency, setBaseCurrency] = useState<string>(savedDraft?.baseCurrency || 'ZAR');
+  const [flexibleRate, setFlexibleRate] = useState<number>(savedDraft?.flexibleRate ?? 0);
+  const [nonRefundableRate, setNonRefundableRate] = useState<number>(savedDraft?.nonRefundableRate ?? 0);
+  const [breakfastRate, setBreakfastRate] = useState<number>(savedDraft?.breakfastRate ?? 0);
+  const [halfBoardRate, setHalfBoardRate] = useState<number>(savedDraft?.halfBoardRate ?? 0);
+  const [smartPricingEnabled, setSmartPricingEnabled] = useState<boolean>(savedDraft?.smartPricingEnabled ?? true);
   const [selectedCalendarAction, setSelectedCalendarAction] = useState<'Open' | 'Close' | 'Block'>('Open');
-  const [closedDates, setClosedDates] = useState<number[]>([14, 15]);
-  const [blockedDates, setBlockedDates] = useState<number[]>([28]);
-  const [checkInTime, setCheckInTime] = useState<string>('14:00');
-  const [checkOutTime, setCheckOutTime] = useState<string>('11:00');
+  const [closedDates, setClosedDates] = useState<number[]>(savedDraft?.closedDates || []);
+  const [blockedDates, setBlockedDates] = useState<number[]>(savedDraft?.blockedDates || []);
+  const [checkInTime, setCheckInTime] = useState<string>(savedDraft?.checkInTime || '');
+  const [checkOutTime, setCheckOutTime] = useState<string>(savedDraft?.checkOutTime || '');
   const [earlyCheckIn, setEarlyCheckIn] = useState<'Available' | 'Unavailable'>('Available');
   const [lateCheckOut, setLateCheckOut] = useState<'Available' | 'Unavailable'>('Available');
-  const [minStay, setMinStay] = useState<number>(1);
-  const [maxStay, setMaxStay] = useState<number>(30);
-  const [cancellationPolicy, setCancellationPolicy] = useState<string>('Flexible');
+  const [minStay, setMinStay] = useState<number>(savedDraft?.minStay ?? 1);
+  const [maxStay, setMaxStay] = useState<number>(savedDraft?.maxStay ?? 30);
+  const [cancellationPolicy, setCancellationPolicy] = useState<string>(savedDraft?.cancellationPolicy || '');
   const [childrenAllowed, setChildrenAllowed] = useState<'Yes' | 'No'>('Yes');
   const [petsAllowed, setPetsAllowed] = useState<'Yes' | 'No'>('No');
   const [smokingPolicy, setSmokingPolicy] = useState<string>('Non-smoking');
   const [partiesAllowed, setPartiesAllowed] = useState<'Allowed' | 'Not allowed'>('Not allowed');
-  const [minGuestAge, setMinGuestAge] = useState<number>(18);
+  const [minGuestAge, setMinGuestAge] = useState<number>(savedDraft?.minGuestAge ?? 18);
 
   // Stage 8 State (Payments & Taxes)
-  const [accountHolder, setAccountHolder] = useState<string>('Meridian Hospitality Group (Pty) Ltd');
-  const [bankName, setBankName] = useState<string>('First National Bank (FNB)');
-  const [accountNumber, setAccountNumber] = useState<string>('62891044312');
-  const [branchCode, setBranchCode] = useState<string>('250655');
-  const [swiftBic, setSwiftBic] = useState<string>('FIRNZAJJ');
+  const [accountHolder, setAccountHolder] = useState<string>(savedDraft?.accountHolder || '');
+  const [bankName, setBankName] = useState<string>(savedDraft?.bankName || '');
+  const [accountNumber, setAccountNumber] = useState<string>(savedDraft?.accountNumber || '');
+  const [branchCode, setBranchCode] = useState<string>(savedDraft?.branchCode || '');
+  const [swiftBic, setSwiftBic] = useState<string>(savedDraft?.swiftBic || '');
   const [bankAccountType, setBankAccountType] = useState<'Business' | 'Personal'>('Business');
   const [simGuestUsd, setSimGuestUsd] = useState<number>(180);
   const [chargesTaxes, setChargesTaxes] = useState<'Yes' | 'No'>('Yes');
@@ -432,7 +376,7 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({
   const [taxDisplayMode, setTaxDisplayMode] = useState<'Included in displayed price' | 'Added at checkout'>('Included in displayed price');
 
   // Stage 9 State (Compliance & Preview)
-  const [legalChecks, setLegalChecks] = useState<boolean[]>([true, true, true, true, false]);
+  const [legalChecks, setLegalChecks] = useState<boolean[]>(savedDraft?.legalChecks || [false, false, false, false, false]);
   const [previewTab, setPreviewTab] = useState<'Photos' | 'Rooms' | 'Amenities' | 'Location' | 'Reviews'>('Photos');
 
   // Hotel Command Center State (Post-Submission)
@@ -690,6 +634,100 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({
     return Math.min(100, score);
   }, [shortDesc.length, galleryImages.length, roomTypes.length, selectedAmenities.length, smartPricingEnabled, legalChecks]);
 
+  const resetNewListing = () => {
+    try {
+      localStorage.removeItem(DRAFT_STORAGE_KEY);
+    } catch {
+      // ignore storage errors
+    }
+    setStage(1);
+    setFirstName('');
+    setMiddleName('');
+    setLastName('');
+    setBusinessEmail('');
+    setPhoneCountry('South Africa');
+    setPhoneCode('+27');
+    setPhoneNumber('');
+    setPassword('');
+    setConfirmPassword('');
+    setConsentTerms(false);
+    setConsentPrivacy(false);
+    setConsentUpdates(false);
+    setAwaitingOtp(false);
+    setEmailOtp(['', '', '', '', '', '']);
+    setPhoneOtp(['', '', '', '', '', '']);
+    setAccountVerified(false);
+    setOperatorType('');
+    setCompanyName('');
+    setTradingName('');
+    setRegNumber('');
+    setRegCountry('South Africa');
+    setTaxNumber('');
+    setBusinessType('Private Company');
+    setRegProvince('');
+    setRegCity('');
+    setRegStreet('');
+    setRegPostal('');
+    setRelationship('');
+    setUploadedDocs({
+      'Certificate of incorporation': false,
+      'Tax certificate': false,
+      'Business registration': false,
+      'Operating license': false,
+      'Authorization evidence': false,
+    });
+    setHotelName('');
+    setHotelType('Hotel');
+    setStarRating('5 Star');
+    setOfficiallyAccredited('No');
+    setAccreditingAuthority('');
+    setCertificateNumber('');
+    setCertificateExpiry('');
+    setShortDesc('');
+    setFullDesc('');
+    setHasLogo(false);
+    setHasCoverImage(false);
+    setSelectedGalleryCats([]);
+    setGalleryImages([]);
+    setHotelCountry('South Africa');
+    setHotelProvince('');
+    setHotelCity('');
+    setHotelDistrict('');
+    setHotelStreet('');
+    setHotelPostal('');
+    setLocationConfirmed(false);
+    setPublicAddress('');
+    setOperationalAddress('');
+    setBillingAddress('');
+    setEmergencyAddress('');
+    setBuildingsCount(0);
+    setFloorsCount(0);
+    setTotalRoomsCount(0);
+    setYearOpened(0);
+    setLastRenovation(0);
+    setTotalCapacity(0);
+    setRoomTypes([]);
+    setSelectedAccessibility([]);
+    setSelectedAmenities([]);
+    setBaseCurrency('ZAR');
+    setFlexibleRate(0);
+    setNonRefundableRate(0);
+    setBreakfastRate(0);
+    setHalfBoardRate(0);
+    setClosedDates([]);
+    setBlockedDates([]);
+    setCheckInTime('');
+    setCheckOutTime('');
+    setCancellationPolicy('');
+    setAccountHolder('');
+    setBankName('');
+    setAccountNumber('');
+    setBranchCode('');
+    setSwiftBic('');
+    setLegalChecks([false, false, false, false, false]);
+    setStageErrors([]);
+  };
+
   // Save draft helper
   const saveDraft = (nextStage = stage) => {
     try {
@@ -736,9 +774,37 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({
         hotelStreet,
         hotelPostal,
         locationConfirmed,
+        publicAddress,
+        operationalAddress,
+        billingAddress,
+        emergencyAddress,
         hasLogo,
         hasCoverImage,
+        galleryImages,
+        selectedGalleryCats,
+        buildingsCount,
+        floorsCount,
+        totalRoomsCount,
+        yearOpened,
+        lastRenovation,
+        totalCapacity,
         roomTypes,
+        selectedAccessibility,
+        selectedAmenities,
+        baseCurrency,
+        flexibleRate,
+        nonRefundableRate,
+        breakfastRate,
+        halfBoardRate,
+        checkInTime,
+        checkOutTime,
+        cancellationPolicy,
+        accountHolder,
+        bankName,
+        accountNumber,
+        branchCode,
+        swiftBic,
+        legalChecks,
       };
       localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(payload));
     } catch {
@@ -747,10 +813,10 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({
   };
 
   useEffect(() => {
-    if (mode === 'wizard') {
+    if (mode === 'wizard' && completionPct > 0) {
       saveDraft(stage);
     }
-  }, [stage, mode]);
+  }, [stage, mode, completionPct]);
 
   const handleSaveAndExit = () => {
     saveDraft(stage);
@@ -958,7 +1024,7 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({
     const parsedStars = Math.min(5, Math.max(3, parseInt(starRating, 10) || 5));
     const sig = generateListingSignature(hotelId, businessEmail || cleanName, lowestRate);
 
-    const heroUrls = galleryImages.length > 0 ? galleryImages : ['/images/coastal_mansion_1779978805301.png', '/images/loft_interior_1779978697203.png'];
+    const heroUrls = galleryImages.length > 0 ? galleryImages : ['/images/50_88d3447798594a3781403aa23f0baf00_t_w_1440_h_900.jpg', '/images/bQpZBCFZhwE8O_cs7mNAwkaUM8W3jpm_4o1EJoHW6CGw7RXnjNWQ4gX3DfiZQ6GxCxJqkk20Qg5bXqnlWqaI92-MaZ8a8Xmce7-Cu87PNH1kCvSJ58uf9qG4HPAkgSNvwht2w7D-62vuOPfMKOF4mrLv86eLr0x1s2VjH82vOpSiRnY3HbLAXkL6ghFJL81S.jpg'];
     const primaryImage = heroUrls[0];
 
     const mapToStayCategory = (
@@ -1205,16 +1271,28 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({
                   <div>
                     <p className="text-xs font-semibold text-amber-300 uppercase tracking-wider">Saved Draft Detected</p>
                     <p className="text-sm text-white mt-0.5">
-                      Your hotel registration is <strong className="font-mono">{savedDraft.completionPct || 62}%</strong> complete.
+                      Your hotel registration is <strong className="font-mono">{savedDraft.completionPct ?? 0}%</strong> complete.
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setMode('wizard')}
-                    className="px-4 py-2 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-bold whitespace-nowrap shrink-0"
-                  >
-                    Continue Registration →
-                  </button>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        resetNewListing();
+                        setMode('wizard');
+                      }}
+                      className="px-3.5 py-2 rounded-lg border border-white/25 hover:bg-white/10 text-white text-xs font-semibold whitespace-nowrap"
+                    >
+                      New Listing (0%)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMode('wizard')}
+                      className="px-4 py-2 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-bold whitespace-nowrap"
+                    >
+                      Continue Registration →
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -1222,7 +1300,7 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({
                 <button
                   type="button"
                   onClick={() => {
-                    setStage(1);
+                    resetNewListing();
                     setMode('wizard');
                   }}
                   className="inline-flex items-center gap-2 px-6 py-4 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-sm font-bold transition-colors whitespace-nowrap"
@@ -1263,7 +1341,7 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({
               <div className="rounded-2xl overflow-hidden border border-white/10 bg-slate-900 shadow-2xl">
                 <div className="relative h-64 sm:h-72">
                   <img
-                    src="/images/coastal_mansion_1779978805301.png"
+                    src="/images/50_88d3447798594a3781403aa23f0baf00_t_w_1440_h_900.jpg"
                     alt="The Cape Meridian Hotel"
                     referrerPolicy="no-referrer"
                     className="w-full h-full object-cover"
@@ -1906,6 +1984,16 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({
             </span>
           </div>
           <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                resetNewListing();
+                addToast('Reset to a fresh 0% new hotel listing.', 'info');
+              }}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 whitespace-nowrap"
+            >
+              Reset (0%)
+            </button>
             <button
               type="button"
               onClick={() => addToast('Concierge onboarding desk notified — call +27 21 555 0140 for live help.', 'info')}
@@ -2717,25 +2805,23 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({
 
                 {/* Hotel Gallery & AI Image Quality Check (Sections 11 & 12) */}
                 <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-4">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <h3 className="text-base font-bold font-heading text-slate-900 dark:text-white">
-                        Hotel Branding, Gallery &amp; AI Image Quality Check <span className="text-rose-600">*</span>
-                      </h3>
-                      <p className="text-xs text-slate-500">Logo, Cover Banner (2400 × 1200), and minimum 5 gallery images required.</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setGalleryImages((prev) => [...prev, '/images/modern_house_tan_1779978632706.png']);
-                        addToast('Image uploaded and passed AI quality inspection (93%).', 'success');
-                      }}
-                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-900 dark:bg-amber-400 text-white dark:text-slate-950 text-xs font-bold"
-                    >
-                      <CloudArrowUpIcon className="w-4 h-4" />
-                      <span>Upload Photo ({galleryImages.length})</span>
-                    </button>
+                  <div>
+                    <h3 className="text-base font-bold font-heading text-slate-900 dark:text-white">
+                      Hotel Branding, Gallery &amp; Drag-and-Drop Upload <span className="text-rose-600">*</span>
+                    </h3>
+                    <p className="text-xs text-slate-500">Logo, Cover Banner (2400 × 1200), and minimum 5 gallery images required.</p>
                   </div>
+
+                  <ImageDropzoneUploader
+                    images={galleryImages}
+                    onChange={(nextImgs) => setGalleryImages(nextImgs)}
+                    bucket="property-media"
+                    folderPrefix="hotels"
+                    maxImages={12}
+                    title="Drag & Drop Hotel Gallery Photos"
+                    subtitle="Upload exterior architecture, lobby, suites, pool, and dining photos (minimum 5 images)."
+                    presets={HOTEL_GALLERY_PRESETS}
+                  />
 
                   {/* Required Logo & Cover Banner Cards */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -3119,6 +3205,14 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({
                 </div>
 
                 <div className="space-y-4">
+                  {roomTypes.length === 0 && (
+                    <div className="rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-700 p-6 text-center space-y-2 bg-[#FAF8F5] dark:bg-slate-800/30">
+                      <p className="text-sm font-bold text-slate-900 dark:text-white">No Room Categories Added Yet</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                        Click &ldquo;Add Room Type&rdquo; above to configure room names, bed types, capacities, and nightly rates.
+                      </p>
+                    </div>
+                  )}
                   {roomTypes.map((room, rIdx) => (
                     <div
                       key={room.id}
@@ -4022,8 +4116,8 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({
                 <div className="rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden bg-white dark:bg-slate-950">
                   <div className="relative h-56">
                     <img
-                      src={galleryImages[0]}
-                      alt={hotelName}
+                      src={galleryImages[0] || '/images/50_88d3447798594a3781403aa23f0baf00_t_w_1440_h_900.jpg'}
+                      alt={hotelName || 'New Hotel Listing'}
                       referrerPolicy="no-referrer"
                       className="w-full h-full object-cover"
                     />

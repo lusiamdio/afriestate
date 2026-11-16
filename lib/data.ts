@@ -323,6 +323,7 @@ export const publishCarRental = async (
         currency: string;
         description: string;
         image_url?: string;
+        images?: string[];
     },
     currentUser: User
 ): Promise<Property> => {
@@ -333,14 +334,18 @@ export const publishCarRental = async (
         catLower.includes('luxury') ? 'Luxury' : catLower.includes('van') ? 'Van' : catLower.includes('suv') || catLower.includes('pickup') ? 'SUV' : 'Sedan';
     const defaultImg = vehicleType === 'Sedan' ? '/images/executive_sedan_fleet.jpg' : '/images/luxury_suv_fleet.jpg';
 
-    const imgUrl = sanitizeSafeUrl(payload.image_url, defaultImg);
+    const cleanGallery = (payload.images && payload.images.length > 0
+        ? payload.images.map((u) => sanitizeSafeUrl(u, '')).filter(Boolean)
+        : []);
+    const imgUrl = cleanGallery[0] || sanitizeSafeUrl(payload.image_url, defaultImg);
+    const resolvedImages = cleanGallery.length > 0 ? cleanGallery : [imgUrl];
 
     try {
         await supabase.from('car_rentals').insert([{
             owner_id: currentUser.id || null,
             user_id: currentUser.username || currentUser.id,
             ...payload,
-            images: [imgUrl],
+            images: resolvedImages,
             status: 'active',
         }]);
     } catch {
@@ -374,7 +379,7 @@ export const publishCarRental = async (
             'Unlimited Mileage Option',
             'Verified Mobility Partner',
         ].filter(Boolean),
-        images: [sanitizeSafeUrl(payload.image_url, defaultImg)],
+        images: resolvedImages,
         agent: {
             name: sanitizeText(payload.business_name || payload.contact_person || currentUser.username, 80),
             phone: sanitizeText(payload.mobile_number || currentUser.phone || '+27 11 000 0000', 30),
@@ -418,20 +423,25 @@ export const publishWellnessService = async (
         description: string;
         session_price?: number;
         image_url?: string;
+        images?: string[];
     },
     currentUser: User
 ): Promise<Property> => {
     const id = `well_${Date.now().toString(36)}`;
     const sig = generateListingSignature(id, currentUser.username, payload.session_price || 650);
 
-    const imgUrl = sanitizeSafeUrl(payload.image_url, '/images/spa_wellness_1779978823248.png');
+    const cleanGallery = (payload.images && payload.images.length > 0
+        ? payload.images.map((u) => sanitizeSafeUrl(u, '')).filter(Boolean)
+        : []);
+    const imgUrl = cleanGallery[0] || sanitizeSafeUrl(payload.image_url, '/images/getlstd-property-photo.jpg');
+    const resolvedImages = cleanGallery.length > 0 ? cleanGallery : [imgUrl];
 
     try {
         await supabase.from('wellness_services').insert([{
             owner_id: currentUser.id || null,
             user_id: currentUser.username || currentUser.id,
             ...payload,
-            images: [imgUrl],
+            images: resolvedImages,
             status: 'active',
         }]);
     } catch {
@@ -467,7 +477,7 @@ export const publishWellnessService = async (
         neighborhoodInfo: `${sanitizeText(payload.description, 260)}${payload.website ? ` | Web: ${sanitizeText(payload.website, 100)}` : ''}`,
         amenities: [categoryLabel, 'Verified Practitioner', sanitizeText(payload.city, 40)],
         packageIncludes: [sanitizeText(payload.contact_person, 60), sanitizeText(payload.email_address, 80), sanitizeText(payload.whatsapp_number, 30)],
-        images: [sanitizeSafeUrl(payload.image_url, '/images/spa_wellness_1779978823248.png')],
+        images: resolvedImages,
         agent: {
             name: sanitizeText(payload.contact_person || payload.business_name || currentUser.username, 80),
             phone: sanitizeText(payload.mobile_number || payload.whatsapp_number || '+27 21 000 0000', 30),

@@ -1,12 +1,10 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { GlobeAltIcon } from './icons/NavIcons';
 import { BellIcon, UserCircleIcon, CheckBadgeIcon, BanknotesIcon, HeartIcon } from './icons/ActionIcons';
 import type { User, Notification } from '../types';
-import { Language, Currency } from '../types';
-import { useTranslations } from '../contexts/LanguageContext';
+import { Currency } from '../types';
 import { useCurrency } from '../contexts/CurrencyContext';
-import { languageOptions, currencyOptions } from '../constants';
-import { Bars3Icon, XMarkIcon, ChatBubbleLeftRightIcon } from '@heroicons/react/24/outline';
+import { currencyOptions } from '../constants';
+import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
 import NotificationsPanel from './NotificationsPanel';
 import { useAdminState } from '../contexts/AdminStateContext';
 
@@ -76,16 +74,13 @@ const Header: React.FC<HeaderProps> = (props) => {
     onMessagesClick
   } = props;
 
-  const [isLangOpen, setIsLangOpen] = useState(false);
   const [isCurrencyOpen, setIsCurrencyOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   
-  const langRef = useRef<HTMLDivElement>(null);
   const currencyRef = useRef<HTMLDivElement>(null);
   const notificationsRef = useRef<HTMLDivElement>(null);
 
-  const { language, setLanguage, t, isTranslating } = useTranslations();
   const { currency, setCurrency } = useCurrency();
   const { settings } = useAdminState();
   const flags = settings.featureFlags;
@@ -97,7 +92,6 @@ const Header: React.FC<HeaderProps> = (props) => {
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (langRef.current && !langRef.current.contains(event.target as Node)) setIsLangOpen(false);
       if (currencyRef.current && !currencyRef.current.contains(event.target as Node)) setIsCurrencyOpen(false);
       if (notificationsRef.current && !notificationsRef.current.contains(event.target as Node)) setIsNotificationsOpen(false);
     };
@@ -252,44 +246,6 @@ const Header: React.FC<HeaderProps> = (props) => {
             )}
           </div>
 
-          {/* Language Selector */}
-          <div className="relative" ref={langRef}>
-            <button 
-              onClick={() => setIsLangOpen(!isLangOpen)} 
-              className="p-1.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex items-center gap-1 text-xs"
-              title="Change Language"
-            >
-              <GlobeAltIcon className="w-4 h-4 text-slate-500" />
-              {isTranslating ? (
-                <div className="w-3 h-3 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></div>
-              ) : (
-                <span className="text-[11px] font-mono font-semibold uppercase hidden sm:inline">{languageOptions[language].flag}</span>
-              )}
-            </button>
-            {isLangOpen && (
-              <div className="absolute top-full right-0 mt-2 w-44 bg-white dark:bg-slate-900 rounded-xl shadow-xl py-1 z-50">
-                {Object.entries(languageOptions).map(([langCode, langDetails]) => (
-                  <button 
-                    key={langCode}
-                    onClick={() => {
-                      setLanguage(langCode as Language);
-                      setIsLangOpen(false);
-                    }}
-                    className="w-full text-left px-3 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center justify-between"
-                  >
-                    <span className="flex items-center gap-2">
-                      <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                        {langDetails.flag}
-                      </span>
-                      <span>{langDetails.name}</span>
-                    </span>
-                    {language === langCode && <CheckBadgeIcon className="w-4 h-4 text-emerald-600"/>}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
           {/* Saved Properties Link / Button */}
           {onSavedClick && (
             <button
@@ -307,28 +263,30 @@ const Header: React.FC<HeaderProps> = (props) => {
             </button>
           )}
 
-          {/* Notifications */}
-          <div className="relative" ref={notificationsRef}>
-            <button
-              onClick={() => setIsNotificationsOpen(prev => !prev)}
-              className="p-1.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors relative"
-              title="Notifications"
-            >
-              <BellIcon className="w-5 h-5" />
-              {currentUser && unreadCount > 0 && (
-                <span className="absolute top-0.5 right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-red-500 text-white text-[9px] font-bold">
-                  {unreadCount}
-                </span>
+          {/* Notifications (Visible only once signed in) */}
+          {currentUser && (
+            <div className="relative" ref={notificationsRef}>
+              <button
+                onClick={() => setIsNotificationsOpen(prev => !prev)}
+                className="p-1.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors relative"
+                title="Notifications"
+              >
+                <BellIcon className="w-5 h-5" />
+                {unreadCount > 0 && (
+                  <span className="absolute top-0.5 right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-red-500 text-white text-[9px] font-bold">
+                    {unreadCount}
+                  </span>
+                )}
+              </button>
+              {isNotificationsOpen && (
+                <NotificationsPanel 
+                  notifications={notifications} 
+                  onNotificationClick={handleNotificationItemClick}
+                  onMarkAllAsRead={onMarkAllNotificationsAsRead}
+                />
               )}
-            </button>
-            {isNotificationsOpen && currentUser && (
-              <NotificationsPanel 
-                notifications={notifications} 
-                onNotificationClick={handleNotificationItemClick}
-                onMarkAllAsRead={onMarkAllNotificationsAsRead}
-              />
-            )}
-          </div>
+            </div>
+          )}
 
           {/* User Account / Profile */}
           {currentUser ? (
