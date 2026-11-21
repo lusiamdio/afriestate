@@ -148,7 +148,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
 
   const displayImage = property.images && property.images.length > 0
     ? property.images[currentImageIndex]
-    : '/images/house_suburbs_1779978598551.png';
+    : '/images/2ec34ce4ca57aef13fc8b3239a99345e.jpg';
 
   // Format pricing with local vs converted preferred currency
   const formattedPrice = formatCurrency(property.price);
@@ -163,14 +163,20 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
   return (
     <article 
       onClick={() => onOpenDetailModal(property)}
-      className="group cursor-pointer bg-white dark:bg-slate-900 rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-200 flex flex-col"
+      className="group cursor-pointer bg-white dark:bg-slate-900 rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-200 flex flex-col border border-slate-200/70 dark:border-slate-800"
     >
       {/* Media Viewport */}
-      <div className="relative aspect-[16/10] bg-slate-100 dark:bg-slate-800 overflow-hidden">
+      <div className="relative h-36 bg-slate-100 dark:bg-slate-800 overflow-hidden">
         <img
           src={displayImage}
           alt={property.title}
           referrerPolicy="no-referrer"
+          onError={(e) => {
+            if (!e.currentTarget.dataset.fb) {
+              e.currentTarget.dataset.fb = '1';
+              e.currentTarget.src = '/images/2ec34ce4ca57aef13fc8b3239a99345e.jpg';
+            }
+          }}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
         />
 
@@ -273,19 +279,19 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
       </div>
 
       {/* Card Content Area */}
-      <div className="p-4 flex-1 flex flex-col justify-between">
+      <div className="p-3 flex-1 flex flex-col justify-between">
         {/* Title & Neighbourhood */}
         <div>
-          <h3 className="text-base font-bold text-slate-900 dark:text-white line-clamp-1 group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">
+          <h3 className="text-sm font-bold text-slate-900 dark:text-white line-clamp-1 group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">
             {property.title}
           </h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-1 mt-0.5">
+          <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-1 mt-0.5">
             {property.address.street}
           </p>
 
           {/* If Investment Card: Render Financial Metrics Matrix (Section 9) */}
           {isInvestment ? (
-            <div className="mt-3 grid grid-cols-2 gap-2 p-2.5 rounded-xl bg-amber-50/70 dark:bg-amber-950/25 text-xs">
+            <div className="mt-2 grid grid-cols-2 gap-1.5 p-2 rounded-xl bg-amber-50/70 dark:bg-amber-950/25 text-[11px]">
               <div>
                 <span className="text-[10px] text-amber-800 dark:text-amber-400 uppercase tracking-wider block font-semibold">
                   Target Return
@@ -321,53 +327,53 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
             </div>
           ) : (
             /* Residential Specs (Bed · Bath · Area) */
-            <div className="mt-3 flex items-center gap-3 text-xs text-slate-600 dark:text-slate-300">
+            <div className="mt-2 flex items-center gap-2.5 text-[11px] text-slate-600 dark:text-slate-300">
               <span className="flex items-center gap-1">
-                <BedIcon className="w-4 h-4 text-slate-400" />
+                <BedIcon className="w-3.5 h-3.5 text-slate-400" />
                 <span className="tabular-nums">{property.details.beds}</span> Beds
               </span>
               <span className="text-slate-300 dark:text-slate-700">·</span>
               <span className="flex items-center gap-1">
-                <BathIcon className="w-4 h-4 text-slate-400" />
+                <BathIcon className="w-3.5 h-3.5 text-slate-400" />
                 <span className="tabular-nums">{property.details.baths}</span> Baths
               </span>
               <span className="text-slate-300 dark:text-slate-700">·</span>
               <span className="flex items-center gap-1">
-                <AreaIcon className="w-4 h-4 text-slate-400" />
+                <AreaIcon className="w-3.5 h-3.5 text-slate-400" />
                 <span className="tabular-nums">{Math.round(property.details.area * 0.0929)}</span> m²
               </span>
             </div>
           )}
 
           {/* African Infrastructure Highlights Strip */}
-          <div className="mt-3 pt-2.5 flex flex-wrap items-center gap-2 text-[11px] text-slate-600 dark:text-slate-400">
+          <div className="mt-2 pt-1.5 flex flex-wrap items-center gap-1.5 text-[10px] text-slate-600 dark:text-slate-400">
             {property.hasSolar && (
               <span className="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-400 font-medium">
-                <SolarIcon className="w-3.5 h-3.5 text-emerald-600" />
+                <SolarIcon className="w-3 h-3 text-emerald-600" />
                 Solar
               </span>
             )}
             {property.hasGenerator && (
               <span className="inline-flex items-center gap-1">
-                <GeneratorIcon className="w-3.5 h-3.5 text-amber-600" />
+                <GeneratorIcon className="w-3 h-3 text-amber-600" />
                 Generator
               </span>
             )}
             {property.hasBorehole && (
               <span className="inline-flex items-center gap-1">
-                <BoreholeIcon className="w-3.5 h-3.5 text-sky-600" />
+                <BoreholeIcon className="w-3 h-3 text-sky-600" />
                 Borehole
               </span>
             )}
             {property.hasFibre && (
               <span className="inline-flex items-center gap-1">
-                <FibreIcon className="w-3.5 h-3.5 text-indigo-500" />
+                <FibreIcon className="w-3 h-3 text-indigo-500" />
                 Fibre
               </span>
             )}
             {property.securityFeatures && property.securityFeatures.length > 0 && (
               <span className="inline-flex items-center gap-1">
-                <GatedSecurityIcon className="w-3.5 h-3.5 text-slate-500" />
+                <GatedSecurityIcon className="w-3 h-3 text-slate-500" />
                 Secured
               </span>
             )}
@@ -375,19 +381,19 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
         </div>
 
         {/* Pricing and Primary CTA */}
-        <div className="mt-4 pt-3 flex items-center justify-between">
-          <div>
+        <div className="mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
+          <div className="min-w-0">
             <div className="flex items-baseline gap-1">
-              <span className="text-lg font-bold text-slate-900 dark:text-white tabular-nums tracking-tight">
+              <span className="text-base font-bold text-slate-900 dark:text-white tabular-nums tracking-tight truncate">
                 {formattedPrice}
               </span>
               {priceSubtext && (
-                <span className="text-xs text-slate-500 dark:text-slate-400">
+                <span className="text-[11px] text-slate-500 dark:text-slate-400 shrink-0">
                   {priceSubtext}
                 </span>
               )}
             </div>
-            <p className="text-[10px] text-slate-500 dark:text-slate-400">
+            <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
               {isRent ? 'Verified landlord' : isInvestment ? 'Institutional yield' : 'Freehold deed verified'}
             </p>
           </div>
@@ -398,7 +404,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
               e.stopPropagation();
               onOpenDetailModal(property);
             }}
-            className="px-3.5 py-1.5 text-xs font-semibold rounded-xl bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 transition shadow-sm"
+            className="px-3 py-1.5 text-[11px] font-semibold rounded-lg bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 transition shadow-sm shrink-0"
           >
             {isInvestment ? 'View Investment' : 'View Property'}
           </button>

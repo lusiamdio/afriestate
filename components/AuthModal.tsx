@@ -603,7 +603,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin, 
             onClick={e => e.stopPropagation()}
         >
             <div className="hidden lg:block lg:w-1/2 relative bg-brand-dark overflow-hidden group">
-                <img src="https://www.propertycoza.com/wp-content/uploads/2022/11/Real-Estate-Agent-1920-x-1357-1-1536x736.png" alt="Luxury Estate" className="absolute inset-0 w-full h-full object-cover opacity-60 group-hover:scale-110 group-hover:opacity-80 transition-all duration-1000 ease-in-out"  referrerPolicy="no-referrer" />
+                <img src="/images/photo-1600596542815-ffad4c1539a9.avif" alt="Luxury Estate" className="absolute inset-0 w-full h-full object-cover opacity-60 group-hover:scale-110 group-hover:opacity-80 transition-all duration-1000 ease-in-out" referrerPolicy="no-referrer" />
                 <div className="absolute inset-0 bg-gradient-to-t from-brand-dark via-brand-dark/40 to-transparent pointer-events-none"></div>
                 <div className="absolute inset-0 bg-brand-primary mix-blend-color opacity-20 group-hover:opacity-0 transition-opacity duration-1000"></div>
                 <div className="absolute bottom-12 left-12 right-12 text-white transform group-hover:-translate-y-2 transition-transform duration-700">

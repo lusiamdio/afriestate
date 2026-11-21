@@ -44,7 +44,7 @@ const AboutPage: React.FC<AboutPageProps> = ({ onExploreProperties }) => {
       <section className="relative h-[70vh] min-h-[600px] flex items-center justify-center overflow-hidden">
         <div className="absolute inset-0 z-0">
           <img 
-            src="/images/coastal_mansion_1779978805301.png" 
+            src="/images/2ec34ce4ca57aef13fc8b3239a99345e.jpg" 
             alt="Luxury African Estate" 
             referrerPolicy="no-referrer"
             className="w-full h-full object-cover"
@@ -72,7 +72,7 @@ const AboutPage: React.FC<AboutPageProps> = ({ onExploreProperties }) => {
               <div className="relative">
                 <div className="absolute -inset-4 bg-brand-gold/20 rounded-t-full transform -rotate-3 z-0"></div>
                 <img 
-                  src="/images/luxury_kitchen_living_1779978720358.png" 
+                  src="/images/photo-1600596542815-ffad4c1539a9.avif" 
                   alt="Our Heritage" 
                   referrerPolicy="no-referrer"
                   className="relative z-10 w-full h-[600px] object-cover rounded-t-full shadow-2xl"

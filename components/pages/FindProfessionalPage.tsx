@@ -525,7 +525,7 @@ const FindProfessionalPage: React.FC<FindProfessionalPageProps> = ({
       {/* Hero Header Banner */}
       <section className="relative w-full bg-[#0B1F1A] text-white overflow-hidden">
         <img
-          src="/images/harbour_house_1779978766107.png"
+          src="/images/383842941.jpg"
           alt="African Real Estate Advisory Architecture"
           referrerPolicy="no-referrer"
           className="absolute inset-0 w-full h-full object-cover opacity-25"

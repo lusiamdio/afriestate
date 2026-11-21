@@ -1,0 +1,1446 @@
+export type TripType = 'round-trip' | 'one-way' | 'multi-city';
+export type CabinClass = 'Economy' | 'Premium Economy' | 'Business' | 'First';
+export type FlexibleMode = 'exact' | 'plus-minus-1' | 'plus-minus-3' | 'cheapest-month';
+export type ResultSortTab = 'recommended' | 'cheapest' | 'fastest';
+export type FareTierId = 'basic' | 'standard' | 'flex';
+
+export interface AirportHub {
+  code: string;
+  city: string;
+  country: string;
+  countryCode: string;
+  flag: string;
+  airport: string;
+  region: 'Southern Africa' | 'West Africa' | 'East Africa' | 'North Africa' | 'Central Africa' | 'International';
+  popular?: boolean;
+  nearbyCodes?: string[];
+  avgWeatherC: number;
+  terminalNote: string;
+}
+
+export interface FlightSegment {
+  from: string;
+  fromAirport: string;
+  to: string;
+  toAirport: string;
+  departTime: string;
+  arriveTime: string;
+  durationMinutes: number;
+  carrier: string;
+  flightNumber: string;
+  aircraft: string;
+  layoverMinutes?: number;
+  layoverCity?: string;
+}
+
+export interface FlightItinerary {
+  id: string;
+  flightNumber: string;
+  airline: string;
+  airlineCode: string;
+  alliance: string;
+  origin: string;
+  destination: string;
+  departureTime: string;
+  arrivalTime: string;
+  durationMinutes: number;
+  stops: number;
+  stopHub?: string;
+  segments: FlightSegment[];
+  aircraft: string;
+  baseZarFare: number; // Base fare inclusive of taxes in ZAR
+  taxesZar: number;
+  cabinBaggageKg: number;
+  checkedBaggageKg: number;
+  changeAvailable: boolean;
+  refundable: boolean;
+  cabinAvailability: CabinClass[];
+  connectivity: 'direct-africa' | 'same-country' | 'cross-border';
+  supportedPayments: ('card' | 'local-currency' | 'mobile-money' | 'bank-transfer')[];
+  visaConvenienceHint: 'visa-free' | 'visa-on-arrival' | 'evisa' | 'visa-required';
+  seatsRemaining: number;
+}
+
+export interface VisaRuleInfo {
+  country: string;
+  flag: string;
+  statusByPassport: Record<
+    string,
+    {
+      requirement: 'Visa-free' | 'Visa on arrival' | 'eVisa available' | 'Visa required';
+      stayLimit: string;
+      processingTime: string;
+      notes: string;
+    }
+  >;
+  source: string;
+  lastUpdated: string;
+}
+
+export interface FlightStatusRecord {
+  flightNumber: string;
+  airline: string;
+  origin: string;
+  originCity: string;
+  destination: string;
+  destinationCity: string;
+  scheduledDeparture: string;
+  estimatedDeparture: string;
+  scheduledArrival: string;
+  terminal: string;
+  gate: string;
+  baggageBelt: string;
+  status: 'On time' | 'Boarding' | 'Scheduled' | 'Delayed 20m';
+  aircraft: string;
+}
+
+export interface MultiCityLeg {
+  id: string;
+  origin: string;
+  destination: string;
+  date: string;
+}
+
+export interface BookedTripRecord {
+  id: string;
+  reference: string;
+  airline: string;
+  flightNumber: string;
+  origin: string;
+  originCity: string;
+  destination: string;
+  destinationCity: string;
+  departureDate: string;
+  returnDate?: string;
+  departureTime: string;
+  arrivalTime: string;
+  durationMinutes: number;
+  stops: number;
+  cabin: CabinClass;
+  fareTier: FareTierId;
+  travellersCount: number;
+  leadTravellerName: string;
+  contactEmail: string;
+  contactPhone: string;
+  whatsappConfirmation: boolean;
+  whatsappUpdates: boolean;
+  seatSelected: string;
+  extraBagKg: number;
+  mealPreference: string;
+  airportTransferAdded: boolean;
+  paymentMethod: string;
+  totalZar: number;
+  settlementId?: string;
+  authorizationCode?: string;
+  status: 'Confirmed' | 'Cancelled' | 'Refund Requested' | 'Date Changed';
+  bookedAt: string;
+}
+
+export interface PriceAlertRecord {
+  id: string;
+  origin: string;
+  destination: string;
+  currentZar: number;
+  rule: 'below-target' | 'drop-10' | 'drop-20';
+  targetZar: number;
+  email: string;
+  active: boolean;
+  createdAt: string;
+}
+
+export const HUBS: AirportHub[] = [
+  {
+    code: 'CPT',
+    city: 'Cape Town',
+    country: 'South Africa',
+    countryCode: 'ZA',
+    flag: '🇿🇦',
+    airport: 'Cape Town International',
+    region: 'Southern Africa',
+    popular: true,
+    nearbyCodes: ['JNB', 'DUR'],
+    avgWeatherC: 23,
+    terminalNote: 'Main International & Domestic Terminal · Arrivals Duty Free & Chauffeur Desk',
+  },
+  {
+    code: 'JNB',
+    city: 'Johannesburg',
+    country: 'South Africa',
+    countryCode: 'ZA',
+    flag: '🇿🇦',
+    airport: 'O.R. Tambo International',
+    region: 'Southern Africa',
+    popular: true,
+    nearbyCodes: ['HLA', 'CPT'],
+    avgWeatherC: 24,
+    terminalNote: 'Terminal A (International) & Terminal B (Domestic) · Gautrain Rail Link',
+  },
+  {
+    code: 'DUR',
+    city: 'Durban',
+    country: 'South Africa',
+    countryCode: 'ZA',
+    flag: '🇿🇦',
+    airport: 'King Shaka International',
+    region: 'Southern Africa',
+    nearbyCodes: ['JNB', 'CPT'],
+    avgWeatherC: 26,
+    terminalNote: 'Single integrated terminal with executive coastal shuttle access',
+  },
+  {
+    code: 'LOS',
+    city: 'Lagos',
+    country: 'Nigeria',
+    countryCode: 'NG',
+    flag: '🇳🇬',
+    airport: 'Murtala Muhammed International',
+    region: 'West Africa',
+    popular: true,
+    nearbyCodes: ['ABV'],
+    avgWeatherC: 29,
+    terminalNote: 'New International Terminal 2 · Protocol & Victoria Island transfer lane',
+  },
+  {
+    code: 'ABV',
+    city: 'Abuja',
+    country: 'Nigeria',
+    countryCode: 'NG',
+    flag: '🇳🇬',
+    airport: 'Nnamdi Azikiwe International',
+    region: 'West Africa',
+    nearbyCodes: ['LOS'],
+    avgWeatherC: 30,
+    terminalNote: 'International Wing · 35 min expressway to Maitama & Central District',
+  },
+  {
+    code: 'NBO',
+    city: 'Nairobi',
+    country: 'Kenya',
+    countryCode: 'KE',
+    flag: '🇰🇪',
+    airport: 'Jomo Kenyatta International',
+    region: 'East Africa',
+    popular: true,
+    nearbyCodes: ['KGL', 'ZNZ'],
+    avgWeatherC: 24,
+    terminalNote: 'Terminal 1A International & 1C · Nairobi Expressway to Westlands',
+  },
+  {
+    code: 'ACC',
+    city: 'Accra',
+    country: 'Ghana',
+    countryCode: 'GH',
+    flag: '🇬🇭',
+    airport: 'Kotoka International',
+    region: 'West Africa',
+    popular: true,
+    nearbyCodes: ['LOS'],
+    avgWeatherC: 30,
+    terminalNote: 'Terminal 3 International · 15 min to Airport Residential & Cantonments',
+  },
+  {
+    code: 'LAD',
+    city: 'Luanda',
+    country: 'Angola',
+    countryCode: 'AO',
+    flag: '🇦🇴',
+    airport: 'Quatro de Fevereiro International',
+    region: 'Central Africa',
+    popular: true,
+    nearbyCodes: ['CPT', 'WDH'],
+    avgWeatherC: 28,
+    terminalNote: 'International Departures · Direct access to Ilha & Talatona',
+  },
+  {
+    code: 'CMN',
+    city: 'Casablanca',
+    country: 'Morocco',
+    countryCode: 'MA',
+    flag: '🇲🇦',
+    airport: 'Mohammed V International',
+    region: 'North Africa',
+    popular: true,
+    nearbyCodes: ['CAI'],
+    avgWeatherC: 24,
+    terminalNote: 'Terminal 1 & Terminal 2 · ONCF rail link to Casa-Port',
+  },
+  {
+    code: 'KGL',
+    city: 'Kigali',
+    country: 'Rwanda',
+    countryCode: 'RW',
+    flag: '🇷🇼',
+    airport: 'Kigali International',
+    region: 'East Africa',
+    popular: true,
+    nearbyCodes: ['NBO'],
+    avgWeatherC: 25,
+    terminalNote: 'Single clean modern terminal · 15 min to Kigali Convention Centre',
+  },
+  {
+    code: 'ADD',
+    city: 'Addis Ababa',
+    country: 'Ethiopia',
+    countryCode: 'ET',
+    flag: '🇪🇹',
+    airport: 'Bole International',
+    region: 'East Africa',
+    nearbyCodes: ['NBO', 'KGL'],
+    avgWeatherC: 22,
+    terminalNote: 'Terminal 2 East Africa Mega-Hub · Cloud Nine Lounge',
+  },
+  {
+    code: 'CAI',
+    city: 'Cairo',
+    country: 'Egypt',
+    countryCode: 'EG',
+    flag: '🇪🇬',
+    airport: 'Cairo International',
+    region: 'North Africa',
+    nearbyCodes: ['CMN'],
+    avgWeatherC: 28,
+    terminalNote: 'Terminal 2 & Terminal 3 Star Alliance Hub',
+  },
+  {
+    code: 'WDH',
+    city: 'Windhoek',
+    country: 'Namibia',
+    countryCode: 'NA',
+    flag: '🇳🇦',
+    airport: 'Hosea Kutako International',
+    region: 'Southern Africa',
+    nearbyCodes: ['CPT', 'JNB'],
+    avgWeatherC: 25,
+    terminalNote: 'Upgraded Arrivals Hall · 40 min to Windhoek CBD',
+  },
+  {
+    code: 'MPM',
+    city: 'Maputo',
+    country: 'Mozambique',
+    countryCode: 'MZ',
+    flag: '🇲🇿',
+    airport: 'Maputo International',
+    region: 'Southern Africa',
+    nearbyCodes: ['JNB'],
+    avgWeatherC: 27,
+    terminalNote: 'Modern International Terminal · 15 min to Polana waterfront',
+  },
+  {
+    code: 'ZNZ',
+    city: 'Zanzibar',
+    country: 'Tanzania',
+    countryCode: 'TZ',
+    flag: '🇹🇿',
+    airport: 'Abeid Amani Karume International',
+    region: 'East Africa',
+    nearbyCodes: ['NBO'],
+    avgWeatherC: 29,
+    terminalNote: 'Terminal 3 International · Direct coastal resort transfers',
+  },
+  {
+    code: 'DXB',
+    city: 'Dubai',
+    country: 'United Arab Emirates',
+    countryCode: 'AE',
+    flag: '🇦🇪',
+    airport: 'Dubai International',
+    region: 'International',
+    nearbyCodes: ['DOH'],
+    avgWeatherC: 33,
+    terminalNote: 'Terminal 3 Emirates Global Concourse',
+  },
+  {
+    code: 'LHR',
+    city: 'London',
+    country: 'United Kingdom',
+    countryCode: 'GB',
+    flag: '🇬🇧',
+    airport: 'London Heathrow',
+    region: 'International',
+    nearbyCodes: ['CDG'],
+    avgWeatherC: 16,
+    terminalNote: 'Terminal 3 & Terminal 5 International Connectors',
+  },
+];
+
+export const DESTINATION_PHOTOS: Record<string, string> = {
+  JNB: '/images/city_johannesburg_skyline.jpg',
+  NBO: '/images/city_nairobi_skyline.jpg',
+  ACC: '/images/city_accra_coast.jpg',
+  LOS: '/images/city_lagos_sunset.jpg',
+  ABV: '/images/city_johannesburg_skyline.jpg',
+  CPT: '/images/2ec34ce4ca57aef13fc8b3239a99345e.jpg',
+  LHR: '/images/280162474.jpg',
+};
+
+export const AIRLINE_BADGE_STYLES: Record<string, { bg: string; accent: string; short: string }> = {
+  ET: { bg: '#078930', accent: '#FCDD09', short: 'ET' },
+  P4: { bg: '#D71920', accent: '#003087', short: 'P4' },
+  AT: { bg: '#C1272D', accent: '#006233', short: 'AT' },
+  MS: { bg: '#002664', accent: '#C8A14D', short: 'MS' },
+  EK: { bg: '#D71920', accent: '#FFFFFF', short: 'EK' },
+  WB: { bg: '#00A1DE', accent: '#FAD201', short: 'WB' },
+  SA: { bg: '#006847', accent: '#FFB612', short: 'SA' },
+  FA: { bg: '#E6007E', accent: '#009FE3', short: 'FA' },
+  KQ: { bg: '#BB0000', accent: '#006600', short: 'KQ' },
+  TM: { bg: '#009A44', accent: '#FCE100', short: 'TM' },
+  DT: { bg: '#CC092F', accent: '#FFCB05', short: 'DT' },
+  QR: { bg: '#5C0632', accent: '#FFFFFF', short: 'QR' },
+};
+
+export const FLIGHT_INVENTORY: FlightItinerary[] = [
+  {
+    id: 'af-cpt-los-et',
+    flightNumber: 'ET 846',
+    airline: 'Ethiopian Airlines',
+    airlineCode: 'ET',
+    alliance: 'Star Alliance',
+    origin: 'CPT',
+    destination: 'LOS',
+    departureTime: '09:10',
+    arrivalTime: '21:50',
+    durationMinutes: 760,
+    stops: 1,
+    stopHub: 'ADD',
+    aircraft: 'Airbus A350-900',
+    baseZarFare: 2399,
+    taxesZar: 299,
+    cabinBaggageKg: 7,
+    checkedBaggageKg: 23,
+    changeAvailable: true,
+    refundable: false,
+    cabinAvailability: ['Economy', 'Premium Economy', 'Business'],
+    connectivity: 'cross-border',
+    supportedPayments: ['card', 'local-currency', 'bank-transfer'],
+    visaConvenienceHint: 'evisa',
+    seatsRemaining: 6,
+    segments: [
+      {
+        from: 'CPT',
+        fromAirport: 'Cape Town International',
+        to: 'ADD',
+        toAirport: 'Addis Ababa Bole International',
+        departTime: '09:10',
+        arriveTime: '15:30',
+        durationMinutes: 380,
+        carrier: 'Ethiopian Airlines',
+        flightNumber: 'ET 846',
+        aircraft: 'Airbus A350-900',
+        layoverMinutes: 100,
+        layoverCity: 'Addis Ababa',
+      },
+      {
+        from: 'ADD',
+        fromAirport: 'Addis Ababa Bole International',
+        to: 'LOS',
+        toAirport: 'Murtala Muhammed International',
+        departTime: '17:10',
+        arriveTime: '21:50',
+        durationMinutes: 280,
+        carrier: 'Ethiopian Airlines',
+        flightNumber: 'ET 901',
+        aircraft: 'Boeing 787-9 Dreamliner',
+      },
+    ],
+  },
+  {
+    id: 'af-cpt-los-p4',
+    flightNumber: 'P4 756',
+    airline: 'Air Peace',
+    airlineCode: 'P4',
+    alliance: 'West & South Link',
+    origin: 'CPT',
+    destination: 'LOS',
+    departureTime: '11:30',
+    arrivalTime: '21:50',
+    durationMinutes: 620,
+    stops: 1,
+    stopHub: 'ABJ',
+    aircraft: 'Boeing 777-200ER',
+    baseZarFare: 2450,
+    taxesZar: 310,
+    cabinBaggageKg: 7,
+    checkedBaggageKg: 23,
+    changeAvailable: true,
+    refundable: false,
+    cabinAvailability: ['Economy', 'Premium Economy', 'Business'],
+    connectivity: 'cross-border',
+    supportedPayments: ['card', 'local-currency', 'bank-transfer'],
+    visaConvenienceHint: 'evisa',
+    seatsRemaining: 9,
+    segments: [
+      {
+        from: 'CPT',
+        fromAirport: 'Cape Town International',
+        to: 'ABJ',
+        toAirport: 'Félix Houphouët-Boigny International',
+        departTime: '11:30',
+        arriveTime: '18:20',
+        durationMinutes: 410,
+        carrier: 'Air Peace',
+        flightNumber: 'P4 755',
+        aircraft: 'Boeing 777-200ER',
+        layoverMinutes: 90,
+        layoverCity: 'Abidjan',
+      },
+      {
+        from: 'ABJ',
+        fromAirport: 'Félix Houphouët-Boigny International',
+        to: 'LOS',
+        toAirport: 'Murtala Muhammed International',
+        departTime: '19:50',
+        arriveTime: '21:50',
+        durationMinutes: 120,
+        carrier: 'Air Peace',
+        flightNumber: 'P4 756',
+        aircraft: 'Embraer E195-E2',
+      },
+    ],
+  },
+  {
+    id: 'af-cpt-los-at',
+    flightNumber: 'AT 564',
+    airline: 'Royal Air Maroc',
+    airlineCode: 'AT',
+    alliance: 'oneworld',
+    origin: 'CPT',
+    destination: 'LOS',
+    departureTime: '13:05',
+    arrivalTime: '03:50 +1',
+    durationMinutes: 885,
+    stops: 1,
+    stopHub: 'CMN',
+    aircraft: 'Boeing 787-8 Dreamliner',
+    baseZarFare: 2699,
+    taxesZar: 325,
+    cabinBaggageKg: 10,
+    checkedBaggageKg: 23,
+    changeAvailable: true,
+    refundable: true,
+    cabinAvailability: ['Economy', 'Business'],
+    connectivity: 'cross-border',
+    supportedPayments: ['card', 'local-currency'],
+    visaConvenienceHint: 'evisa',
+    seatsRemaining: 5,
+    segments: [
+      {
+        from: 'CPT',
+        fromAirport: 'Cape Town International',
+        to: 'CMN',
+        toAirport: 'Mohammed V International',
+        departTime: '13:05',
+        arriveTime: '22:15',
+        durationMinutes: 550,
+        carrier: 'Royal Air Maroc',
+        flightNumber: 'AT 564',
+        aircraft: 'Boeing 787-8 Dreamliner',
+        layoverMinutes: 95,
+        layoverCity: 'Casablanca',
+      },
+      {
+        from: 'CMN',
+        fromAirport: 'Mohammed V International',
+        to: 'LOS',
+        toAirport: 'Murtala Muhammed International',
+        departTime: '23:50',
+        arriveTime: '03:50',
+        durationMinutes: 240,
+        carrier: 'Royal Air Maroc',
+        flightNumber: 'AT 555',
+        aircraft: 'Boeing 737 MAX 8',
+      },
+    ],
+  },
+  {
+    id: 'af-cpt-los-ms',
+    flightNumber: 'MS 840',
+    airline: 'EgyptAir',
+    airlineCode: 'MS',
+    alliance: 'Star Alliance',
+    origin: 'CPT',
+    destination: 'LOS',
+    departureTime: '22:10',
+    arrivalTime: '12:15 +1',
+    durationMinutes: 785,
+    stops: 1,
+    stopHub: 'CAI',
+    aircraft: 'Boeing 787-9 Dreamliner',
+    baseZarFare: 2799,
+    taxesZar: 330,
+    cabinBaggageKg: 8,
+    checkedBaggageKg: 23,
+    changeAvailable: true,
+    refundable: true,
+    cabinAvailability: ['Economy', 'Business'],
+    connectivity: 'cross-border',
+    supportedPayments: ['card', 'local-currency', 'bank-transfer'],
+    visaConvenienceHint: 'evisa',
+    seatsRemaining: 7,
+    segments: [
+      {
+        from: 'CPT',
+        fromAirport: 'Cape Town International',
+        to: 'CAI',
+        toAirport: 'Cairo International',
+        departTime: '22:10',
+        arriveTime: '06:40',
+        durationMinutes: 510,
+        carrier: 'EgyptAir',
+        flightNumber: 'MS 840',
+        aircraft: 'Boeing 787-9 Dreamliner',
+        layoverMinutes: 85,
+        layoverCity: 'Cairo',
+      },
+      {
+        from: 'CAI',
+        fromAirport: 'Cairo International',
+        to: 'LOS',
+        toAirport: 'Murtala Muhammed International',
+        departTime: '08:05',
+        arriveTime: '12:15',
+        durationMinutes: 190,
+        carrier: 'EgyptAir',
+        flightNumber: 'MS 875',
+        aircraft: 'Airbus A320neo',
+      },
+    ],
+  },
+  {
+    id: 'af-cpt-los-ek',
+    flightNumber: 'EK 771',
+    airline: 'Emirates',
+    airlineCode: 'EK',
+    alliance: 'Global Connector',
+    origin: 'CPT',
+    destination: 'LOS',
+    departureTime: '07:50',
+    arrivalTime: '18:35',
+    durationMinutes: 585,
+    stops: 0,
+    aircraft: 'Boeing 777-300ER',
+    baseZarFare: 4299,
+    taxesZar: 499,
+    cabinBaggageKg: 7,
+    checkedBaggageKg: 30,
+    changeAvailable: true,
+    refundable: true,
+    cabinAvailability: ['Economy', 'Premium Economy', 'Business', 'First'],
+    connectivity: 'direct-africa',
+    supportedPayments: ['card', 'local-currency', 'bank-transfer'],
+    visaConvenienceHint: 'evisa',
+    seatsRemaining: 4,
+    segments: [
+      {
+        from: 'CPT',
+        fromAirport: 'Cape Town International',
+        to: 'LOS',
+        toAirport: 'Murtala Muhammed International',
+        departTime: '07:50',
+        arriveTime: '18:35',
+        durationMinutes: 585,
+        carrier: 'Emirates Express Charter',
+        flightNumber: 'EK 771',
+        aircraft: 'Boeing 777-300ER',
+      },
+    ],
+  },
+  {
+    id: 'af-jnb-cpt-sa',
+    flightNumber: 'SA 317',
+    airline: 'South African Airways',
+    airlineCode: 'SA',
+    alliance: 'Star Alliance',
+    origin: 'JNB',
+    destination: 'CPT',
+    departureTime: '07:15',
+    arrivalTime: '09:25',
+    durationMinutes: 130,
+    stops: 0,
+    aircraft: 'Airbus A320neo',
+    baseZarFare: 1690,
+    taxesZar: 240,
+    cabinBaggageKg: 7,
+    checkedBaggageKg: 23,
+    changeAvailable: true,
+    refundable: true,
+    cabinAvailability: ['Economy', 'Business'],
+    connectivity: 'same-country',
+    supportedPayments: ['card', 'local-currency', 'bank-transfer'],
+    visaConvenienceHint: 'visa-free',
+    seatsRemaining: 11,
+    segments: [
+      {
+        from: 'JNB',
+        fromAirport: 'O.R. Tambo International',
+        to: 'CPT',
+        toAirport: 'Cape Town International',
+        departTime: '07:15',
+        arriveTime: '09:25',
+        durationMinutes: 130,
+        carrier: 'South African Airways',
+        flightNumber: 'SA 317',
+        aircraft: 'Airbus A320neo',
+      },
+    ],
+  },
+  {
+    id: 'af-jnb-cpt-fa',
+    flightNumber: 'FA 104',
+    airline: 'FlySafair',
+    airlineCode: 'FA',
+    alliance: 'Domestic Value',
+    origin: 'JNB',
+    destination: 'CPT',
+    departureTime: '11:40',
+    arrivalTime: '13:50',
+    durationMinutes: 130,
+    stops: 0,
+    aircraft: 'Boeing 737-800',
+    baseZarFare: 1190,
+    taxesZar: 185,
+    cabinBaggageKg: 7,
+    checkedBaggageKg: 20,
+    changeAvailable: false,
+    refundable: false,
+    cabinAvailability: ['Economy'],
+    connectivity: 'same-country',
+    supportedPayments: ['card', 'local-currency', 'bank-transfer'],
+    visaConvenienceHint: 'visa-free',
+    seatsRemaining: 7,
+    segments: [
+      {
+        from: 'JNB',
+        fromAirport: 'O.R. Tambo International',
+        to: 'CPT',
+        toAirport: 'Cape Town International',
+        departTime: '11:40',
+        arriveTime: '13:50',
+        durationMinutes: 130,
+        carrier: 'FlySafair',
+        flightNumber: 'FA 104',
+        aircraft: 'Boeing 737-800',
+      },
+    ],
+  },
+  {
+    id: 'af-jnb-nbo-kq',
+    flightNumber: 'KQ 763',
+    airline: 'Kenya Airways',
+    airlineCode: 'KQ',
+    alliance: 'SkyTeam',
+    origin: 'JNB',
+    destination: 'NBO',
+    departureTime: '18:20',
+    arrivalTime: '23:40',
+    durationMinutes: 260,
+    stops: 0,
+    aircraft: 'Boeing 787-8 Dreamliner',
+    baseZarFare: 3199,
+    taxesZar: 380,
+    cabinBaggageKg: 7,
+    checkedBaggageKg: 23,
+    changeAvailable: true,
+    refundable: true,
+    cabinAvailability: ['Economy', 'Premium Economy', 'Business'],
+    connectivity: 'direct-africa',
+    supportedPayments: ['card', 'local-currency', 'mobile-money'],
+    visaConvenienceHint: 'evisa',
+    seatsRemaining: 5,
+    segments: [
+      {
+        from: 'JNB',
+        fromAirport: 'O.R. Tambo International',
+        to: 'NBO',
+        toAirport: 'Jomo Kenyatta International',
+        departTime: '18:20',
+        arriveTime: '23:40',
+        durationMinutes: 260,
+        carrier: 'Kenya Airways',
+        flightNumber: 'KQ 763',
+        aircraft: 'Boeing 787-8 Dreamliner',
+      },
+    ],
+  },
+  {
+    id: 'af-cpt-nbo-kq',
+    flightNumber: 'KQ 782',
+    airline: 'Kenya Airways',
+    airlineCode: 'KQ',
+    alliance: 'SkyTeam',
+    origin: 'CPT',
+    destination: 'NBO',
+    departureTime: '08:30',
+    arrivalTime: '14:10',
+    durationMinutes: 340,
+    stops: 0,
+    aircraft: 'Boeing 787-8 Dreamliner',
+    baseZarFare: 3299,
+    taxesZar: 390,
+    cabinBaggageKg: 7,
+    checkedBaggageKg: 23,
+    changeAvailable: true,
+    refundable: true,
+    cabinAvailability: ['Economy', 'Business', 'First'],
+    connectivity: 'direct-africa',
+    supportedPayments: ['card', 'local-currency', 'mobile-money'],
+    visaConvenienceHint: 'evisa',
+    seatsRemaining: 6,
+    segments: [
+      {
+        from: 'CPT',
+        fromAirport: 'Cape Town International',
+        to: 'NBO',
+        toAirport: 'Jomo Kenyatta International',
+        departTime: '08:30',
+        arriveTime: '14:10',
+        durationMinutes: 340,
+        carrier: 'Kenya Airways',
+        flightNumber: 'KQ 782',
+        aircraft: 'Boeing 787-8 Dreamliner',
+      },
+    ],
+  },
+  {
+    id: 'af-cpt-acc-sa',
+    flightNumber: 'SA 052',
+    airline: 'South African Airways',
+    airlineCode: 'SA',
+    alliance: 'Star Alliance',
+    origin: 'CPT',
+    destination: 'ACC',
+    departureTime: '10:25',
+    arrivalTime: '18:10',
+    durationMinutes: 465,
+    stops: 1,
+    stopHub: 'JNB',
+    aircraft: 'Airbus A330-300',
+    baseZarFare: 2250,
+    taxesZar: 280,
+    cabinBaggageKg: 7,
+    checkedBaggageKg: 23,
+    changeAvailable: true,
+    refundable: false,
+    cabinAvailability: ['Economy', 'Business'],
+    connectivity: 'cross-border',
+    supportedPayments: ['card', 'local-currency', 'mobile-money', 'bank-transfer'],
+    visaConvenienceHint: 'visa-on-arrival',
+    seatsRemaining: 8,
+    segments: [
+      {
+        from: 'CPT',
+        fromAirport: 'Cape Town International',
+        to: 'JNB',
+        toAirport: 'O.R. Tambo International',
+        departTime: '10:25',
+        arriveTime: '12:30',
+        durationMinutes: 125,
+        carrier: 'South African Airways',
+        flightNumber: 'SA 324',
+        aircraft: 'Airbus A320',
+        layoverMinutes: 85,
+        layoverCity: 'Johannesburg',
+      },
+      {
+        from: 'JNB',
+        fromAirport: 'O.R. Tambo International',
+        to: 'ACC',
+        toAirport: 'Kotoka International',
+        departTime: '13:55',
+        arriveTime: '18:10',
+        durationMinutes: 375,
+        carrier: 'South African Airways',
+        flightNumber: 'SA 052',
+        aircraft: 'Airbus A330-300',
+      },
+    ],
+  },
+  {
+    id: 'af-cpt-wdh-sw',
+    flightNumber: 'SA 074',
+    airline: 'South African Airways',
+    airlineCode: 'SA',
+    alliance: 'Star Alliance',
+    origin: 'CPT',
+    destination: 'WDH',
+    departureTime: '09:50',
+    arrivalTime: '12:00',
+    durationMinutes: 130,
+    stops: 0,
+    aircraft: 'Airbus A320',
+    baseZarFare: 1999,
+    taxesZar: 220,
+    cabinBaggageKg: 7,
+    checkedBaggageKg: 23,
+    changeAvailable: true,
+    refundable: true,
+    cabinAvailability: ['Economy', 'Business'],
+    connectivity: 'direct-africa',
+    supportedPayments: ['card', 'local-currency', 'bank-transfer'],
+    visaConvenienceHint: 'visa-free',
+    seatsRemaining: 10,
+    segments: [
+      {
+        from: 'CPT',
+        fromAirport: 'Cape Town International',
+        to: 'WDH',
+        toAirport: 'Hosea Kutako International',
+        departTime: '09:50',
+        arriveTime: '12:00',
+        durationMinutes: 130,
+        carrier: 'South African Airways',
+        flightNumber: 'SA 074',
+        aircraft: 'Airbus A320',
+      },
+    ],
+  },
+  {
+    id: 'af-cpt-mpm-tm',
+    flightNumber: 'TM 315',
+    airline: 'LAM Mozambique',
+    airlineCode: 'TM',
+    alliance: 'Direct Regional',
+    origin: 'CPT',
+    destination: 'MPM',
+    departureTime: '14:20',
+    arrivalTime: '16:50',
+    durationMinutes: 150,
+    stops: 0,
+    aircraft: 'Embraer 190',
+    baseZarFare: 1850,
+    taxesZar: 210,
+    cabinBaggageKg: 7,
+    checkedBaggageKg: 23,
+    changeAvailable: true,
+    refundable: false,
+    cabinAvailability: ['Economy', 'Business'],
+    connectivity: 'direct-africa',
+    supportedPayments: ['card', 'local-currency', 'mobile-money'],
+    visaConvenienceHint: 'visa-free',
+    seatsRemaining: 8,
+    segments: [
+      {
+        from: 'CPT',
+        fromAirport: 'Cape Town International',
+        to: 'MPM',
+        toAirport: 'Maputo International',
+        departTime: '14:20',
+        arriveTime: '16:50',
+        durationMinutes: 150,
+        carrier: 'LAM Mozambique',
+        flightNumber: 'TM 315',
+        aircraft: 'Embraer 190',
+      },
+    ],
+  },
+  {
+    id: 'af-cpt-znz-kq',
+    flightNumber: 'KQ 786',
+    airline: 'Kenya Airways',
+    airlineCode: 'KQ',
+    alliance: 'SkyTeam',
+    origin: 'CPT',
+    destination: 'ZNZ',
+    departureTime: '07:45',
+    arrivalTime: '15:10',
+    durationMinutes: 385,
+    stops: 1,
+    stopHub: 'NBO',
+    aircraft: 'Boeing 787-8',
+    baseZarFare: 4299,
+    taxesZar: 410,
+    cabinBaggageKg: 7,
+    checkedBaggageKg: 23,
+    changeAvailable: true,
+    refundable: true,
+    cabinAvailability: ['Economy', 'Business'],
+    connectivity: 'cross-border',
+    supportedPayments: ['card', 'local-currency', 'mobile-money'],
+    visaConvenienceHint: 'visa-free',
+    seatsRemaining: 5,
+    segments: [
+      {
+        from: 'CPT',
+        fromAirport: 'Cape Town International',
+        to: 'NBO',
+        toAirport: 'Jomo Kenyatta International',
+        departTime: '07:45',
+        arriveTime: '13:15',
+        durationMinutes: 270,
+        carrier: 'Kenya Airways',
+        flightNumber: 'KQ 786',
+        aircraft: 'Boeing 787-8',
+        layoverMinutes: 65,
+        layoverCity: 'Nairobi',
+      },
+      {
+        from: 'NBO',
+        fromAirport: 'Jomo Kenyatta International',
+        to: 'ZNZ',
+        toAirport: 'Abeid Amani Karume International',
+        departTime: '14:20',
+        arriveTime: '15:10',
+        durationMinutes: 50,
+        carrier: 'Kenya Airways',
+        flightNumber: 'KQ 492',
+        aircraft: 'Embraer E190',
+      },
+    ],
+  },
+  {
+    id: 'af-cpt-cai-ms',
+    flightNumber: 'MS 840',
+    airline: 'EgyptAir',
+    airlineCode: 'MS',
+    alliance: 'Star Alliance',
+    origin: 'CPT',
+    destination: 'CAI',
+    departureTime: '21:15',
+    arrivalTime: '07:40',
+    durationMinutes: 625,
+    stops: 0,
+    aircraft: 'Boeing 787-9 Dreamliner',
+    baseZarFare: 4599,
+    taxesZar: 450,
+    cabinBaggageKg: 8,
+    checkedBaggageKg: 23,
+    changeAvailable: true,
+    refundable: true,
+    cabinAvailability: ['Economy', 'Business'],
+    connectivity: 'direct-africa',
+    supportedPayments: ['card', 'local-currency'],
+    visaConvenienceHint: 'evisa',
+    seatsRemaining: 7,
+    segments: [
+      {
+        from: 'CPT',
+        fromAirport: 'Cape Town International',
+        to: 'CAI',
+        toAirport: 'Cairo International',
+        departTime: '21:15',
+        arriveTime: '07:40',
+        durationMinutes: 625,
+        carrier: 'EgyptAir',
+        flightNumber: 'MS 840',
+        aircraft: 'Boeing 787-9 Dreamliner',
+      },
+    ],
+  },
+  {
+    id: 'af-cmn-cai-at',
+    flightNumber: 'AT 270',
+    airline: 'Royal Air Maroc',
+    airlineCode: 'AT',
+    alliance: 'oneworld',
+    origin: 'CMN',
+    destination: 'CAI',
+    departureTime: '10:05',
+    arrivalTime: '16:15',
+    durationMinutes: 310,
+    stops: 0,
+    aircraft: 'Boeing 787-9',
+    baseZarFare: 3650,
+    taxesZar: 340,
+    cabinBaggageKg: 10,
+    checkedBaggageKg: 23,
+    changeAvailable: true,
+    refundable: true,
+    cabinAvailability: ['Economy', 'Business', 'First'],
+    connectivity: 'direct-africa',
+    supportedPayments: ['card', 'local-currency'],
+    visaConvenienceHint: 'visa-required',
+    seatsRemaining: 6,
+    segments: [
+      {
+        from: 'CMN',
+        fromAirport: 'Mohammed V International',
+        to: 'CAI',
+        toAirport: 'Cairo International',
+        departTime: '10:05',
+        arriveTime: '16:15',
+        durationMinutes: 310,
+        carrier: 'Royal Air Maroc',
+        flightNumber: 'AT 270',
+        aircraft: 'Boeing 787-9',
+      },
+    ],
+  },
+  {
+    id: 'af-lad-cpt-dt',
+    flightNumber: 'DT 577',
+    airline: 'TAAG Angola Airlines',
+    airlineCode: 'DT',
+    alliance: 'Direct Regional',
+    origin: 'LAD',
+    destination: 'CPT',
+    departureTime: '10:30',
+    arrivalTime: '15:10',
+    durationMinutes: 220,
+    stops: 0,
+    aircraft: 'Boeing 777-300ER',
+    baseZarFare: 3980,
+    taxesZar: 360,
+    cabinBaggageKg: 8,
+    checkedBaggageKg: 32,
+    changeAvailable: true,
+    refundable: true,
+    cabinAvailability: ['Economy', 'Business', 'First'],
+    connectivity: 'direct-africa',
+    supportedPayments: ['card', 'local-currency', 'bank-transfer'],
+    visaConvenienceHint: 'visa-free',
+    seatsRemaining: 4,
+    segments: [
+      {
+        from: 'LAD',
+        fromAirport: 'Quatro de Fevereiro International',
+        to: 'CPT',
+        toAirport: 'Cape Town International',
+        departTime: '10:30',
+        arriveTime: '15:10',
+        durationMinutes: 220,
+        carrier: 'TAAG Angola Airlines',
+        flightNumber: 'DT 577',
+        aircraft: 'Boeing 777-300ER',
+      },
+    ],
+  },
+  {
+    id: 'af-cpt-dxb-qr',
+    flightNumber: 'QR 1370',
+    airline: 'Qatar Airways',
+    airlineCode: 'QR',
+    alliance: 'oneworld',
+    origin: 'CPT',
+    destination: 'DXB',
+    departureTime: '12:50',
+    arrivalTime: '02:15',
+    durationMinutes: 685,
+    stops: 1,
+    stopHub: 'DOH',
+    aircraft: 'Boeing 777-300ER Qsuite',
+    baseZarFare: 7950,
+    taxesZar: 820,
+    cabinBaggageKg: 7,
+    checkedBaggageKg: 30,
+    changeAvailable: true,
+    refundable: true,
+    cabinAvailability: ['Economy', 'Premium Economy', 'Business', 'First'],
+    connectivity: 'cross-border',
+    supportedPayments: ['card', 'local-currency', 'bank-transfer'],
+    visaConvenienceHint: 'evisa',
+    seatsRemaining: 5,
+    segments: [
+      {
+        from: 'CPT',
+        fromAirport: 'Cape Town International',
+        to: 'DOH',
+        toAirport: 'Hamad International',
+        departTime: '12:50',
+        arriveTime: '23:20',
+        durationMinutes: 570,
+        carrier: 'Qatar Airways',
+        flightNumber: 'QR 1370',
+        aircraft: 'Boeing 777-300ER',
+        layoverMinutes: 65,
+        layoverCity: 'Doha',
+      },
+      {
+        from: 'DOH',
+        fromAirport: 'Hamad International',
+        to: 'DXB',
+        toAirport: 'Dubai International',
+        departTime: '00:25',
+        arriveTime: '02:15',
+        durationMinutes: 50,
+        carrier: 'Qatar Airways',
+        flightNumber: 'QR 1018',
+        aircraft: 'Airbus A320',
+      },
+    ],
+  },
+];
+
+export const ANYWHERE_DESTINATIONS = [
+  { code: 'MPM', city: 'Maputo', country: 'Mozambique', fromZar: 1850, tag: 'Coastal 2h flight', badge: 'Visa-free' },
+  { code: 'WDH', city: 'Windhoek', country: 'Namibia', fromZar: 1999, tag: '2h 10m direct', badge: 'Visa-free' },
+  { code: 'ACC', city: 'Accra', country: 'Ghana', fromZar: 2250, tag: 'West Africa hub', badge: 'Visa on arrival' },
+  { code: 'LOS', city: 'Lagos', country: 'Nigeria', fromZar: 2399, tag: 'Commercial powerhouse', badge: 'eVisa' },
+  { code: 'ADD', city: 'Addis Ababa', country: 'Ethiopia', fromZar: 3100, tag: 'Diplomatic capital', badge: 'eVisa' },
+  { code: 'NBO', city: 'Nairobi', country: 'Kenya', fromZar: 3299, tag: 'East Africa Safari & Tech', badge: 'eTA Online' },
+  { code: 'ZNZ', city: 'Zanzibar', country: 'Tanzania', fromZar: 4299, tag: 'Island Sanctuary', badge: 'Visa-free' },
+  { code: 'CAI', city: 'Cairo', country: 'Egypt', fromZar: 4599, tag: 'Direct Dreamliner', badge: 'eVisa' },
+];
+
+export const VISA_INTELLIGENCE: Record<string, VisaRuleInfo> = {
+  NG: {
+    country: 'Nigeria',
+    flag: '🇳🇬',
+    source: 'Nigeria Immigration Service (eVisa Portal)',
+    lastUpdated: 'November 2026',
+    statusByPassport: {
+      'South Africa': {
+        requirement: 'eVisa available',
+        stayLimit: 'Up to 30 days',
+        processingTime: '48–72 hours online',
+        notes: 'Passport valid 6+ months, return ticket, and Lagos/Abuja accommodation confirmation required.',
+      },
+      Kenya: {
+        requirement: 'Visa on arrival',
+        stayLimit: 'Up to 30 days',
+        processingTime: 'Pre-approval recommended',
+        notes: 'Biometric Visa on Arrival counter open 24/7 at Murtala Muhammed (LOS) Terminal 2.',
+      },
+      Ghana: {
+        requirement: 'Visa-free',
+        stayLimit: 'Up to 90 days (ECOWAS)',
+        processingTime: 'Immediate upon arrival',
+        notes: 'Valid ECOWAS passport or travel certificate required.',
+      },
+      Default: {
+        requirement: 'eVisa available',
+        stayLimit: 'Up to 30 days',
+        processingTime: '3–5 business days',
+        notes: 'Verify yellow fever vaccination card alongside eVisa printout prior to boarding.',
+      },
+    },
+  },
+  ZA: {
+    country: 'South Africa',
+    flag: '🇿🇦',
+    source: 'Department of Home Affairs (DHA)',
+    lastUpdated: 'November 2026',
+    statusByPassport: {
+      'South Africa': {
+        requirement: 'Visa-free',
+        stayLimit: 'Citizen entry',
+        processingTime: 'Immediate',
+        notes: 'Automated e-Gates available at O.R. Tambo & Cape Town International.',
+      },
+      Nigeria: {
+        requirement: 'eVisa available',
+        stayLimit: 'Up to 90 days',
+        processingTime: '5–10 business days',
+        notes: 'Digital eVisa or VFS submission required prior to departure.',
+      },
+      Kenya: {
+        requirement: 'Visa-free',
+        stayLimit: 'Up to 90 days',
+        processingTime: 'Immediate upon arrival',
+        notes: '90-day visa-free bilateral arrangement for ordinary passport holders.',
+      },
+      Default: {
+        requirement: 'Visa on arrival',
+        stayLimit: '30–90 days',
+        processingTime: 'Passport control',
+        notes: 'Two blank passport pages required upon arrival at Cape Town / Johannesburg.',
+      },
+    },
+  },
+  KE: {
+    country: 'Kenya',
+    flag: '🇰🇪',
+    source: 'Kenya Electronic Travel Authorisation (eTA)',
+    lastUpdated: 'November 2026',
+    statusByPassport: {
+      'South Africa': {
+        requirement: 'eVisa available',
+        stayLimit: 'Up to 90 days (eTA)',
+        processingTime: '24–72 hours online',
+        notes: 'Apply via official eTA portal at least 3 days before departure.',
+      },
+      Kenya: {
+        requirement: 'Visa-free',
+        stayLimit: 'Citizen entry',
+        processingTime: 'Immediate',
+        notes: 'East African Community fast-track lane available.',
+      },
+      Default: {
+        requirement: 'eVisa available',
+        stayLimit: 'Up to 90 days (eTA)',
+        processingTime: '72 hours',
+        notes: 'Digital eTA authorization required for most international arrivals.',
+      },
+    },
+  },
+  GH: {
+    country: 'Ghana',
+    flag: '🇬🇭',
+    source: 'Ghana Immigration Service',
+    lastUpdated: 'November 2026',
+    statusByPassport: {
+      'South Africa': {
+        requirement: 'Visa-free',
+        stayLimit: 'Up to 90 days',
+        processingTime: 'Immediate upon arrival',
+        notes: 'Reciprocal 90-day visa waiver active between South Africa and Ghana.',
+      },
+      Nigeria: {
+        requirement: 'Visa-free',
+        stayLimit: 'Up to 90 days (ECOWAS)',
+        processingTime: 'Immediate',
+        notes: 'ECOWAS regional free movement.',
+      },
+      Default: {
+        requirement: 'Visa on arrival',
+        stayLimit: 'Up to 30 days (AU Nationals)',
+        processingTime: 'At Kotoka Terminal 3',
+        notes: 'African Union passport holders eligible for Visa on Arrival at Accra (ACC).',
+      },
+    },
+  },
+};
+
+export const LIVE_FLIGHT_STATUSES: FlightStatusRecord[] = [
+  {
+    flightNumber: 'ET 908',
+    airline: 'Ethiopian Airlines',
+    origin: 'CPT',
+    originCity: 'Cape Town',
+    destination: 'ADD',
+    destinationCity: 'Addis Ababa',
+    scheduledDeparture: '09:10',
+    estimatedDeparture: '09:10',
+    scheduledArrival: '15:30',
+    terminal: 'International',
+    gate: 'A12',
+    baggageBelt: 'Belt 4',
+    status: 'On time',
+    aircraft: 'Airbus A350-900',
+  },
+  {
+    flightNumber: 'ET 846',
+    airline: 'Ethiopian Airlines',
+    origin: 'CPT',
+    originCity: 'Cape Town',
+    destination: 'LOS',
+    destinationCity: 'Lagos (via ADD)',
+    scheduledDeparture: '09:10',
+    estimatedDeparture: '09:10',
+    scheduledArrival: '21:50',
+    terminal: 'International',
+    gate: 'A12',
+    baggageBelt: 'Belt 2',
+    status: 'On time',
+    aircraft: 'Airbus A350-900',
+  },
+  {
+    flightNumber: 'SA 317',
+    airline: 'South African Airways',
+    origin: 'JNB',
+    originCity: 'Johannesburg',
+    destination: 'CPT',
+    destinationCity: 'Cape Town',
+    scheduledDeparture: '07:15',
+    estimatedDeparture: '07:15',
+    scheduledArrival: '09:25',
+    terminal: 'Terminal B',
+    gate: 'D4',
+    baggageBelt: 'Belt 1',
+    status: 'Boarding',
+    aircraft: 'Airbus A320neo',
+  },
+  {
+    flightNumber: 'KQ 782',
+    airline: 'Kenya Airways',
+    origin: 'CPT',
+    originCity: 'Cape Town',
+    destination: 'NBO',
+    destinationCity: 'Nairobi',
+    scheduledDeparture: '08:30',
+    estimatedDeparture: '08:30',
+    scheduledArrival: '14:10',
+    terminal: 'International',
+    gate: 'A07',
+    baggageBelt: 'Belt 3',
+    status: 'On time',
+    aircraft: 'Boeing 787-8 Dreamliner',
+  },
+  {
+    flightNumber: 'P4 756',
+    airline: 'Air Peace',
+    origin: 'JNB',
+    originCity: 'Johannesburg',
+    destination: 'LOS',
+    destinationCity: 'Lagos',
+    scheduledDeparture: '15:30',
+    estimatedDeparture: '15:50',
+    scheduledArrival: '21:50',
+    terminal: 'Terminal A',
+    gate: 'A18',
+    baggageBelt: 'Belt 5',
+    status: 'Delayed 20m',
+    aircraft: 'Boeing 777-200ER',
+  },
+  {
+    flightNumber: 'DT 577',
+    airline: 'TAAG Angola Airlines',
+    origin: 'LAD',
+    originCity: 'Luanda',
+    destination: 'CPT',
+    destinationCity: 'Cape Town',
+    scheduledDeparture: '10:30',
+    estimatedDeparture: '10:30',
+    scheduledArrival: '15:10',
+    terminal: 'International',
+    gate: 'B02',
+    baggageBelt: 'Belt 2',
+    status: 'Scheduled',
+    aircraft: 'Boeing 777-300ER',
+  },
+];
+
+export const CABIN_MULTIPLIERS: Record<CabinClass, number> = {
+  Economy: 1,
+  'Premium Economy': 1.45,
+  Business: 2.35,
+  First: 3.9,
+};
+
+export const FARE_TIER_CONFIG: Record<
+  FareTierId,
+  {
+    name: string;
+    multiplier: number;
+    recommended?: boolean;
+    baggageLabel: string;
+    changesAllowed: boolean;
+    refundAllowed: boolean;
+    seatSelection: boolean;
+  }
+> = {
+  basic: {
+    name: 'Basic',
+    multiplier: 1,
+    baggageLabel: '7kg cabin only',
+    changesAllowed: false,
+    refundAllowed: false,
+    seatSelection: false,
+  },
+  standard: {
+    name: 'Standard',
+    multiplier: 1.16,
+    recommended: true,
+    baggageLabel: '7kg cabin + 23kg checked',
+    changesAllowed: true,
+    refundAllowed: false,
+    seatSelection: true,
+  },
+  flex: {
+    name: 'Flex',
+    multiplier: 1.37,
+    baggageLabel: '10kg cabin + 2x23kg checked',
+    changesAllowed: true,
+    refundAllowed: true,
+    seatSelection: true,
+  },
+};
+
+export const formatMinutes = (mins: number) => {
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return `${h}h ${m.toString().padStart(2, '0')}m`;
+};
+
+export const getHubByCode = (code: string): AirportHub | undefined =>
+  HUBS.find((h) => h.code === code);
+
+export const zarToUsd = (zarAmount: number): number => zarAmount / 18.5;

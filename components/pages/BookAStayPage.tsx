@@ -295,6 +295,12 @@ const BookAStayPage: React.FC<BookAStayPageProps> = ({
             }
             alt={termMode === 'long-term' ? 'AfriEstate Long-Term African Residence' : 'African Short-Term Luxury Escape'}
             referrerPolicy="no-referrer"
+            onError={(e) => {
+              if (!e.currentTarget.dataset.fb) {
+                e.currentTarget.dataset.fb = '1';
+                e.currentTarget.src = '/images/841376502.webp';
+              }
+            }}
             className="w-full h-full object-cover opacity-55"
           />
           <div className="absolute inset-0 bg-gradient-to-r from-[#0B1F1A]/90 via-[#123B2A]/75 to-[#0B1F1A]/55" />
@@ -366,6 +372,12 @@ const BookAStayPage: React.FC<BookAStayPageProps> = ({
                       src="/images/841376502.webp"
                       alt="Furnished Long-Term Executive Apartment Interior"
                       referrerPolicy="no-referrer"
+                      onError={(e) => {
+                        if (!e.currentTarget.dataset.fb) {
+                          e.currentTarget.dataset.fb = '1';
+                          e.currentTarget.src = '/images/280162474.jpg';
+                        }
+                      }}
                       className="w-full h-full object-cover"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/15 to-transparent" />
@@ -383,6 +395,12 @@ const BookAStayPage: React.FC<BookAStayPageProps> = ({
                       src="/images/2ec34ce4ca57aef13fc8b3239a99345e.jpg"
                       alt="Modern Architectural Long-Term Residence"
                       referrerPolicy="no-referrer"
+                      onError={(e) => {
+                        if (!e.currentTarget.dataset.fb) {
+                          e.currentTarget.dataset.fb = '1';
+                          e.currentTarget.src = '/images/841376502.webp';
+                        }
+                      }}
                       className="w-full h-full object-cover"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/15 to-transparent" />
@@ -402,6 +420,12 @@ const BookAStayPage: React.FC<BookAStayPageProps> = ({
                     src="/images/S5AW63xLpS5OInt3q7b2VfysVJZWUgL_mA50RmD3XPIDOg6FweUaBTyD2D55tZpB00mFfWJpOaM7y51sawZ95XIy0eckan_AR9cwNRlzXYNo8omw6E0jLV0-YEdLcA237iyhzwWVPPfb99eJb5FOkA-h5zNJ3Q4YSw2vtWqoUZNhTJV3_qUS2aKUV1ys1UEF.jpg"
                     alt="Featured Short-Term Retreat & Hotel"
                     referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      if (!e.currentTarget.dataset.fb) {
+                        e.currentTarget.dataset.fb = '1';
+                        e.currentTarget.src = '/images/841376502.webp';
+                      }
+                    }}
                     className="w-full h-full object-cover"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/15 to-transparent" />
@@ -559,7 +583,7 @@ const BookAStayPage: React.FC<BookAStayPageProps> = ({
                 Instant confirmation · Verified hospitality partners · Chauffeur arrival options
               </p>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {[
                 {
                   image:
@@ -592,23 +616,29 @@ const BookAStayPage: React.FC<BookAStayPageProps> = ({
                   key={card.title}
                   type="button"
                   onClick={card.action}
-                  className="group text-left relative rounded-2xl overflow-hidden border border-[#E4E1D9] dark:border-slate-800 bg-slate-900 aspect-[16/10] shadow-sm hover:shadow-xl transition-all"
+                  className="group text-left relative rounded-2xl overflow-hidden border border-[#E4E1D9] dark:border-slate-800 bg-slate-900 aspect-[16/9] shadow-sm hover:shadow-xl transition-all"
                 >
                   <img
                     src={card.image}
                     alt={card.title}
                     referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      if (!e.currentTarget.dataset.fb) {
+                        e.currentTarget.dataset.fb = '1';
+                        e.currentTarget.src = '/images/841376502.webp';
+                      }
+                    }}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent" />
                   <div className="absolute top-3 left-3">
-                    <span className="px-2.5 py-1 rounded-lg bg-[#123B2A]/95 text-[#C99A3D] text-[11px] font-bold uppercase tracking-wider">
+                    <span className="px-2.5 py-1 rounded-lg bg-[#123B2A]/95 text-[#C99A3D] text-[10px] font-bold uppercase tracking-wider">
                       {card.badge}
                     </span>
                   </div>
-                  <div className="absolute bottom-4 left-4 right-4 text-white">
-                    <h3 className="font-heading text-lg font-bold leading-snug">{card.title}</h3>
-                    <p className="text-xs text-slate-200 mt-1 line-clamp-1">{card.subtitle}</p>
+                  <div className="absolute bottom-3.5 left-4 right-4 text-white">
+                    <h3 className="font-heading text-base font-bold leading-snug">{card.title}</h3>
+                    <p className="text-[11px] text-slate-200 mt-0.5 line-clamp-1">{card.subtitle}</p>
                   </div>
                 </button>
               ))}
@@ -618,11 +648,17 @@ const BookAStayPage: React.FC<BookAStayPageProps> = ({
 
         {/* Flagship Spotlight: The African Grand Hotel */}
         <section className="rounded-3xl bg-white dark:bg-slate-900 border border-[#E4E1D9] dark:border-slate-800 overflow-hidden grid grid-cols-1 lg:grid-cols-12 shadow-sm">
-          <div className="lg:col-span-6 relative min-h-[280px] lg:min-h-[380px]">
+          <div className="lg:col-span-5 relative min-h-[240px] lg:min-h-[300px]">
             <img
               src={FLAGSHIP_AFRICAN_GRAND_HOTEL.heroImages[0].url}
               alt={FLAGSHIP_AFRICAN_GRAND_HOTEL.name}
               referrerPolicy="no-referrer"
+              onError={(e) => {
+                if (!e.currentTarget.dataset.fb) {
+                  e.currentTarget.dataset.fb = '1';
+                  e.currentTarget.src = '/images/841376502.webp';
+                }
+              }}
               className="w-full h-full object-cover"
             />
             <div className="absolute top-4 left-4 flex items-center gap-2">
@@ -632,7 +668,7 @@ const BookAStayPage: React.FC<BookAStayPageProps> = ({
             </div>
           </div>
 
-          <div className="lg:col-span-6 p-6 sm:p-10 flex flex-col justify-between gap-6">
+          <div className="lg:col-span-7 p-6 sm:p-8 flex flex-col justify-between gap-5">
             <div className="space-y-3">
               <div className="flex flex-wrap items-center gap-2 text-xs font-bold text-[#C99A3D] uppercase tracking-wider">
                 <span>Flagship Property Spotlight</span>
@@ -776,7 +812,7 @@ const BookAStayPage: React.FC<BookAStayPageProps> = ({
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {filteredStays.map((stay) => {
                 const isSaved = savedIds.includes(stay.id);
                 const isCompared = compareIds.includes(stay.id);
@@ -788,74 +824,80 @@ const BookAStayPage: React.FC<BookAStayPageProps> = ({
                     className="rounded-2xl bg-white dark:bg-slate-900 border border-[#E4E1D9] dark:border-slate-800 overflow-hidden flex flex-col justify-between shadow-xs hover:shadow-md transition-shadow"
                   >
                     <div>
-                      <div className="relative h-64 overflow-hidden">
+                      <div className="relative h-36 overflow-hidden bg-slate-200 dark:bg-slate-800">
                         <img
-                          src={stay.heroImages[0].url}
+                          src={stay.heroImages[0]?.url || '/images/841376502.webp'}
                           alt={stay.name}
                           referrerPolicy="no-referrer"
+                          onError={(e) => {
+                            if (!e.currentTarget.dataset.fb) {
+                              e.currentTarget.dataset.fb = '1';
+                              e.currentTarget.src = '/images/841376502.webp';
+                            }
+                          }}
                           className="w-full h-full object-cover"
                         />
-                        <div className="absolute top-3 left-3 flex items-center gap-2">
-                          <span className="px-2.5 py-1 rounded-lg bg-[#123B2A] text-white font-mono text-xs font-bold">
-                            {stay.score} {stay.scoreLabel}
+                        <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5">
+                          <span className="px-2 py-0.5 rounded-md bg-[#123B2A] text-white font-mono text-[10px] font-bold">
+                            {stay.score}
                           </span>
-                          <span className="px-2.5 py-1 rounded-lg bg-white/95 text-[#151515] text-[11px] font-bold">
+                          <span className="px-2 py-0.5 rounded-md bg-white/95 text-[#151515] text-[10px] font-bold">
                             {stay.propertyType}
                           </span>
                         </div>
-                        <div className="absolute top-3 right-3 flex items-center gap-1.5">
+                        <div className="absolute top-2.5 right-2.5 flex items-center gap-1">
                           <button
                             type="button"
                             onClick={() => toggleSave(stay.id, stay.name)}
                             aria-label={`Save ${stay.name}`}
-                            className="p-2 rounded-full bg-white/95 text-[#151515] hover:bg-white shadow"
+                            className="p-1.5 rounded-full bg-white/95 text-[#151515] hover:bg-white shadow"
                           >
                             {isSaved ? (
-                              <HeartSolidIcon className="w-4 h-4 text-[#123B2A]" />
+                              <HeartSolidIcon className="w-3.5 h-3.5 text-[#123B2A]" />
                             ) : (
-                              <HeartIcon className="w-4 h-4" />
+                              <HeartIcon className="w-3.5 h-3.5" />
                             )}
                           </button>
                           <button
                             type="button"
                             onClick={() => setShareTarget(stay)}
                             aria-label={`Share ${stay.name}`}
-                            className="p-2 rounded-full bg-white/95 text-[#151515] hover:bg-white shadow"
+                            className="p-1.5 rounded-full bg-white/95 text-[#151515] hover:bg-white shadow"
                           >
-                            <ShareIcon className="w-4 h-4" />
+                            <ShareIcon className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       </div>
 
-                      <div className="p-6 space-y-3">
-                        <div className="flex items-center justify-between text-xs text-[#6B6B6B] dark:text-slate-400">
-                          <span className="flex items-center gap-1 font-medium text-[#151515] dark:text-slate-200">
-                            <MapPinIcon className="w-3.5 h-3.5 text-[#123B2A] dark:text-[#C99A3D]" />
-                            {stay.locationLabel}
+                      <div className="p-3.5 space-y-2">
+                        <div className="flex items-center justify-between text-[11px] text-[#6B6B6B] dark:text-slate-400">
+                          <span className="flex items-center gap-1 font-medium text-[#151515] dark:text-slate-200 truncate">
+                            <MapPinIcon className="w-3 h-3 text-[#123B2A] dark:text-[#C99A3D] shrink-0" />
+                            <span className="truncate">{stay.locationLabel}</span>
                           </span>
-                          <span className="flex items-center gap-0.5 text-[#C99A3D]">
+                          <span className="flex items-center gap-0.5 text-[#C99A3D] shrink-0">
                             {Array.from({ length: stay.starRating }).map((_, idx) => (
-                              <StarSolidIcon key={idx} className="w-3.5 h-3.5" />
+                              <StarSolidIcon key={idx} className="w-3 h-3" />
                             ))}
                           </span>
                         </div>
 
-                        <h3 className="font-heading text-2xl font-bold text-[#151515] dark:text-white">
+                        <h3 className="font-heading text-base font-bold text-[#151515] dark:text-white line-clamp-1">
                           {stay.name}
                         </h3>
-                        <p className="text-xs sm:text-sm text-[#6B6B6B] dark:text-slate-300 leading-relaxed">
+                        <p className="text-xs text-[#6B6B6B] dark:text-slate-300 leading-relaxed line-clamp-2">
                           {stay.overviewShort}
                         </p>
 
-                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[#6B6B6B] dark:text-slate-400 pt-1">
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-[#6B6B6B] dark:text-slate-400">
                           <span>{stay.specs.rooms} keys</span>
                           <span>·</span>
-                          <span>Green Score {stay.sustainabilityScore}/100</span>
+                          <span>Green {stay.sustainabilityScore}/100</span>
                           {stay.investmentEligible && stay.investmentData && (
                             <>
                               <span>·</span>
                               <span className="font-semibold text-[#123B2A] dark:text-[#C99A3D]">
-                                {stay.investmentData.grossYield} Est. Yield
+                                {stay.investmentData.grossYield}
                               </span>
                             </>
                           )}
@@ -863,30 +905,30 @@ const BookAStayPage: React.FC<BookAStayPageProps> = ({
                       </div>
                     </div>
 
-                    <div className="px-6 py-4 bg-[#F8F7F3] dark:bg-slate-800/80 border-t border-[#E4E1D9] dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
+                    <div className="px-3.5 py-2.5 bg-[#F8F7F3] dark:bg-slate-800/80 border-t border-[#E4E1D9] dark:border-slate-800 flex items-center justify-between gap-2">
                       <div>
-                        <p className="text-[11px] text-[#6B6B6B] dark:text-slate-400">
-                          {termMode === 'long-term' ? `${leaseMonths}-month residency` : 'Nightly rate from'}
+                        <p className="text-[10px] text-[#6B6B6B] dark:text-slate-400">
+                          {termMode === 'long-term' ? `${leaseMonths}-mo lease` : 'From'}
                         </p>
-                        <p className="font-mono text-lg font-bold text-[#123B2A] dark:text-white">
+                        <p className="font-mono text-sm font-bold text-[#123B2A] dark:text-white">
                           R{displayPrice.toLocaleString()}
-                          <span className="text-xs font-normal text-[#6B6B6B] dark:text-slate-400">
-                            /{termMode === 'long-term' ? 'month' : 'night'}
+                          <span className="text-[10px] font-normal text-[#6B6B6B] dark:text-slate-400">
+                            /{termMode === 'long-term' ? 'mo' : 'nt'}
                           </span>
                         </p>
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5">
                         <button
                           type="button"
                           onClick={() => toggleCompare(stay.id)}
-                          className={`px-3 py-2 rounded-xl text-xs font-bold border transition-colors ${
+                          className={`px-2 py-1.5 rounded-lg text-[11px] font-bold border transition-colors ${
                             isCompared
                               ? 'bg-[#C99A3D] text-[#151515] border-[#C99A3D]'
                               : 'bg-white dark:bg-slate-900 border-[#E4E1D9] dark:border-slate-700'
                           }`}
                         >
-                          {isCompared ? 'Comparing' : 'Compare'}
+                          {isCompared ? 'Cmp' : 'Compare'}
                         </button>
                         <button
                           type="button"
@@ -894,9 +936,9 @@ const BookAStayPage: React.FC<BookAStayPageProps> = ({
                             setSelectedStay(stay);
                             window.scrollTo({ top: 0, behavior: 'smooth' });
                           }}
-                          className="px-4 py-2 rounded-xl bg-[#123B2A] hover:bg-[#0e2d20] text-white text-xs font-bold"
+                          className="px-3 py-1.5 rounded-lg bg-[#123B2A] hover:bg-[#0e2d20] text-white text-[11px] font-bold"
                         >
-                          View Details
+                          View
                         </button>
                       </div>
                     </div>
@@ -1011,9 +1053,15 @@ const BookAStayPage: React.FC<BookAStayPageProps> = ({
               {comparedStays.map((st) => (
                 <div key={st.id} className="rounded-xl bg-[#F8F7F3] dark:bg-slate-800 p-4 space-y-3 text-xs">
                   <img
-                    src={st.heroImages[0].url}
+                    src={st.heroImages[0]?.url || '/images/841376502.webp'}
                     alt={st.name}
                     referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      if (!e.currentTarget.dataset.fb) {
+                        e.currentTarget.dataset.fb = '1';
+                        e.currentTarget.src = '/images/841376502.webp';
+                      }
+                    }}
                     className="w-full h-32 object-cover rounded-lg"
                   />
                   <div>

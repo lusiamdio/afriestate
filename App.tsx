@@ -100,8 +100,9 @@ import FindProfessionalPage from './components/pages/FindProfessionalPage';
 import HotelRegistrationPage from './components/pages/HotelRegistrationPage';
 import ServiceListingPage from './components/pages/ServiceListingPage';
 import DashboardPortalPage from './components/pages/DashboardPortalPage';
+import BookFlightsPage from './components/pages/BookFlightsPage';
 
-type Page = 'home' | 'about' | 'services' | 'contact' | 'pricing' | 'rent-a-car' | 'find-wellness' | 'book-a-stay' | 'long-term-stays' | 'auth' | 'property-detail' | 'neighborhood-explorer' | 'find-professional' | 'hotel-registration' | 'list-service' | 'list-transport' | 'list-wellness' | 'dashboard' | 'seeker-dashboard' | 'agent-platform' | 'investor-platform';
+type Page = 'home' | 'about' | 'services' | 'contact' | 'pricing' | 'rent-a-car' | 'find-wellness' | 'book-a-stay' | 'long-term-stays' | 'book-flights' | 'auth' | 'property-detail' | 'neighborhood-explorer' | 'find-professional' | 'hotel-registration' | 'list-service' | 'list-transport' | 'list-wellness' | 'dashboard' | 'seeker-dashboard' | 'agent-platform' | 'investor-platform';
 
 const initialFilters: SearchFilters = {
     location: '',
@@ -800,7 +801,7 @@ const App: React.FC = () => {
     return [...governedProperties]
       .filter(p => p.status === PropertyStatus.ACTIVE && ![PropertyType.HOTEL, PropertyType.SHORT_TERM_RENTAL, PropertyType.TRANSPORT, PropertyType.WELLNESS].includes(p.propertyType))
       .sort((a, b) => b.dateListed - a.dateListed)
-      .slice(0, 3);
+      .slice(0, 4);
   }, [governedProperties]);
 
   const savedProperties = useMemo(() => {
@@ -1574,6 +1575,14 @@ const App: React.FC = () => {
               }}
             />
           );
+      case 'book-flights':
+          return (
+            <BookFlightsPage
+              currentUser={currentUser}
+              onBack={() => scrollToSection('home')}
+              onNavigate={(target) => scrollToSection(target as Page)}
+            />
+          );
       case 'list-service':
       case 'list-transport':
       case 'list-wellness':
@@ -1749,6 +1758,49 @@ const App: React.FC = () => {
                       onOpenDetailModal={handleOpenDetailModal}
                   />
 
+                  <section className="py-10 lg:py-12 bg-[#0B1F1A] text-white">
+                      <div className="w-full px-4 sm:px-6 lg:px-10">
+                          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
+                              <div className="max-w-2xl">
+                                  <p className="text-xs font-semibold tracking-widest uppercase text-amber-300 mb-2">
+                                      Tailored Discovery
+                                  </p>
+                                  <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold font-heading tracking-tight text-white" style={{ textWrap: 'balance' }}>
+                                      {t.app.exploreByLifestyle}
+                                  </h2>
+                              </div>
+                              <p className="text-sm sm:text-base text-slate-300 max-w-md leading-relaxed">
+                                  {t.app.exploreByLifestyleSubtitle}
+                              </p>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 items-stretch">
+                          {CATEGORIES.map((category, idx) => {
+                              const lifestyleMedia = [
+                                { image: '/images/841376502.webp', actionLabel: 'Browse Short Stays', onClick: () => scrollToSection('book-a-stay') },
+                                { image: '/images/2a47542b078d54560485a1e72a5373aa9c3a4a48-800x535.avif', actionLabel: 'Explore Vehicles', onClick: () => scrollToSection('rent-a-car') },
+                                { image: '/images/getlstd-property-photo.jpg', actionLabel: 'Discover Retreats', onClick: () => scrollToSection('find-wellness') },
+                                { image: '/images/2ec34ce4ca57aef13fc8b3239a99345e.jpg', actionLabel: 'Search Long-Term', onClick: () => scrollToSection('long-term-stays') },
+                                { image: '/images/book_flights_africa.jpg', actionLabel: 'Search Flights', onClick: () => scrollToSection('book-flights') },
+                              ][idx] || { image: '/images/383842941.jpg', actionLabel: 'Explore', onClick: () => scrollToSection('home', 'all-listings') };
+
+                              return (
+                                <CategoryCard
+                                  key={category.titleKey}
+                                  title={t.categories[category.titleKey as keyof typeof t.categories]}
+                                  description={t.categories[category.descriptionKey as keyof typeof t.categories]}
+                                  Icon={category.Icon}
+                                  image={lifestyleMedia.image}
+                                  indexLabel={`0${idx + 1}`}
+                                  actionLabel={lifestyleMedia.actionLabel}
+                                  onClick={lifestyleMedia.onClick}
+                                />
+                              );
+                          })}
+                          </div>
+                      </div>
+                  </section>
+
                   {/* Explore Africa Continental Geographic Hub Discovery */}
                   <div id="explore-africa">
                     <ExploreAfricaMap 
@@ -1807,48 +1859,6 @@ const App: React.FC = () => {
                       isLoading={isLoadingProperties}
                       />
                   </div>
-                  </section>
-
-                  <section className="py-20 lg:py-24 bg-[#0B1F1A] text-white">
-                      <div className="w-full px-4 sm:px-6 lg:px-10">
-                          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
-                              <div className="max-w-2xl">
-                                  <p className="text-xs font-semibold tracking-widest uppercase text-amber-300 mb-2">
-                                      Tailored Discovery
-                                  </p>
-                                  <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold font-heading tracking-tight text-white" style={{ textWrap: 'balance' }}>
-                                      {t.app.exploreByLifestyle}
-                                  </h2>
-                              </div>
-                              <p className="text-sm sm:text-base text-slate-300 max-w-md leading-relaxed">
-                                  {t.app.exploreByLifestyleSubtitle}
-                              </p>
-                          </div>
-
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 items-stretch">
-                          {CATEGORIES.map((category, idx) => {
-                              const lifestyleMedia = [
-                                { image: '/images/841376502.webp', actionLabel: 'Browse Short Stays', onClick: () => scrollToSection('book-a-stay') },
-                                { image: '/images/2a47542b078d54560485a1e72a5373aa9c3a4a48-800x535.avif', actionLabel: 'Explore Vehicles', onClick: () => scrollToSection('rent-a-car') },
-                                { image: '/images/getlstd-property-photo.jpg', actionLabel: 'Discover Retreats', onClick: () => scrollToSection('find-wellness') },
-                                { image: '/images/2ec34ce4ca57aef13fc8b3239a99345e.jpg', actionLabel: 'Search Long-Term', onClick: () => scrollToSection('long-term-stays') },
-                              ][idx] || { image: '/images/383842941.jpg', actionLabel: 'Explore', onClick: () => scrollToSection('home', 'all-listings') };
-
-                              return (
-                                <CategoryCard
-                                  key={category.titleKey}
-                                  title={t.categories[category.titleKey as keyof typeof t.categories]}
-                                  description={t.categories[category.descriptionKey as keyof typeof t.categories]}
-                                  Icon={category.Icon}
-                                  image={lifestyleMedia.image}
-                                  indexLabel={`0${idx + 1}`}
-                                  actionLabel={lifestyleMedia.actionLabel}
-                                  onClick={lifestyleMedia.onClick}
-                                />
-                              );
-                          })}
-                          </div>
-                      </div>
                   </section>
 
                   <section id="all-listings" className="py-16 md:py-24 bg-slate-50 dark:bg-slate-950">
@@ -2248,6 +2258,7 @@ const App: React.FC = () => {
             onLongTermClick={() => scrollToSection('long-term-stays')}
             onTransportClick={() => scrollToSection('rent-a-car')}
             onWellnessClick={() => scrollToSection('find-wellness')}
+            onFlightsClick={() => scrollToSection('book-flights')}
             onInvestClick={() => {
               handleFilterChange('mode', 'invest');
               handleFilterChange('listingType', ListingType.FOR_INVESTMENT);

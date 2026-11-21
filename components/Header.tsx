@@ -28,6 +28,7 @@ interface HeaderProps {
   onLongTermClick?: () => void;
   onTransportClick?: () => void;
   onWellnessClick?: () => void;
+  onFlightsClick?: () => void;
   onInvestClick?: () => void;
   onSellClick?: () => void;
   onDevelopClick?: () => void;
@@ -61,6 +62,7 @@ const Header: React.FC<HeaderProps> = (props) => {
     onLongTermClick,
     onTransportClick,
     onWellnessClick,
+    onFlightsClick,
     onInvestClick,
     onSellClick,
     onDevelopClick,
@@ -183,6 +185,15 @@ const Header: React.FC<HeaderProps> = (props) => {
               className="hover:text-slate-900 dark:hover:text-white transition-colors whitespace-nowrap"
             >
               Wellness
+            </button>
+          )}
+          {onFlightsClick && (
+            <button
+              type="button"
+              onClick={onFlightsClick}
+              className="hover:text-slate-900 dark:hover:text-white transition-colors whitespace-nowrap"
+            >
+              Flights
             </button>
           )}
           <button 
@@ -384,6 +395,14 @@ const Header: React.FC<HeaderProps> = (props) => {
             >
               Invest &amp; High-Yield Deals
             </button>
+            {onFlightsClick && (
+              <button
+                onClick={() => { onFlightsClick(); setIsMobileMenuOpen(false); }}
+                className="block w-full text-left py-1.5 text-slate-700 dark:text-slate-200"
+              >
+                Book Flights
+              </button>
+            )}
             {flags.neighborhoods && (
               <button
                 onClick={() => { (onNeighborhoodsClick || onExploreClick)?.(); setIsMobileMenuOpen(false); }}

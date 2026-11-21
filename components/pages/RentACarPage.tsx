@@ -28,6 +28,7 @@ import {
   sanitizeSafeUrl,
   sanitizeText,
 } from '../../lib/security';
+import PaymentSettlementPanel, { type SettlementReceipt } from '../payments/PaymentSettlementPanel';
 
 const carRentals = [
   {
@@ -177,7 +178,20 @@ const RentACarPage: React.FC<RentACarPageProps> = ({ properties = [], onListFlee
   const [driverName, setDriverName] = useState('');
   const [driverEmail, setDriverEmail] = useState('');
   const [driverPhone, setDriverPhone] = useState('');
-  const [isBookingSubmitting, setIsBookingSubmitting] = useState(false);
+  const [modalStep, setModalStep] = useState<'details' | 'settlement'>('details');
+  const [settledReceipt, setSettledReceipt] = useState<SettlementReceipt | null>(null);
+
+  const rentalDays = useMemo(() => {
+    const start = new Date(pickupDate).getTime();
+    const end = new Date(returnDate).getTime();
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return 1;
+    return Math.max(1, Math.round((end - start) / (1000 * 60 * 60 * 24)));
+  }, [pickupDate, returnDate]);
+
+  const parseDailyRateZar = (priceLabel: string) => {
+    const numeric = Number(priceLabel.replace(/[^0-9.]/g, ''));
+    return Number.isFinite(numeric) && numeric > 0 ? Math.round(numeric) : 1450;
+  };
 
   // AI Vehicle Advisor
   const [tripPrompt, setTripPrompt] = useState('');
@@ -262,9 +276,9 @@ const RentACarPage: React.FC<RentACarPageProps> = ({ properties = [], onListFlee
     return carRentals.filter((c) => c.hub === activeHub);
   }, [activeHub]);
 
-  const handleConfirmBooking = async (e: React.FormEvent) => {
+  const handleProceedToSettlement = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedVehicle || isBookingSubmitting) return;
+    if (!selectedVehicle) return;
 
     const cleanName = sanitizeText(driverName, 80);
     const cleanEmail = sanitizeText(driverEmail, 120);
@@ -274,39 +288,43 @@ const RentACarPage: React.FC<RentACarPageProps> = ({ properties = [], onListFlee
       addToast('Please provide a valid driver name, email address, and mobile number.', 'error');
       return;
     }
+    setModalStep('settlement');
+  };
+
+  const handleCarHireSettled = async (receipt: SettlementReceipt) => {
+    if (!selectedVehicle) return;
+    const cleanEmail = sanitizeText(driverEmail, 120);
+    const title = `${selectedVehicle.make} ${selectedVehicle.model}`;
+    setSettledReceipt(receipt);
 
     const throttle = checkSubmissionThrottle(`car_book_${selectedVehicle.id}`, 8000);
-    if (!throttle.allowed) {
-      addToast(`Please wait ${throttle.waitSeconds}s before submitting another booking request.`, 'info');
-      return;
+    if (throttle.allowed) {
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        const username = user?.email || cleanEmail;
+        await supabase.from('tour_requests').insert({
+          property_id: selectedVehicle.id,
+          property_title: `${title} (${pickupLocation} · ${pickupDate} to ${returnDate} · Ref ${receipt.transactionRef})`,
+          username,
+          date: pickupDate,
+          time: '10:00',
+          status: 'Confirmed',
+          timestamp: Date.now(),
+        });
+      } catch {
+        // proceed smoothly in local mode
+      }
     }
 
-    setIsBookingSubmitting(true);
-    const title = `${selectedVehicle.make} ${selectedVehicle.model}`;
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      const username = user?.email || cleanEmail;
-      await supabase.from('tour_requests').insert({
-        property_id: selectedVehicle.id,
-        property_title: `${title} (${pickupLocation} · ${pickupDate} to ${returnDate})`,
-        username,
-        date: pickupDate,
-        time: '10:00',
-        status: 'Pending',
-        timestamp: Date.now(),
-      });
-    } catch {
-      // proceed smoothly in local mode
-    } finally {
-      setIsBookingSubmitting(false);
-      addToast(`Verified booking request submitted for ${title} (${selectedVehicle.verificationHash}).`, 'success');
-      setSelectedVehicle(null);
-      setDriverName('');
-      setDriverEmail('');
-      setDriverPhone('');
-    }
+    addToast(`Car hire settled & confirmed for ${title} (${receipt.transactionRef}).`, 'success');
+  };
+
+  const closeVehicleModal = () => {
+    setSelectedVehicle(null);
+    setModalStep('details');
+    setSettledReceipt(null);
   };
 
   const handleAskAdvisor = async (customQuery?: string) => {
@@ -513,76 +531,86 @@ const RentACarPage: React.FC<RentACarPageProps> = ({ properties = [], onListFlee
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {displayedVehicles.map((vehicle) => (
               <div
                 key={vehicle.id}
                 className="bg-white dark:bg-slate-900 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 transition-colors group flex flex-col"
               >
-                <div className="h-56 overflow-hidden relative bg-slate-100 dark:bg-slate-800">
+                <div className="h-36 overflow-hidden relative bg-slate-100 dark:bg-slate-800">
                   <img
                     src={vehicle.image}
                     alt={`${vehicle.make} ${vehicle.model}`}
+                    onError={(e) => {
+                      if (!e.currentTarget.dataset.fb) {
+                        e.currentTarget.dataset.fb = '1';
+                        e.currentTarget.src = '/images/luxury_suv_fleet.jpg';
+                      }
+                    }}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     referrerPolicy="no-referrer"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-transparent" />
-                  <div className="absolute top-3 left-3 right-3 flex items-center justify-between gap-2">
-                    <span className="px-2.5 py-1 rounded-lg bg-[#0B1F1A]/90 text-[#C9A35D] text-[10px] font-bold uppercase tracking-wider inline-flex items-center gap-1">
-                      <CheckBadgeIcon className="w-3.5 h-3.5" />
-                      {vehicle.isUserPublished ? 'Live Partner Fleet' : 'Verified Fleet'}
+                  <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between gap-2">
+                    <span className="px-2 py-0.5 rounded-md bg-[#0B1F1A]/90 text-[#C9A35D] text-[10px] font-bold uppercase tracking-wider inline-flex items-center gap-1">
+                      <CheckBadgeIcon className="w-3 h-3" />
+                      {vehicle.isUserPublished ? 'Live Partner' : 'Verified'}
                     </span>
-                    <span className="px-2 py-1 rounded-lg bg-white/90 text-slate-900 font-mono text-[10px] font-bold">
+                    <span className="px-2 py-0.5 rounded-md bg-white/90 text-slate-900 font-mono text-[10px] font-bold">
                       {vehicle.city}
                     </span>
                   </div>
-                  <span className="absolute bottom-3 left-4 text-[11px] font-semibold uppercase tracking-wider text-white">
+                  <span className="absolute bottom-2 left-3 text-[10px] font-semibold uppercase tracking-wider text-white truncate max-w-[90%]">
                     {vehicle.category} · {vehicle.businessName}
                   </span>
                 </div>
 
-                <div className="p-6 flex-1 flex flex-col">
-                  <div className="flex justify-between items-start gap-3">
-                    <div>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 uppercase tracking-widest font-semibold">
+                <div className="p-3.5 flex-1 flex flex-col">
+                  <div className="flex justify-between items-start gap-2">
+                    <div className="min-w-0">
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-widest font-semibold truncate">
                         {vehicle.make}
                       </p>
-                      <h3 className="font-heading text-2xl font-semibold text-slate-900 dark:text-white mt-0.5">
+                      <h3 className="font-heading text-base font-semibold text-slate-900 dark:text-white mt-0.5 line-clamp-1">
                         {vehicle.model}
                       </h3>
                     </div>
                     <div className="text-right shrink-0">
-                      <p className="text-xl font-bold font-mono tabular-nums text-[#0F2D25] dark:text-emerald-400">
+                      <p className="text-base font-bold font-mono tabular-nums text-[#0F2D25] dark:text-emerald-400">
                         {vehicle.price}
                       </p>
-                      <p className="text-[11px] text-slate-500">/ day</p>
+                      <p className="text-[10px] text-slate-500">/ day</p>
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between gap-2 mt-2 mb-3 text-xs text-slate-600 dark:text-slate-300 font-mono tabular-nums">
-                    <span className="inline-flex items-center gap-1.5">
-                      <StarSolidIcon className="w-3.5 h-3.5 text-[#C9A35D]" />
+                  <div className="flex items-center justify-between gap-2 mt-1.5 mb-2 text-[11px] text-slate-600 dark:text-slate-300 font-mono tabular-nums">
+                    <span className="inline-flex items-center gap-1">
+                      <StarSolidIcon className="w-3 h-3 text-[#C9A35D]" />
                       <span className="font-semibold text-slate-900 dark:text-white">{vehicle.rating}</span>
-                      <span className="text-slate-400">({vehicle.reviews} trips)</span>
+                      <span className="text-slate-400">({vehicle.reviews})</span>
                     </span>
-                    <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-semibold">
+                    <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-semibold truncate">
                       {vehicle.verificationHash}
                     </span>
                   </div>
 
-                  <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed mb-3 line-clamp-2">
+                  <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed mb-2 line-clamp-2">
                     {vehicle.description}
                   </p>
 
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-5">
-                    {vehicle.specs.slice(0, 4).join(' · ')}
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400 mb-3 line-clamp-1">
+                    {vehicle.specs.slice(0, 3).join(' · ')}
                   </p>
 
                   <button
-                    onClick={() => setSelectedVehicle(vehicle)}
-                    className="mt-auto w-full bg-[#0F2D25] text-white font-semibold py-2.5 rounded-xl hover:bg-[#173f34] transition-colors text-xs"
+                    onClick={() => {
+                      setSelectedVehicle(vehicle);
+                      setModalStep('details');
+                      setSettledReceipt(null);
+                    }}
+                    className="mt-auto w-full bg-[#0F2D25] text-white font-semibold py-2 rounded-xl hover:bg-[#173f34] transition-colors text-xs"
                   >
-                    Inspect Details &amp; Reserve
+                    Book &amp; Settle Online
                   </button>
                 </div>
               </div>
@@ -806,120 +834,198 @@ const RentACarPage: React.FC<RentACarPageProps> = ({ properties = [], onListFlee
         </div>
       </section>
 
-      {/* Vehicle Inspection & Secure Reservation Modal */}
-      {selectedVehicle && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/65 backdrop-blur-sm" onClick={() => setSelectedVehicle(null)} />
-          <div className="relative z-10 w-full max-w-2xl rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
-            <div className="relative h-48 shrink-0">
-              <img
-                src={selectedVehicle.image}
-                alt={`${selectedVehicle.make} ${selectedVehicle.model}`}
-                referrerPolicy="no-referrer"
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#0B1F1A] via-[#0B1F1A]/50 to-transparent" />
-              <button
-                type="button"
-                onClick={() => setSelectedVehicle(null)}
-                aria-label="Close modal"
-                className="absolute top-3 right-3 p-2 rounded-full bg-black/50 text-white hover:bg-black/75"
-              >
-                <XMarkIcon className="w-4 h-4" />
-              </button>
-              <div className="absolute bottom-4 left-6 right-6 text-white flex items-end justify-between gap-4">
-                <div>
-                  <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-[#C9A35D]">
-                    <LockClosedIcon className="w-3.5 h-3.5" />
-                    Integrity Signature {selectedVehicle.verificationHash}
-                  </span>
-                  <h3 className="font-heading text-2xl font-bold mt-0.5">
-                    {selectedVehicle.make} {selectedVehicle.model}
-                  </h3>
+      {/* Vehicle Inspection & Real-Time Car Hire Settlement Modal */}
+      {selectedVehicle && (() => {
+        const dailyRateZar = parseDailyRateZar(selectedVehicle.price);
+        const rentalSubtotalZar = dailyRateZar * rentalDays;
+        const insuranceAndAirportFeeZar = 350;
+        const grandTotalZar = rentalSubtotalZar + insuranceAndAirportFeeZar;
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/65 backdrop-blur-sm" onClick={closeVehicleModal} />
+            <div className="relative z-10 w-full max-w-2xl rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+              <div className="relative h-44 shrink-0">
+                <img
+                  src={selectedVehicle.image}
+                  alt={`${selectedVehicle.make} ${selectedVehicle.model}`}
+                  onError={(e) => {
+                    if (!e.currentTarget.dataset.fb) {
+                      e.currentTarget.dataset.fb = '1';
+                      e.currentTarget.src = '/images/luxury_suv_fleet.jpg';
+                    }
+                  }}
+                  referrerPolicy="no-referrer"
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#0B1F1A] via-[#0B1F1A]/50 to-transparent" />
+                <button
+                  type="button"
+                  onClick={closeVehicleModal}
+                  aria-label="Close modal"
+                  className="absolute top-3 right-3 p-2 rounded-full bg-black/50 text-white hover:bg-black/75"
+                >
+                  <XMarkIcon className="w-4 h-4" />
+                </button>
+                <div className="absolute bottom-4 left-6 right-6 text-white flex items-end justify-between gap-4">
+                  <div>
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-[#C99A3D]">
+                      <LockClosedIcon className="w-3.5 h-3.5" />
+                      Integrity Signature {selectedVehicle.verificationHash}
+                    </span>
+                    <h3 className="font-heading text-2xl font-bold mt-0.5">
+                      {selectedVehicle.make} {selectedVehicle.model}
+                    </h3>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="font-mono text-xl font-bold text-[#C9A35D]">{selectedVehicle.price}</p>
+                    <p className="text-[11px] text-slate-300">per day · {rentalDays}d total R {grandTotalZar.toLocaleString()}</p>
+                  </div>
                 </div>
-                <div className="text-right shrink-0">
-                  <p className="font-mono text-xl font-bold text-[#C9A35D]">{selectedVehicle.price}</p>
-                  <p className="text-[11px] text-slate-300">per day</p>
+              </div>
+
+              <div className="p-6 overflow-y-auto space-y-4">
+                <div className="flex items-center justify-between gap-2 text-xs border-b border-slate-200 dark:border-slate-800 pb-3">
+                  <div className="flex items-center gap-2">
+                    <span className={`px-2.5 py-1 rounded-lg font-bold ${modalStep === 'details' ? 'bg-[#0F2D25] text-white' : 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300'}`}>
+                      1. Driver Details
+                    </span>
+                    <span className="text-slate-400">→</span>
+                    <span className={`px-2.5 py-1 rounded-lg font-bold ${modalStep === 'settlement' ? 'bg-[#008F45] text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}>
+                      2. Real-Time Settlement
+                    </span>
+                  </div>
+                  {modalStep === 'settlement' && !settledReceipt && (
+                    <button
+                      type="button"
+                      onClick={() => setModalStep('details')}
+                      className="text-xs font-semibold text-[#0F2D25] dark:text-[#C9A35D] hover:underline"
+                    >
+                      Edit Driver Info
+                    </button>
+                  )}
                 </div>
+
+                {modalStep === 'details' ? (
+                  <form onSubmit={handleProceedToSettlement} className="space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs bg-[#FAF8F5] dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
+                      <div>
+                        <p className="text-[10px] font-bold uppercase text-slate-500">Verified Operator</p>
+                        <p className="font-semibold text-slate-900 dark:text-white mt-0.5">{selectedVehicle.businessName}</p>
+                        <p className="text-slate-500 font-mono mt-0.5">{selectedVehicle.phone}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-bold uppercase text-slate-500">Pickup &amp; Return Window</p>
+                        <p className="font-semibold text-slate-900 dark:text-white mt-0.5">
+                          {pickupLocation} → {returnLocation}
+                        </p>
+                        <p className="text-slate-500 mt-0.5">{pickupDate} → {returnDate} ({rentalDays} days · Age {driverAge})</p>
+                      </div>
+                    </div>
+
+                    <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                      {selectedVehicle.description}
+                    </p>
+
+                    <div className="flex flex-wrap gap-1.5">
+                      {selectedVehicle.specs.map((spec) => (
+                        <span
+                          key={spec}
+                          className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-[11px] font-semibold text-slate-700 dark:text-slate-200"
+                        >
+                          {spec}
+                        </span>
+                      ))}
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                      <div>
+                        <label className="block text-xs font-semibold mb-1">Primary Driver Name *</label>
+                        <input
+                          type="text"
+                          required
+                          value={driverName}
+                          onChange={(e) => setDriverName(e.target.value)}
+                          placeholder="Full legal name"
+                          className="w-full px-3 py-2.5 rounded-xl bg-[#FAF8F5] dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold mb-1">Email Address *</label>
+                        <input
+                          type="email"
+                          required
+                          value={driverEmail}
+                          onChange={(e) => setDriverEmail(e.target.value)}
+                          placeholder="driver@domain.com"
+                          className="w-full px-3 py-2.5 rounded-xl bg-[#FAF8F5] dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold mb-1">Mobile Number *</label>
+                        <input
+                          type="tel"
+                          required
+                          value={driverPhone}
+                          onChange={(e) => setDriverPhone(e.target.value)}
+                          placeholder="+27 82 000 0000"
+                          className="w-full px-3 py-2.5 rounded-xl bg-[#FAF8F5] dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="w-full py-3 rounded-xl bg-[#0F2D25] hover:bg-[#173f34] text-white text-xs font-bold transition-colors"
+                    >
+                      Continue to Real-Time Settlement · R {grandTotalZar.toLocaleString()}
+                    </button>
+                  </form>
+                ) : (
+                  <div className="space-y-4">
+                    <PaymentSettlementPanel
+                      bookingCategory="car-hire"
+                      itemId={selectedVehicle.id}
+                      itemTitle={`${selectedVehicle.make} ${selectedVehicle.model}`}
+                      itemSubtitle={`${pickupLocation} → ${returnLocation} (${pickupDate} to ${returnDate} · ${rentalDays} days)`}
+                      amountZar={grandTotalZar}
+                      displayTotal={`R ${grandTotalZar.toLocaleString()}`}
+                      currencyCode="ZAR"
+                      lineItems={[
+                        { label: `${rentalDays} day(s) × R ${dailyRateZar.toLocaleString()}/day`, amountText: `R ${rentalSubtotalZar.toLocaleString()}` },
+                        { label: 'CDW Protection & Terminal Key Dispatch Fee', amountText: `R ${insuranceAndAirportFeeZar.toLocaleString()}` },
+                      ]}
+                      customerName={driverName}
+                      customerEmail={driverEmail}
+                      metadata={{
+                        pickupLocation,
+                        returnLocation,
+                        pickupDate,
+                        returnDate,
+                        rentalDays,
+                        driverPhone,
+                        driverAge,
+                      }}
+                      submitLabel={`Settle Car Hire · R ${grandTotalZar.toLocaleString()}`}
+                      onSettled={handleCarHireSettled}
+                    />
+
+                    {settledReceipt && (
+                      <button
+                        type="button"
+                        onClick={closeVehicleModal}
+                        className="w-full py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800"
+                      >
+                        Done · Return to Mobility Fleet
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
-
-            <form onSubmit={handleConfirmBooking} className="p-6 overflow-y-auto space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs bg-[#FAF8F5] dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
-                <div>
-                  <p className="text-[10px] font-bold uppercase text-slate-500">Verified Operator</p>
-                  <p className="font-semibold text-slate-900 dark:text-white mt-0.5">{selectedVehicle.businessName}</p>
-                  <p className="text-slate-500 font-mono mt-0.5">{selectedVehicle.phone}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold uppercase text-slate-500">Pickup Location &amp; Dates</p>
-                  <p className="font-semibold text-slate-900 dark:text-white mt-0.5">{selectedVehicle.pickupAddress}</p>
-                  <p className="text-slate-500 mt-0.5">{pickupDate} → {returnDate} (Age {driverAge})</p>
-                </div>
-              </div>
-
-              <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-                {selectedVehicle.description}
-              </p>
-
-              <div className="flex flex-wrap gap-1.5">
-                {selectedVehicle.specs.map((spec) => (
-                  <span
-                    key={spec}
-                    className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-[11px] font-semibold text-slate-700 dark:text-slate-200"
-                  >
-                    {spec}
-                  </span>
-                ))}
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
-                <div>
-                  <label className="block text-xs font-semibold mb-1">Primary Driver Name *</label>
-                  <input
-                    type="text"
-                    required
-                    value={driverName}
-                    onChange={(e) => setDriverName(e.target.value)}
-                    placeholder="Full legal name"
-                    className="w-full px-3 py-2.5 rounded-xl bg-[#FAF8F5] dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold mb-1">Email Address *</label>
-                  <input
-                    type="email"
-                    required
-                    value={driverEmail}
-                    onChange={(e) => setDriverEmail(e.target.value)}
-                    placeholder="driver@domain.com"
-                    className="w-full px-3 py-2.5 rounded-xl bg-[#FAF8F5] dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold mb-1">Mobile Number *</label>
-                  <input
-                    type="tel"
-                    required
-                    value={driverPhone}
-                    onChange={(e) => setDriverPhone(e.target.value)}
-                    placeholder="+27 82 000 0000"
-                    className="w-full px-3 py-2.5 rounded-xl bg-[#FAF8F5] dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs outline-none"
-                  />
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={isBookingSubmitting}
-                className="w-full py-3 rounded-xl bg-[#0F2D25] hover:bg-[#173f34] disabled:bg-slate-400 text-white text-xs font-bold transition-colors"
-              >
-                {isBookingSubmitting ? 'Verifying & Securing Hold...' : `Confirm Reservation · ${selectedVehicle.price}/day`}
-              </button>
-            </form>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 };

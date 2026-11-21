@@ -30,6 +30,7 @@ import { GoogleGenAI } from '../../lib/ai';
 import { createStayBooking } from '../../lib/data';
 import { generateSecureBookingRef, isValidEmail, sanitizeText } from '../../lib/security';
 import { useToast } from '../../contexts/ToastContext';
+import PaymentSettlementPanel, { type SettlementReceipt } from '../payments/PaymentSettlementPanel';
 
 interface VerificationModalProps {
   isOpen: boolean;
@@ -853,51 +854,91 @@ export const TransparentBookingModal: React.FC<{
   const { addToast } = useToast();
   const [guestName, setGuestName] = useState('');
   const [guestEmail, setGuestEmail] = useState('');
+  const [leaseNote, setLeaseNote] = useState('');
   const [payOption, setPayOption] = useState<'now' | 'property'>('now');
   const [confirmed, setConfirmed] = useState(false);
   const [bookingRef, setBookingRef] = useState('');
+  const [settledReceipt, setSettledReceipt] = useState<SettlementReceipt | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (!isOpen) {
       setConfirmed(false);
       setBookingRef('');
+      setSettledReceipt(null);
       setIsSubmitting(false);
     }
   }, [isOpen]);
 
   if (!isOpen || !room || !ratePlan) return null;
 
-  const baseSubtotal = termMode === 'long-term' ? ratePlan.monthlyZar * months : ratePlan.nightlyZar * nights;
-  const taxes = Math.round(baseSubtotal * 0.15);
-  const serviceFee = termMode === 'long-term' ? 650 : 250;
+  const isLongTermLease = termMode === 'long-term';
+  const baseSubtotal = isLongTermLease ? ratePlan.monthlyZar * months : ratePlan.nightlyZar * nights;
+  const taxes = isLongTermLease ? 0 : Math.round(baseSubtotal * 0.15);
+  const serviceFee = isLongTermLease ? 0 : 250;
   const grandTotal = baseSubtotal + taxes + serviceFee;
-  const payToday = payOption === 'now' ? grandTotal : serviceFee + Math.round(taxes * 0.5);
-  const payAtProperty = grandTotal - payToday;
+  const payToday = isLongTermLease
+    ? 0
+    : payOption === 'now'
+      ? grandTotal
+      : serviceFee + Math.round(taxes * 0.5);
+  const payAtProperty = isLongTermLease ? grandTotal : grandTotal - payToday;
 
-  const handleConfirmBooking = async (e: React.FormEvent) => {
+  const handleShortStaySettled = async (receipt: SettlementReceipt) => {
+    const cleanedName = sanitizeText(guestName, 120);
+    const cleanedEmail = guestEmail.trim().toLowerCase();
+    await createStayBooking({
+      propertyId: property.id,
+      propertyName: property.name,
+      roomId: room.id,
+      roomName: room.name,
+      ratePlanName: ratePlan.name,
+      termMode: 'short-term',
+      checkIn,
+      checkOut,
+      guestsLabel,
+      nights,
+      months,
+      guestName: cleanedName,
+      guestEmail: cleanedEmail,
+      payOption,
+      baseSubtotal,
+      taxes,
+      serviceFee,
+      grandTotal,
+      payToday,
+      payAtProperty,
+      bookingRef: receipt.transactionRef,
+    });
+    setSettledReceipt(receipt);
+    setBookingRef(receipt.transactionRef);
+    setConfirmed(true);
+    addToast(`Short-stay payment settled & confirmed (${receipt.transactionRef})!`, 'success');
+  };
+
+  const handleConfirmLeaseInquiry = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanedName = sanitizeText(guestName, 120);
     const cleanedEmail = guestEmail.trim().toLowerCase();
     if (!cleanedName || cleanedName.length < 2) {
-      addToast('Please enter a valid full guest name.', 'error');
+      addToast('Please enter a valid full applicant name.', 'error');
       return;
     }
     if (!isValidEmail(cleanedEmail)) {
-      addToast('Please enter a valid guest email address.', 'error');
+      addToast('Please enter a valid applicant email address.', 'error');
       return;
     }
 
     setIsSubmitting(true);
     try {
-      const ref = generateSecureBookingRef('AFR-STAY');
+      const ref = generateSecureBookingRef('AFR-LEASE');
       await createStayBooking({
         propertyId: property.id,
         propertyName: property.name,
         roomId: room.id,
         roomName: room.name,
-        ratePlanName: ratePlan.name,
-        termMode,
+        ratePlanName: `${ratePlan.name} (Off-Platform Lease)`,
+        termMode: 'long-term',
         checkIn,
         checkOut,
         guestsLabel,
@@ -905,18 +946,18 @@ export const TransparentBookingModal: React.FC<{
         months,
         guestName: cleanedName,
         guestEmail: cleanedEmail,
-        payOption,
+        payOption: 'property',
         baseSubtotal,
-        taxes,
-        serviceFee,
+        taxes: 0,
+        serviceFee: 0,
         grandTotal,
-        payToday,
-        payAtProperty,
+        payToday: 0,
+        payAtProperty: grandTotal,
         bookingRef: ref,
       });
       setBookingRef(ref);
       setConfirmed(true);
-      addToast(`Booking confirmed for ${room.name} (${ref})!`, 'success');
+      addToast(`Long-term tenancy inquiry submitted (${ref}). No online payment taken.`, 'success');
     } finally {
       setIsSubmitting(false);
     }
@@ -928,9 +969,15 @@ export const TransparentBookingModal: React.FC<{
       <div className="relative z-10 w-full max-w-xl rounded-2xl bg-white dark:bg-slate-900 border border-[#E4E1D9] dark:border-slate-800 p-6 sm:p-8 space-y-5 shadow-2xl max-h-[90vh] overflow-y-auto">
         <div className="flex items-start justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-[#C99A3D]">Transparent Checkout</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-[#C99A3D]">
+              {isLongTermLease ? 'Long-Term Tenancy Application' : 'Real-Time Short-Stay Settlement'}
+            </p>
             <h3 className="font-heading text-2xl font-semibold text-[#151515] dark:text-white mt-0.5">
-              {confirmed ? 'Reservation Confirmed' : `${room.name} · ${ratePlan.name}`}
+              {confirmed
+                ? isLongTermLease
+                  ? 'Tenancy Inquiry Submitted'
+                  : 'Short-Stay Settled & Confirmed'
+                : `${room.name} · ${ratePlan.name}`}
             </h3>
             <p className="text-xs text-[#6B6B6B] dark:text-slate-400">
               {property.name} · {checkIn} to {checkOut} · {guestsLabel}
@@ -945,106 +992,181 @@ export const TransparentBookingModal: React.FC<{
         <div className="rounded-xl bg-[#F8F7F3] dark:bg-slate-800 border border-[#E4E1D9] dark:border-slate-700 p-5 space-y-2.5 text-sm">
           <div className="flex justify-between">
             <span className="text-[#6B6B6B] dark:text-slate-300">
-              {termMode === 'long-term' ? `${months} month(s) residency` : `${nights} nights`}
+              {isLongTermLease ? `${months} month(s) residential lease` : `${nights} nights accommodation`}
             </span>
             <span className="font-mono font-semibold text-[#151515] dark:text-white">
               R{baseSubtotal.toLocaleString()}
             </span>
           </div>
-          <div className="flex justify-between">
-            <span className="text-[#6B6B6B] dark:text-slate-300">Taxes (15% VAT)</span>
-            <span className="font-mono font-semibold text-[#151515] dark:text-white">R{taxes.toLocaleString()}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-[#6B6B6B] dark:text-slate-300">AfriEstate Protection &amp; Service fee</span>
-            <span className="font-mono font-semibold text-[#151515] dark:text-white">R{serviceFee.toLocaleString()}</span>
-          </div>
+          {!isLongTermLease && (
+            <>
+              <div className="flex justify-between">
+                <span className="text-[#6B6B6B] dark:text-slate-300">Taxes (15% VAT)</span>
+                <span className="font-mono font-semibold text-[#151515] dark:text-white">R{taxes.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-[#6B6B6B] dark:text-slate-300">AfriEstate Protection &amp; Service fee</span>
+                <span className="font-mono font-semibold text-[#151515] dark:text-white">R{serviceFee.toLocaleString()}</span>
+              </div>
+            </>
+          )}
           <div className="pt-3 border-t border-[#E4E1D9] dark:border-slate-700 flex justify-between text-base font-bold">
-            <span>Total</span>
+            <span>{isLongTermLease ? 'Estimated Lease Value' : 'Total Stay Cost'}</span>
             <span className="font-mono text-[#123B2A] dark:text-[#C99A3D]">R{grandTotal.toLocaleString()}</span>
           </div>
           <div className="pt-2 text-xs grid grid-cols-2 gap-3 text-[#6B6B6B] dark:text-slate-300">
             <div>
-              <p>What you pay today</p>
-              <p className="font-mono font-bold text-[#151515] dark:text-white">R{payToday.toLocaleString()}</p>
+              <p>Settled on AfriEstate today</p>
+              <p className="font-mono font-bold text-[#151515] dark:text-white">
+                {isLongTermLease ? 'R0 (Direct Landlord)' : `R${payToday.toLocaleString()}`}
+              </p>
             </div>
             <div className="text-right">
-              <p>What you pay at property</p>
-              <p className="font-mono font-bold text-[#151515] dark:text-white">R{payAtProperty.toLocaleString()}</p>
+              <p>{isLongTermLease ? 'Lease execution' : 'Balance at property'}</p>
+              <p className="font-mono font-bold text-[#151515] dark:text-white">
+                {isLongTermLease ? 'Off-Platform Lease' : `R${payAtProperty.toLocaleString()}`}
+              </p>
             </div>
           </div>
         </div>
 
-        {confirmed ? (
-          <div className="p-5 rounded-xl bg-[#123B2A] text-white space-y-2">
-            <p className="text-xs font-bold uppercase tracking-wider text-[#C99A3D]">AfriEstate Booking Reference</p>
-            <p className="font-mono text-lg font-bold">{bookingRef}</p>
-            <p className="text-xs text-slate-200">
-              Instant confirmation sent to {guestEmail || 'your account email'}. Covered by AfriEstate Booking Protection.
-            </p>
-          </div>
+        {isLongTermLease ? (
+          confirmed ? (
+            <div className="p-5 rounded-xl bg-[#123B2A] text-white space-y-2">
+              <p className="text-xs font-bold uppercase tracking-wider text-[#C99A3D]">Verified Tenancy Reference</p>
+              <p className="font-mono text-lg font-bold">{bookingRef}</p>
+              <p className="text-xs text-slate-200">
+                Application forwarded to the verified landlord/agent at {property.name}. Lease signing and rent deposits occur strictly off-platform.
+              </p>
+            </div>
+          ) : (
+            <form onSubmit={handleConfirmLeaseInquiry} className="space-y-4">
+              <div className="rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 p-3.5 text-xs text-amber-900 dark:text-amber-200 leading-relaxed">
+                <strong>Long-Term Rental Policy:</strong> Monthly residential leases, properties for sale, and investment properties are never settled financially on AfriEstate. Submit your verified tenancy application below to arrange viewing &amp; direct landlord lease signing.
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <input
+                  type="text"
+                  required
+                  value={guestName}
+                  onChange={(e) => setGuestName(e.target.value)}
+                  placeholder="Applicant full name"
+                  className="px-3.5 py-2.5 rounded-xl bg-[#F8F7F3] dark:bg-slate-800 border border-[#E4E1D9] dark:border-slate-700 text-sm"
+                />
+                <input
+                  type="email"
+                  required
+                  value={guestEmail}
+                  onChange={(e) => setGuestEmail(e.target.value)}
+                  placeholder="Applicant email address"
+                  className="px-3.5 py-2.5 rounded-xl bg-[#F8F7F3] dark:bg-slate-800 border border-[#E4E1D9] dark:border-slate-700 text-sm"
+                />
+              </div>
+
+              <textarea
+                rows={2}
+                value={leaseNote}
+                onChange={(e) => setLeaseNote(e.target.value)}
+                placeholder="Preferred move-in date, occupation, or corporate relocation note (optional)"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-[#F8F7F3] dark:bg-slate-800 border border-[#E4E1D9] dark:border-slate-700 text-sm"
+              />
+
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full py-3.5 rounded-xl bg-[#123B2A] hover:bg-[#0d2a1e] text-white text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-60"
+              >
+                <ShieldCheckIcon className="w-4 h-4 text-[#C99A3D]" />
+                <span>{isSubmitting ? 'Submitting Application...' : 'Submit Verified Lease Application (R0 Due Online)'}</span>
+              </button>
+            </form>
+          )
         ) : (
-          <form onSubmit={handleConfirmBooking} className="space-y-4">
-            <div className="grid grid-cols-2 gap-2 text-xs font-semibold">
-              <button
-                type="button"
-                onClick={() => setPayOption('now')}
-                className={`p-3 rounded-xl border text-left ${
-                  payOption === 'now'
-                    ? 'border-[#123B2A] bg-[#F8F7F3] dark:bg-emerald-950/30'
-                    : 'border-[#E4E1D9] dark:border-slate-700'
-                }`}
-              >
-                <span className="block font-bold">Pay full balance today</span>
-                <span className="text-[#6B6B6B] dark:text-slate-400">Zero balance due at check-in</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setPayOption('property')}
-                className={`p-3 rounded-xl border text-left ${
-                  payOption === 'property'
-                    ? 'border-[#123B2A] bg-[#F8F7F3] dark:bg-emerald-950/30'
-                    : 'border-[#E4E1D9] dark:border-slate-700'
-                }`}
-              >
-                <span className="block font-bold">Pay at property</span>
-                <span className="text-[#6B6B6B] dark:text-slate-400">Reserve now with security hold</span>
-              </button>
-            </div>
+          <div className="space-y-4">
+            {!confirmed && (
+              <>
+                <div className="grid grid-cols-2 gap-2 text-xs font-semibold">
+                  <button
+                    type="button"
+                    onClick={() => setPayOption('now')}
+                    className={`p-3 rounded-xl border text-left ${
+                      payOption === 'now'
+                        ? 'border-[#123B2A] bg-[#F8F7F3] dark:bg-emerald-950/30'
+                        : 'border-[#E4E1D9] dark:border-slate-700'
+                    }`}
+                  >
+                    <span className="block font-bold">Pay full stay today</span>
+                    <span className="text-[#6B6B6B] dark:text-slate-400">R{grandTotal.toLocaleString()} · Zero check-in balance</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPayOption('property')}
+                    className={`p-3 rounded-xl border text-left ${
+                      payOption === 'property'
+                        ? 'border-[#123B2A] bg-[#F8F7F3] dark:bg-emerald-950/30'
+                        : 'border-[#E4E1D9] dark:border-slate-700'
+                    }`}
+                  >
+                    <span className="block font-bold">Deposit &amp; fee today</span>
+                    <span className="text-[#6B6B6B] dark:text-slate-400">Settle R{(serviceFee + Math.round(taxes * 0.5)).toLocaleString()} now</span>
+                  </button>
+                </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <input
-                type="text"
-                required
-                value={guestName}
-                onChange={(e) => setGuestName(e.target.value)}
-                placeholder="Full guest name"
-                className="px-3.5 py-2.5 rounded-xl bg-[#F8F7F3] dark:bg-slate-800 border border-[#E4E1D9] dark:border-slate-700 text-sm"
-              />
-              <input
-                type="email"
-                required
-                value={guestEmail}
-                onChange={(e) => setGuestEmail(e.target.value)}
-                placeholder="Guest email for voucher"
-                className="px-3.5 py-2.5 rounded-xl bg-[#F8F7F3] dark:bg-slate-800 border border-[#E4E1D9] dark:border-slate-700 text-sm"
-              />
-            </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <input
+                    type="text"
+                    required
+                    value={guestName}
+                    onChange={(e) => setGuestName(e.target.value)}
+                    placeholder="Full guest name"
+                    className="px-3.5 py-2.5 rounded-xl bg-[#F8F7F3] dark:bg-slate-800 border border-[#E4E1D9] dark:border-slate-700 text-sm"
+                  />
+                  <input
+                    type="email"
+                    required
+                    value={guestEmail}
+                    onChange={(e) => setGuestEmail(e.target.value)}
+                    placeholder="Guest email for voucher"
+                    className="px-3.5 py-2.5 rounded-xl bg-[#F8F7F3] dark:bg-slate-800 border border-[#E4E1D9] dark:border-slate-700 text-sm"
+                  />
+                </div>
+              </>
+            )}
 
-            <div className="flex items-center gap-2 text-xs text-[#6B6B6B] dark:text-slate-300">
-              <ShieldCheckIcon className="w-4 h-4 text-[#123B2A] dark:text-[#C99A3D] shrink-0" />
-              <span>Your booking is protected · Transparent pricing · Verified property</span>
-            </div>
+            <PaymentSettlementPanel
+              bookingCategory="short-stay"
+              itemId={property.id}
+              itemTitle={`${property.name} — ${room.name}`}
+              itemSubtitle={`${ratePlan.name} · ${checkIn} to ${checkOut} (${nights} nights)`}
+              amountZar={payToday}
+              displayTotal={`R${payToday.toLocaleString()}`}
+              currencyCode="ZAR"
+              lineItems={[
+                { label: `${nights} nights · ${room.name}`, amountText: `R${baseSubtotal.toLocaleString()}` },
+                { label: 'Taxes (15% VAT) & Protection Fee', amountText: `R${(taxes + serviceFee).toLocaleString()}` },
+                ...(payAtProperty > 0 ? [{ label: 'Remaining balance at check-in', amountText: `R${payAtProperty.toLocaleString()}` }] : []),
+              ]}
+              customerName={guestName}
+              customerEmail={guestEmail}
+              metadata={{
+                roomId: room.id,
+                ratePlan: ratePlan.name,
+                checkIn,
+                checkOut,
+                nights,
+                payOption,
+              }}
+              submitLabel={`Settle Short Stay · R${payToday.toLocaleString()}`}
+              onSettled={handleShortStaySettled}
+            />
 
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full py-3.5 rounded-xl bg-[#123B2A] hover:bg-[#0d2a1e] text-white text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-60"
-            >
-              <CurrencyDollarIcon className="w-4 h-4 text-[#C99A3D]" />
-              <span>{isSubmitting ? 'Processing Reservation...' : `Confirm Reservation · R${payToday.toLocaleString()} Due Today`}</span>
-            </button>
-          </form>
+            {settledReceipt && (
+              <p className="text-[11px] text-center text-[#6B6B6B] dark:text-slate-400">
+                Settlement ID {settledReceipt.settlementId} · Protected under AfriEstate Short-Stay Guarantee.
+              </p>
+            )}
+          </div>
         )}
       </div>
     </div>

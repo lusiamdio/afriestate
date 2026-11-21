@@ -17,9 +17,9 @@ interface Props {
 }
 
 const STAY_IMAGES = [
-  { label: 'Coastal Mansion', url: '/images/coastal_mansion_1779978805301.png' },
-  { label: 'Loft Interior', url: '/images/loft_interior_1779978697203.png' },
-  { label: 'Apartment Block', url: '/images/apartment_block_1779978678706.png' },
+  { label: 'Coastal Mansion', url: '/images/2ec34ce4ca57aef13fc8b3239a99345e.jpg' },
+  { label: 'Loft Interior', url: '/images/841376502.webp' },
+  { label: 'Apartment Block', url: '/images/280162474.jpg' },
 ];
 
 const AccommodationListingForm: React.FC<Props> = ({ currentUser, onSuccess, onBack }) => {

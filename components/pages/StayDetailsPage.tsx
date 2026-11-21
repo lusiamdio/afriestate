@@ -624,6 +624,12 @@ const StayDetailsPage: React.FC<StayDetailsPageProps> = ({
                 src={visibleGalleryImages[0].url}
                 alt={visibleGalleryImages[0].caption}
                 referrerPolicy="no-referrer"
+                onError={(e) => {
+                  if (!e.currentTarget.dataset.fb) {
+                    e.currentTarget.dataset.fb = '1';
+                    e.currentTarget.src = '/images/841376502.webp';
+                  }
+                }}
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
               />
               <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-black/75 via-black/30 to-transparent text-white">
@@ -650,6 +656,12 @@ const StayDetailsPage: React.FC<StayDetailsPageProps> = ({
                     src={item.url}
                     alt={item.caption}
                     referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      if (!e.currentTarget.dataset.fb) {
+                        e.currentTarget.dataset.fb = '1';
+                        e.currentTarget.src = '/images/841376502.webp';
+                      }
+                    }}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                   />
                   <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/70 to-transparent text-white">
@@ -849,7 +861,7 @@ const StayDetailsPage: React.FC<StayDetailsPageProps> = ({
               onClick={() => openCheckout(ROOM_CATALOG[0])}
               className="w-full py-3.5 rounded-xl bg-[#123B2A] hover:bg-[#0d2a1e] text-white text-sm font-bold shadow"
             >
-              Reserve Selected Unit
+              {termMode === 'long-term' ? 'Apply for Lease (Off-Platform)' : 'Book Selected Unit'}
             </button>
 
             <button
@@ -897,6 +909,12 @@ const StayDetailsPage: React.FC<StayDetailsPageProps> = ({
                         src={room.image}
                         alt={room.name}
                         referrerPolicy="no-referrer"
+                        onError={(e) => {
+                          if (!e.currentTarget.dataset.fb) {
+                            e.currentTarget.dataset.fb = '1';
+                            e.currentTarget.src = '/images/841376502.webp';
+                          }
+                        }}
                         className="w-full h-full object-cover"
                       />
                       <span className="absolute top-3 left-3 px-2.5 py-1 rounded-lg bg-[#123B2A]/90 text-white text-[11px] font-bold">
@@ -995,7 +1013,7 @@ const StayDetailsPage: React.FC<StayDetailsPageProps> = ({
                         onClick={() => openCheckout(room, activePlan)}
                         className="px-6 py-3 rounded-xl bg-[#123B2A] hover:bg-[#0d2a1e] text-white text-xs sm:text-sm font-bold whitespace-nowrap"
                       >
-                        Select &amp; Reserve
+                        {termMode === 'long-term' ? 'Apply for Lease' : 'Select & Book Now'}
                       </button>
                     </div>
                   </div>
@@ -1132,9 +1150,12 @@ const StayDetailsPage: React.FC<StayDetailsPageProps> = ({
             <div className="lg:col-span-7 relative h-[360px] rounded-2xl overflow-hidden border border-[#E4E1D9] dark:border-slate-700 bg-[#E6ECE7] dark:bg-slate-800">
               {mapMode === 'Satellite' ? (
                 <img
-                  src="/images/harbour_house_1779978766107.png"
+                  src="/images/getlstd-property-photo.jpg"
                   alt="Aerial coastal satellite view"
                   referrerPolicy="no-referrer"
+                  onError={(e) => {
+                    e.currentTarget.src = '/images/841376502.webp';
+                  }}
                   className="w-full h-full object-cover opacity-55"
                 />
               ) : (
@@ -1540,6 +1561,12 @@ const StayDetailsPage: React.FC<StayDetailsPageProps> = ({
                     src={sim.heroImages[0].url}
                     alt={sim.name}
                     referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      if (!e.currentTarget.dataset.fb) {
+                        e.currentTarget.dataset.fb = '1';
+                        e.currentTarget.src = '/images/841376502.webp';
+                      }
+                    }}
                     className="w-full h-full object-cover"
                   />
                   <span className="absolute top-3 left-3 px-2.5 py-1 rounded-lg bg-[#123B2A] text-white font-mono text-xs font-bold">
@@ -1592,7 +1619,7 @@ const StayDetailsPage: React.FC<StayDetailsPageProps> = ({
               onClick={() => openCheckout(ROOM_CATALOG[0])}
               className="px-6 py-3.5 rounded-xl bg-[#C99A3D] text-[#151515] text-sm font-bold"
             >
-              Reserve Now
+              {termMode === 'long-term' ? 'Apply for Lease' : 'Book Stay Now'}
             </button>
             <button
               type="button"
@@ -1620,7 +1647,7 @@ const StayDetailsPage: React.FC<StayDetailsPageProps> = ({
           onClick={() => openCheckout(ROOM_CATALOG[0])}
           className="px-6 py-2.5 rounded-xl bg-[#123B2A] text-white text-xs font-bold tracking-wider uppercase"
         >
-          Book Now
+          {termMode === 'long-term' ? 'Apply for Lease' : 'Book Now'}
         </button>
       </div>
 

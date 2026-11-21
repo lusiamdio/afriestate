@@ -522,7 +522,7 @@ export const publishAccommodationService = async (
     const sig = generateListingSignature(id, currentUser.username, payload.nightly_rate);
     const isLongTermApartment = payload.accommodation_type === 'apartment';
     const propType = payload.accommodation_type === 'hotel' ? PropertyType.HOTEL : PropertyType.SHORT_TERM_RENTAL;
-    const imgUrl = sanitizeSafeUrl(payload.image_url, '/images/coastal_mansion_1779978805301.png');
+    const imgUrl = sanitizeSafeUrl(payload.image_url, '/images/photo-1600596542815-ffad4c1539a9.avif');
 
     try {
         await supabase.from('accommodation_services').insert({

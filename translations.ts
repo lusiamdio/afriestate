@@ -54,6 +54,8 @@ export const translations = {
         wellnessRetreatsDescription: 'Yoga, spa, and nature getaways to recharge.',
         longTermRentals: 'Long-term Rentals',
         longTermRentalsDescription: 'Find your next home for a long-term lease.',
+        bookFlights: 'Book Flights',
+        bookFlightsDescription: 'Direct commercial routes and private aviation across Africa.',
     },
     searchBar: {
         forRent: 'For Rent',

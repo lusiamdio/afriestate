@@ -962,11 +962,17 @@ const NeighborhoodExplorerPage: React.FC<NeighborhoodExplorerPageProps> = ({
                     onClick={() => onSelectProperty(item)}
                     className="group text-left bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden hover:shadow-lg transition-all duration-200 flex flex-col"
                   >
-                    <div className="relative h-44 w-full overflow-hidden bg-slate-200 dark:bg-slate-800">
+                    <div className="relative h-36 w-full overflow-hidden bg-slate-200 dark:bg-slate-800">
                       <img
-                        src={item.images[0] || '/images/house_suburbs_1779978598551.png'}
+                        src={item.images[0] || '/images/2ec34ce4ca57aef13fc8b3239a99345e.jpg'}
                         alt={item.title}
                         referrerPolicy="no-referrer"
+                        onError={(e) => {
+                          if (!e.currentTarget.dataset.fb) {
+                            e.currentTarget.dataset.fb = '1';
+                            e.currentTarget.src = '/images/2ec34ce4ca57aef13fc8b3239a99345e.jpg';
+                          }
+                        }}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                       />
                     </div>

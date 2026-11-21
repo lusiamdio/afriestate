@@ -635,7 +635,7 @@ const PricingPage: React.FC<PricingPageProps> = ({ onPlanSelect, onBack }) => {
       {/* Hero Section */}
       <section className="relative bg-[#0B1F1A] text-white border-b border-emerald-950 overflow-hidden">
         <img
-          src="/images/apartment_block_1779978678706.png"
+          src="/images/280162474.jpg"
           alt="Pan-African Architectural Development"
           referrerPolicy="no-referrer"
           className="absolute inset-0 w-full h-full object-cover opacity-25"

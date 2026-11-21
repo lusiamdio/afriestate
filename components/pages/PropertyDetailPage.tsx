@@ -150,7 +150,7 @@ type DetailTab =
   | 'verification'
   | 'agent';
 
-const FALLBACK_IMAGE = '/images/house_suburbs_1779978598551.png';
+const FALLBACK_IMAGE = '/images/2ec34ce4ca57aef13fc8b3239a99345e.jpg';
 
 const PropertyDetailPage: React.FC<PropertyDetailPageProps> = ({
   property,
@@ -404,6 +404,12 @@ Provide estimated_value, confidence, and concise rationale.`;
               src={images[activeImageIndex]}
               alt={property.title}
               referrerPolicy="no-referrer"
+              onError={(e) => {
+                if (!e.currentTarget.dataset.fb) {
+                  e.currentTarget.dataset.fb = '1';
+                  e.currentTarget.src = FALLBACK_IMAGE;
+                }
+              }}
               className="w-full h-full object-cover"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent pointer-events-none" />
@@ -475,6 +481,12 @@ Provide estimated_value, confidence, and concise rationale.`;
                     src={imgSrc}
                     alt={`${property.title} view ${slot + 1}`}
                     referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      if (!e.currentTarget.dataset.fb) {
+                        e.currentTarget.dataset.fb = '1';
+                        e.currentTarget.src = FALLBACK_IMAGE;
+                      }
+                    }}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent" />
@@ -507,6 +519,12 @@ Provide estimated_value, confidence, and concise rationale.`;
                   src={img}
                   alt={`Thumbnail ${idx + 1}`}
                   referrerPolicy="no-referrer"
+                  onError={(e) => {
+                    if (!e.currentTarget.dataset.fb) {
+                      e.currentTarget.dataset.fb = '1';
+                      e.currentTarget.src = FALLBACK_IMAGE;
+                    }
+                  }}
                   className="w-full h-full object-cover"
                 />
               </button>
@@ -1054,7 +1072,7 @@ Provide estimated_value, confidence, and concise rationale.`;
                 )}
               </div>
 
-              <div className="pt-4">
+              <div className="pt-4 space-y-3">
                 <button
                   type="button"
                   onClick={() => onMessageAgent(property)}
@@ -1063,6 +1081,9 @@ Provide estimated_value, confidence, and concise rationale.`;
                   <ChatBubbleLeftRightIcon className="w-4 h-4 text-emerald-300" />
                   <span>Message Now</span>
                 </button>
+                <p className="text-[11px] leading-relaxed text-slate-300/90 bg-white/5 border border-white/10 rounded-xl p-3">
+                  Off-Platform Settlement Policy: Residential rentals, properties for sale, and real estate investments are never settled online on AfriEstate — transactions conclude strictly via verified conveyancing escrow or direct landlord lease agreements.
+                </p>
               </div>
             </div>
 
@@ -1119,7 +1140,7 @@ Provide estimated_value, confidence, and concise rationale.`;
               </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {comparableProperties.map((item) => (
                 <button
                   key={item.id}
@@ -1127,28 +1148,34 @@ Provide estimated_value, confidence, and concise rationale.`;
                   onClick={() => onSelectProperty(item)}
                   className="group text-left bg-white dark:bg-slate-900 rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col"
                 >
-                  <div className="relative h-52 w-full overflow-hidden bg-slate-200 dark:bg-slate-800">
+                  <div className="relative h-36 w-full overflow-hidden bg-slate-200 dark:bg-slate-800">
                     <img
                       src={item.images?.[0] || FALLBACK_IMAGE}
                       alt={item.title}
                       referrerPolicy="no-referrer"
+                      onError={(e) => {
+                        if (!e.currentTarget.dataset.fb) {
+                          e.currentTarget.dataset.fb = '1';
+                          e.currentTarget.src = FALLBACK_IMAGE;
+                        }
+                      }}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
-                    <div className="absolute bottom-3 left-4 right-4 flex items-baseline justify-between text-white">
-                      <span className="text-base font-bold font-mono tabular-nums">
+                    <div className="absolute bottom-2.5 left-3 right-3 flex items-baseline justify-between text-white">
+                      <span className="text-sm font-bold font-mono tabular-nums">
                         {formatCurrency(item.price)}
                       </span>
-                      <span className="text-xs text-slate-200">{item.propertyType}</span>
+                      <span className="text-[11px] text-slate-200">{item.propertyType}</span>
                     </div>
                   </div>
-                  <div className="p-4 space-y-1">
-                    <h3 className="text-base font-bold text-slate-900 dark:text-white line-clamp-1">
+                  <div className="p-3 space-y-1">
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white line-clamp-1">
                       {item.title}
                     </h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                      <LocationPinIcon className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                      <span>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                      <LocationPinIcon className="w-3 h-3 text-amber-600 shrink-0" />
+                      <span className="truncate">
                         {item.address.city}, {item.country || 'Africa'}
                       </span>
                     </p>

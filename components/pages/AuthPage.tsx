@@ -706,7 +706,7 @@ const AuthPage: React.FC<AuthPageProps> = ({
       {/* Left Full-Bleed Architectural Editorial Panel */}
       <div className="relative lg:col-span-5 xl:col-span-6 bg-[#081713] text-white overflow-hidden min-h-[280px] lg:min-h-full flex flex-col justify-between p-8 sm:p-12 lg:p-16">
         <img
-          src="/images/coastal_mansion_1779978805301.png"
+          src="/images/2ec34ce4ca57aef13fc8b3239a99345e.jpg"
           alt="Luxury African Coastal Residence"
           referrerPolicy="no-referrer"
           className="absolute inset-0 w-full h-full object-cover opacity-55 scale-105"

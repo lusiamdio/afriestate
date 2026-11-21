@@ -19,7 +19,7 @@ export const ALL_PROPERTIES: Property[] = [
     amenities: ['Solar Power', 'Fibre Internet', 'Secure Basement Parking', 'Balcony Ocean View', 'Biometric Access', 'Pet Friendly'],
     images: [
       '/images/photo-1600596542815-ffad4c1539a9.avif',
-      '/images/apartment_dining_1779978782850.png',
+      '/images/50_88d3447798594a3781403aa23f0baf00_t_w_1440_h_900.jpg',
     ],
     virtualTourUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
     vrTourUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ?rel=0&autoplay=1&mute=1&loop=1',
@@ -71,7 +71,7 @@ export const ALL_PROPERTIES: Property[] = [
     amenities: ['Solar Microgrid', 'Heavy-Duty Generator', 'Borehole Water Purification', 'Study Lounges', 'High-speed Fibre', '24/7 Security Detail'],
     images: [
       '/images/7b00bc20-eba0-9398-25a4-11eb51c86abc.jpg',
-      '/images/apartment_block_1779978678706.png',
+      '/images/383842941.jpg',
     ],
     agent: { name: 'Kofi Mensah', phone: '+233 30 255 8891', verified: true, rating: 4.9, reviewCount: 64 },
     featured: true,
@@ -121,7 +121,7 @@ export const ALL_PROPERTIES: Property[] = [
     amenities: ['Solar Backup Lights', 'Walled Garden', 'Secure Parking', 'Covered Patio', 'Alarm System with Armed Response'],
     images: [
       '/images/tersia-kroonstad.webp',
-      '/images/house_suburbs_1779978598551.png',
+      '/images/2ec34ce4ca57aef13fc8b3239a99345e.jpg',
     ],
     agent: { name: 'Peter Van der Merwe', phone: '+27 11 888 3333', verified: true, rating: 4.8, reviewCount: 45 },
     featured: true,
@@ -164,7 +164,7 @@ export const ALL_PROPERTIES: Property[] = [
     amenities: ['Solar Array (250kW)', 'Dual Backup Generators', 'Borehole Water Filtration', 'Tier-3 Data Center Ready Fibre', 'Access Control Turnstiles', 'Secure Underground Parking'],
     images: [
       '/images/2ec34ce4ca57aef13fc8b3239a99345e.jpg',
-      '/images/luxury_kitchen_living_1779978720358.png',
+      '/images/280162474.jpg',
     ],
     agent: { name: 'Thabo Ndlovu', phone: '+27 11 940 3321', verified: true, rating: 4.9, reviewCount: 88 },
     featured: true,
@@ -214,7 +214,7 @@ export const ALL_PROPERTIES: Property[] = [
     amenities: ['Solar Micro-Grid with Inverter', 'High-Yield Borehole', 'Private Wine Cellar', 'Heated Swimming Pool', 'Perimeter Electric Fence', 'Mountain Panorama'],
     images: [
       '/images/images%20(14).jpg',
-      '/images/house_pool_1779978750296.png',
+      '/images/y6yoxxh75dq751wyygey.avif',
     ],
     agent: { name: 'Peter Van der Merwe', phone: '+27 21 887 0041', verified: true, rating: 4.9, reviewCount: 38 },
     featured: true,
@@ -257,7 +257,7 @@ export const ALL_PROPERTIES: Property[] = [
     amenities: ['Solar + Inverter System', 'Dual Diesel Generators', 'Water Treatment Plant', 'Private Marina Jetty', 'Infinity Pool', 'Dedicated Fibre Line'],
     images: [
       '/images/y6yoxxh75dq751wyygey.avif',
-      '/images/coastal_mansion_1779978805301.png',
+      '/images/photo-1600596542815-ffad4c1539a9.avif',
     ],
     agent: { name: 'Chukwuma Obi', phone: '+234 1 800 2931', verified: true, rating: 5.0, reviewCount: 42 },
     featured: true,
@@ -301,7 +301,7 @@ export const ALL_PROPERTIES: Property[] = [
     amenities: ['Solar Water Heating', 'Standby Generator', 'High-Yield Borehole', 'Rooftop Infinity Pool', 'Fully Equipped Gym', 'High-Speed Fibre'],
     images: [
       '/images/Crop600x400.jpg',
-      '/images/loft_interior_1779978697203.png',
+      '/images/841376502.webp',
     ],
     agent: { name: 'Wanjiku Mwangi', phone: '+254 20 782 109', verified: true, rating: 4.8, reviewCount: 52 },
     featured: true,
@@ -345,7 +345,7 @@ export const ALL_PROPERTIES: Property[] = [
     amenities: ['City-Wide Smart Power Grid', 'Independent Clean Water Supply', 'Marina Yacht Club', 'Helipad Access', 'Smart Home Automation'],
     images: [
       '/images/50_88d3447798594a3781403aa23f0baf00_t_w_1440_h_900.jpg',
-      '/images/apartment_block_1779978678706.png',
+      '/images/383842941.jpg',
     ],
     agent: { name: 'Chukwuma Obi', phone: '+234 1 800 2931', verified: true, rating: 5.0, reviewCount: 42 },
     featured: true,
@@ -395,7 +395,7 @@ export const ALL_PROPERTIES: Property[] = [
     amenities: ['15kW Solar Inverter System', '60kVA Perkins Generator', 'Borehole & Reverse Osmosis', 'Private Pool', 'Guest Chalet', 'Electric Fence'],
     images: [
       '/images/media_1759112685.webp',
-      '/images/modern_house_tan_1779978632706.png',
+      '/images/a408cd7b7f6cd7d501bd7a2ee00f5374-cc_ft_960.jpg',
     ],
     agent: { name: 'Kofi Mensah', phone: '+233 30 255 8891', verified: true, rating: 4.9, reviewCount: 64 },
     featured: false,
@@ -438,7 +438,7 @@ export const ALL_PROPERTIES: Property[] = [
     amenities: ['Inverter Backup Power', 'Gas Hob', 'Undercover Parking', 'Rooftop Terrace', 'Fibre Connectivity', 'Concierge Service'],
     images: [
       '/images/12553630.jpg',
-      '/images/interior_beanbags_1779978650034.png',
+      '/images/7b00bc20-eba0-9398-25a4-11eb51c86abc.jpg',
     ],
     agent: { name: 'Thabo Ndlovu', phone: '+27 11 940 3321', verified: true, rating: 4.9, reviewCount: 88 },
     featured: false,
@@ -482,7 +482,7 @@ export const ALL_PROPERTIES: Property[] = [
     amenities: ['Complete Solar Solution', 'Rainwater Harvesting', 'Kigali Golf Club View', 'Electric Vehicle Charging', 'Fiber-to-the-Home', 'Landscaped Garden'],
     images: [
       '/images/383842941.jpg',
-      '/images/house_pool_1779978750296.png',
+      '/images/y6yoxxh75dq751wyygey.avif',
     ],
     agent: { name: 'Aline Umutoni', phone: '+250 788 129 401', verified: true, rating: 5.0, reviewCount: 31 },
     featured: true,
@@ -525,7 +525,7 @@ export const ALL_PROPERTIES: Property[] = [
     amenities: ['Dual Cummins Standby Generators', 'Solar Water & Lighting Array', 'Private Borehole Filtration', 'Tier 3 Redundant Fibre', 'Bespoke Boardrooms', 'Ample Parking Bays'],
     images: [
       '/images/jpegorpng.jpg',
-      '/images/luxury_kitchen_living_1779978720358.png',
+      '/images/280162474.jpg',
     ],
     agent: { name: 'Wanjiku Mwangi', phone: '+254 20 782 109', verified: true, rating: 4.8, reviewCount: 52 },
     featured: false,
@@ -575,7 +575,7 @@ export const ALL_PROPERTIES: Property[] = [
     amenities: ['Direct Nile River Panorama', 'Generator Backup', 'Dedicated Water Tank', 'Private Elevator Landing', 'Historic High Ceilings', 'High-Speed Fibre'],
     images: [
       '/images/a408cd7b7f6cd7d501bd7a2ee00f5374-cc_ft_960.jpg',
-      '/images/coastal_mansion_1779978805301.png',
+      '/images/photo-1600596542815-ffad4c1539a9.avif',
     ],
     agent: { name: 'Tarek Mansour', phone: '+20 2 2736 1920', verified: true, rating: 4.9, reviewCount: 47 },
     featured: true,
@@ -618,7 +618,7 @@ export const ALL_PROPERTIES: Property[] = [
     amenities: ['Atlantic Ocean Views', 'Solar Water Heating', 'Underground Parking', 'Swimming Pool', 'Private Balcony', 'High-Speed Fibre'],
     images: [
       '/images/images%20(15).jpg',
-      '/images/harbour_house_1779978766107.png',
+      '/images/getlstd-property-photo.jpg',
     ],
     agent: { name: 'Youssef Bennani', phone: '+212 522 391 002', verified: true, rating: 4.8, reviewCount: 39 },
     featured: false,
@@ -661,7 +661,7 @@ export const ALL_PROPERTIES: Property[] = [
     amenities: ['120kVA Heavy-Duty Generator', 'Borehole & Water Purification', 'Solar Panel Array', 'Private Swimming Pool', 'Gym Access', 'Dedicated Fibre Line'],
     images: [
       '/images/Ensure960x540.jpg',
-      '/images/modern_house_tan_1779978632706.png',
+      '/images/a408cd7b7f6cd7d501bd7a2ee00f5374-cc_ft_960.jpg',
     ],
     agent: { name: 'Manuel Costa', phone: '+244 923 441 029', verified: true, rating: 4.9, reviewCount: 28 },
     featured: false,
@@ -705,7 +705,7 @@ export const ALL_PROPERTIES: Property[] = [
     amenities: ['Inverter Uninterrupted Power', 'High-Speed Fibre Wi-Fi', 'Balcony with Mountain Views', 'Air Conditioning', 'Modern Kitchenette', 'Smart TV'],
     images: [
       '/images/280162474.jpg',
-      '/images/loft_interior_1779978697203.png',
+      '/images/841376502.webp',
     ],
     agent: { name: 'Cape Stays', phone: '+27 21 448 9012', verified: true, rating: 4.9, reviewCount: 125 },
     featured: true,
@@ -750,7 +750,7 @@ export const ALL_PROPERTIES: Property[] = [
     amenities: ['Solar Power Array', 'Standby Diesel Generator', 'Deep Borehole Water System', 'Biometric Access Control', 'High-Speed Fibre', 'Study Cafes'],
     images: [
       '/images/images%20(16).jpg',
-      '/images/apartment_dining_1779978782850.png',
+      '/images/50_88d3447798594a3781403aa23f0baf00_t_w_1440_h_900.jpg',
     ],
     agent: { name: 'Kofi Mensah', phone: '+233 30 255 8891', verified: true, rating: 4.9, reviewCount: 64 },
     featured: true,

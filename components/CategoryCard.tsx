@@ -24,7 +24,7 @@ const CategoryCard: React.FC<CategoryCardProps> = ({
     <button
       type="button"
       onClick={onClick}
-      className="group relative w-full h-full min-h-[290px] text-left rounded-2xl overflow-hidden bg-slate-900 hover:bg-slate-800/95 transition-all duration-300 shadow-lg hover:shadow-2xl flex flex-col justify-between p-6 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+      className="group relative w-full h-full min-h-[215px] text-left rounded-2xl overflow-hidden bg-slate-900 hover:bg-slate-800/95 transition-all duration-300 shadow-lg hover:shadow-2xl flex flex-col justify-between p-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
     >
       {image && (
         <>
@@ -42,19 +42,19 @@ const CategoryCard: React.FC<CategoryCardProps> = ({
         <span className="font-mono text-xs tracking-widest text-amber-300/90 tabular-nums">
           {indexLabel}
         </span>
-        <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-white group-hover:bg-amber-400 group-hover:text-slate-950 transition-colors duration-200">
-          <Icon className="w-5 h-5" />
+        <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-white group-hover:bg-amber-400 group-hover:text-slate-950 transition-colors duration-200">
+          <Icon className="w-4 h-4" />
         </div>
       </div>
 
-      <div className="relative z-10 mt-10">
-        <h3 className="text-xl font-bold text-white font-heading tracking-tight mb-2">
+      <div className="relative z-10 mt-4">
+        <h3 className="text-lg font-bold text-white font-heading tracking-tight mb-1.5">
           {title}
         </h3>
-        <p className="text-slate-300 text-sm leading-relaxed">
+        <p className="text-slate-300 text-xs leading-relaxed">
           {description}
         </p>
-        <div className="mt-5 pt-4 flex items-center justify-between text-xs font-semibold text-amber-300 group-hover:text-white transition-colors">
+        <div className="mt-3 pt-2.5 flex items-center justify-between text-xs font-semibold text-amber-300 group-hover:text-white transition-colors">
           <span className="whitespace-nowrap">{actionLabel}</span>
           <ArrowRightIcon className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-1" />
         </div>

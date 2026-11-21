@@ -451,13 +451,13 @@ const FindWellnessPage: React.FC<FindWellnessPageProps> = ({ properties = [], on
           </div>
 
           {filteredCompanies.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {filteredCompanies.slice(0, visibleCount).map((company, i) => (
                 <div
                   key={`${company.name}-${i}`}
                   className="bg-[#FAF8F5] dark:bg-slate-950 rounded-2xl border border-slate-200/80 dark:border-slate-800 overflow-hidden flex flex-col hover:border-slate-300 dark:hover:border-slate-700 transition-colors"
                 >
-                  <div className="h-44 relative overflow-hidden bg-slate-200 dark:bg-slate-800">
+                  <div className="h-36 relative overflow-hidden bg-slate-200 dark:bg-slate-800">
                     <img
                       src={company.image}
                       alt={company.name}
@@ -476,54 +476,54 @@ const FindWellnessPage: React.FC<FindWellnessPageProps> = ({ properties = [], on
                       {company.isUserPublished ? 'Live Partner' : 'Verified'}
                     </span>
                     {company.price && (
-                      <span className="absolute bottom-2.5 right-2.5 px-2 py-0.5 rounded bg-white/95 text-[#0F2D25] font-mono text-[11px] font-bold">
+                      <span className="absolute bottom-2.5 right-2.5 px-2 py-0.5 rounded bg-white/95 text-[#0F2D25] font-mono text-[10px] font-bold">
                         From R{company.price.toLocaleString()}
                       </span>
                     )}
                   </div>
-                  <div className="p-5 flex flex-col flex-grow">
+                  <div className="p-3.5 flex flex-col flex-grow">
                     <div className="flex items-start justify-between gap-2">
-                      <h3 className="font-heading text-lg font-semibold text-slate-900 dark:text-white leading-snug">
+                      <h3 className="font-heading text-base font-semibold text-slate-900 dark:text-white leading-snug line-clamp-1">
                         {company.name}
                       </h3>
-                      <span className="inline-flex items-center gap-1 text-xs font-mono tabular-nums font-semibold shrink-0 pt-0.5">
-                        <StarSolidIcon className="w-3.5 h-3.5 text-[#C9A35D]" /> {company.rating}
+                      <span className="inline-flex items-center gap-1 text-[11px] font-mono tabular-nums font-semibold shrink-0 pt-0.5">
+                        <StarSolidIcon className="w-3 h-3 text-[#C9A35D]" /> {company.rating}
                       </span>
                     </div>
 
-                    <p className="text-[11px] font-semibold text-[#0F2D25] dark:text-[#C9A35D] mt-1">
+                    <p className="text-[11px] font-semibold text-[#0F2D25] dark:text-[#C9A35D] mt-0.5">
                       {company.category}
                     </p>
-                    <p className="text-[10px] font-mono text-emerald-700 dark:text-emerald-400 mt-0.5">
+                    <p className="text-[10px] font-mono text-emerald-700 dark:text-emerald-400 mt-0.5 truncate">
                       {company.verificationHash}
                     </p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 line-clamp-2 leading-relaxed">
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5 line-clamp-2 leading-relaxed">
                       {company.notes}
                     </p>
 
-                    <div className="mt-auto pt-4 mt-4 border-t border-slate-200/70 dark:border-slate-800 space-y-1 text-xs text-slate-600 dark:text-slate-300">
+                    <div className="mt-auto pt-2.5 mt-2.5 border-t border-slate-200/70 dark:border-slate-800 space-y-1 text-[11px] text-slate-600 dark:text-slate-300">
                       <p className="flex items-center gap-1.5 truncate">
-                        <MapPinIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" /> {company.location}
+                        <MapPinIcon className="w-3 h-3 text-slate-400 shrink-0" /> {company.location}
                       </p>
                       {company.phone !== 'N/A' && (
                         <p className="flex items-center gap-1.5 font-mono tabular-nums truncate">
-                          <PhoneIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" /> {company.phone}
+                          <PhoneIcon className="w-3 h-3 text-slate-400 shrink-0" /> {company.phone}
                         </p>
                       )}
                       {company.website !== 'N/A' && (
                         <p className="flex items-center gap-1.5 truncate">
-                          <GlobeAltIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" /> {company.website.replace('https://', '').replace('www.', '')}
+                          <GlobeAltIcon className="w-3 h-3 text-slate-400 shrink-0" /> {company.website.replace('https://', '').replace('www.', '')}
                         </p>
                       )}
                     </div>
 
-                    <div className="mt-4 flex gap-2">
+                    <div className="mt-3 flex gap-2">
                       <button
                         onClick={() => {
                           setSelectedCompany(company);
                           setModalMode('book');
                         }}
-                        className="flex-1 bg-[#0F2D25] text-white py-2 rounded-lg text-xs font-semibold hover:bg-[#173f34] transition-colors"
+                        className="flex-1 bg-[#0F2D25] text-white py-1.5 rounded-lg text-xs font-semibold hover:bg-[#173f34] transition-colors"
                       >
                         Book
                       </button>
@@ -532,7 +532,7 @@ const FindWellnessPage: React.FC<FindWellnessPageProps> = ({ properties = [], on
                           setSelectedCompany(company);
                           setModalMode('enquire');
                         }}
-                        className="flex-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 py-2 rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                        className="flex-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 py-1.5 rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
                       >
                         Enquire
                       </button>

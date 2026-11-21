@@ -2,7 +2,7 @@
 
 import type { Property, NeighborhoodGuide, KnowledgeBaseArticle, ForumPost, Achievement, ForumCategory, CoInvestmentDeal, ProfessionalContact, ExclusiveDeal, ServiceProvider, Notification } from './types';
 import { ListingType, PropertyType, Language, PropertyStatus, DealType, Currency, NotificationType } from './types';
-import { StudentIcon, AffordableIcon, TownshipIcon, RuralIcon, StayIcon, TransportIcon, WellnessIcon } from './components/icons/CategoryIcons';
+import { StudentIcon, AffordableIcon, TownshipIcon, RuralIcon, StayIcon, TransportIcon, WellnessIcon, FlightIcon } from './components/icons/CategoryIcons';
 import React from 'react';
 // FIX: RocketLaunchIcon is not in ActionIcons, it is in AgentDashboardIcons. Split the import.
 import { StarIcon, TrophyIcon } from './components/icons/ActionIcons';
@@ -31,6 +31,11 @@ export const CATEGORIES = [
     titleKey: "longTermRentals",
     descriptionKey: "longTermRentalsDescription",
     Icon: StudentIcon
+  },
+  {
+    titleKey: "bookFlights",
+    descriptionKey: "bookFlightsDescription",
+    Icon: FlightIcon
   }
 ];
 
@@ -67,7 +72,7 @@ export const NEIGHBORHOOD_GUIDES: NeighborhoodGuide[] = [
             { month: 'Mar', avgRent: 3500, avgSalePrice: 980000 },
             { month: 'Apr', avgRent: 3520, avgSalePrice: 995000 },
         ],
-        gallery: ['/images/images%20(18).jpg', '/images/images%20(19).jpg', '/images/loft_interior_1779978697203.png'],
+        gallery: ['/images/images%20(18).jpg', '/images/images%20(19).jpg', '/images/841376502.webp'],
         virtualTourUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ?rel=0&autoplay=1&mute=1&loop=1',
         reviews: [
             { author: 'Chloe R.', quote: "Living here is an inspiration. There's always a new gallery opening or a street performance to see. The energy is unmatched!", image: '/images/tersia-kroonstad.webp' }
@@ -76,7 +81,7 @@ export const NEIGHBORHOOD_GUIDES: NeighborhoodGuide[] = [
             { name: 'First Friday Art Walk', date: 'First Friday of every month', description: 'Galleries stay open late, offering free wine and showcasing new exhibits.' }
         ],
         hiddenGems: [
-            { name: 'The Speakeasy Scribe', category: 'Cafe', description: 'A hidden basement coffee shop with vintage typewriters for patrons to use.', image: '/images/interior_beanbags_1779978650034.png' }
+            { name: 'The Speakeasy Scribe', category: 'Cafe', description: 'A hidden basement coffee shop with vintage typewriters for patrons to use.', image: '/images/7b00bc20-eba0-9398-25a4-11eb51c86abc.jpg' }
         ]
     },
     {
@@ -102,16 +107,16 @@ export const NEIGHBORHOOD_GUIDES: NeighborhoodGuide[] = [
             { month: 'Mar', avgRent: 2250, avgSalePrice: 535000 },
             { month: 'Apr', avgRent: 2300, avgSalePrice: 550000 },
         ],
-        gallery: ['/images/images%20(20).jpg', '/images/images%20(21).jpg', '/images/luxury_kitchen_living_1779978720358.png'],
+        gallery: ['/images/images%20(20).jpg', '/images/images%20(21).jpg', '/images/280162474.jpg'],
         virtualTourUrl: 'https://www.youtube.com/embed/A45gAEQRd_A?rel=0&autoplay=1&mute=1&loop=1',
         reviews: [
-            { author: 'The Miller Family', quote: "It's the perfect place to raise our kids. The schools are fantastic, and we feel so safe. We love the weekend farmers' market!", image: '/images/house_suburbs_1779978598551.png' }
+            { author: 'The Miller Family', quote: "It's the perfect place to raise our kids. The schools are fantastic, and we feel so safe. We love the weekend farmers' market!", image: '/images/2ec34ce4ca57aef13fc8b3239a99345e.jpg' }
         ],
         events: [
             { name: "Green Valley Farmers' Market", date: 'Every Saturday, 9am - 1pm', description: 'Fresh local produce, baked goods, and crafts at the community park.' }
         ],
         hiddenGems: [
-            { name: 'Willow Creek Duck Pond', category: 'Park', description: 'A serene little pond hidden behind the community center, perfect for a quiet afternoon.', image: '/images/house_suburbs_1779978598551.png' }
+            { name: 'Willow Creek Duck Pond', category: 'Park', description: 'A serene little pond hidden behind the community center, perfect for a quiet afternoon.', image: '/images/2ec34ce4ca57aef13fc8b3239a99345e.jpg' }
         ]
     },
     {
@@ -137,16 +142,16 @@ export const NEIGHBORHOOD_GUIDES: NeighborhoodGuide[] = [
             { month: 'Mar', avgRent: 1600, avgSalePrice: 3100000 },
             { month: 'Apr', avgRent: 1600, avgSalePrice: 3200000 },
         ],
-        gallery: ['/images/images%20(14).jpg', '/images/coastal_mansion_1779978805301.png', '/images/luxury_kitchen_living_1779978720358.png'],
+        gallery: ['/images/images%20(14).jpg', '/images/photo-1600596542815-ffad4c1539a9.avif', '/images/280162474.jpg'],
         virtualTourUrl: 'https://www.youtube.com/embed/IyFLAz5_1I8?rel=0&autoplay=1&mute=1&loop=1',
         reviews: [
-            { author: 'James B.', quote: "Retiring here was the best decision I've ever made. The views are incredible, the food is world-class, and there's a new wine to discover every weekend.", image: '/images/coastal_mansion_1779978805301.png' }
+            { author: 'James B.', quote: "Retiring here was the best decision I've ever made. The views are incredible, the food is world-class, and there's a new wine to discover every weekend.", image: '/images/photo-1600596542815-ffad4c1539a9.avif' }
         ],
         events: [
             { name: 'Stellenbosch Wine Festival', date: 'Annually in February', description: 'A celebration of the regions finest wines, with tastings, food pairings, and live music.' }
         ],
         hiddenGems: [
-            { name: 'Jonkershoek Nature Reserve', category: 'Park', description: 'Stunning hiking and mountain biking trails just a short drive from the town center.', image: '/images/spa_wellness_1779978823248.png' }
+            { name: 'Jonkershoek Nature Reserve', category: 'Park', description: 'Stunning hiking and mountain biking trails just a short drive from the town center.', image: '/images/safari_lodge_retreat.jpg' }
         ]
     },
     {
@@ -172,7 +177,7 @@ export const NEIGHBORHOOD_GUIDES: NeighborhoodGuide[] = [
             { month: 'Mar', avgRent: 260, avgSalePrice: 820000 },
             { month: 'Apr', avgRent: 270, avgSalePrice: 850000 },
         ],
-        gallery: ['/images/tersia-kroonstad.webp', '/images/house_suburbs_1779978598551.png', '/images/apartment_dining_1779978782850.png'],
+        gallery: ['/images/tersia-kroonstad.webp', '/images/2ec34ce4ca57aef13fc8b3239a99345e.jpg', '/images/50_88d3447798594a3781403aa23f0baf00_t_w_1440_h_900.jpg'],
         virtualTourUrl: 'https://www.youtube.com/embed/0uY8_ALH5Vw?rel=0&autoplay=1&mute=1&loop=1',
         reviews: [
             { author: 'Thabo M.', quote: "There is no place like Soweto. The sense of community, the history, the music... it's a place with a soul. I'm proud to call it home.", image: '/images/tersia-kroonstad.webp' }
@@ -181,7 +186,7 @@ export const NEIGHBORHOOD_GUIDES: NeighborhoodGuide[] = [
             { name: 'Soweto Festival of Light', date: 'Annually in December', description: 'A festive celebration with lights, music, and food, bringing the community together.' }
         ],
         hiddenGems: [
-            { name: 'Credo Mutwa Cultural Village', category: 'Art', description: 'An outdoor exhibition of sculptures and buildings depicting African folklore and culture.', image: '/images/apartment_dining_1779978782850.png' }
+            { name: 'Credo Mutwa Cultural Village', category: 'Art', description: 'An outdoor exhibition of sculptures and buildings depicting African folklore and culture.', image: '/images/50_88d3447798594a3781403aa23f0baf00_t_w_1440_h_900.jpg' }
         ]
     }
 ];
@@ -331,7 +336,7 @@ export const CO_INVESTMENT_DEALS: CoInvestmentDeal[] = [
 
 export const PROFESSIONAL_CONTACTS: ProfessionalContact[] = [
     { id: 'pc1', name: 'Sarah Chen', specialty: 'Financial Advisor', rating: 4.9, reviewCount: 120, image: '/images/tersia-kroonstad.webp' },
-    { id: 'pc2', name: 'David Rodriguez', specialty: 'Real Estate Lawyer', rating: 4.8, reviewCount: 95, image: '/images/harbour_house_1779978766107.png' },
+    { id: 'pc2', name: 'David Rodriguez', specialty: 'Real Estate Lawyer', rating: 4.8, reviewCount: 95, image: '/images/getlstd-property-photo.jpg' },
     { id: 'pc3', name: 'Emily White', specialty: 'Property Manager', rating: 5.0, reviewCount: 210, image: '/images/tersia-kroonstad.webp' },
 ];
 
@@ -376,15 +381,15 @@ export const INVESTOR_ACHIEVEMENTS: Omit<Achievement, 'id'>[] = [
 ];
 
 export const SERVICE_PROVIDERS: ServiceProvider[] = [
-  { id: 'sp1', name: 'John\'s Plumbing', service: 'Plumbing', rating: 4.8, reviewCount: 120, phone: '+27821234567', email: 'john@plumbing.co.za', image: '/images/house_suburbs_1779978598551.png' },
-  { id: 'sp2', name: 'Sparky Electrical', service: 'Electrical Work', rating: 4.9, reviewCount: 215, phone: '+27831234568', email: 'contact@sparky.co.za', image: '/images/loft_interior_1779978697203.png' },
-  { id: 'sp3', name: 'Green Leaf Landscaping', service: 'Landscaping', rating: 4.7, reviewCount: 88, phone: '+27841234569', email: 'info@greenleaf.com', image: '/images/house_pool_1779978750296.png' },
-  { id: 'sp4', name: 'Swift Movers', service: 'Moving Services', rating: 4.9, reviewCount: 301, phone: '+27721234561', email: 'support@swiftmovers.co.za', image: '/images/apartment_block_1779978678706.png' },
-  { id: 'sp5', name: 'Eagle Eye Home Inspectors', service: 'Home Inspection', rating: 5.0, reviewCount: 95, phone: '+27731234562', email: 'inspect@eagleeye.com', image: '/images/modern_house_tan_1779978632706.png' },
-  { id: 'sp6', name: 'The Legal Eagles', service: 'Legal Services', rating: 4.8, reviewCount: 56, phone: '+27741234563', email: 'consult@legaleagles.co.za', image: '/images/harbour_house_1779978766107.png' },
-  { id: 'sp7', name: 'Prestige Painters', service: 'Painting', rating: 4.8, reviewCount: 74, phone: '+27741234564', email: 'quote@prestigepainters.co.za', image: '/images/apartment_dining_1779978782850.png' },
-  { id: 'sp8', name: 'FinSecure Mortgages', service: 'Financial Services', rating: 4.9, reviewCount: 150, phone: '+27821112222', email: 'loans@finsecure.co.za', image: '/images/coastal_mansion_1779978805301.png' },
-  { id: 'sp9', name: 'CoverRight Insurance', service: 'Insurance', rating: 4.8, reviewCount: 210, phone: '+27845556666', email: 'quotes@coverright.co.za', image: '/images/luxury_kitchen_living_1779978720358.png' },
+  { id: 'sp1', name: 'John\'s Plumbing', service: 'Plumbing', rating: 4.8, reviewCount: 120, phone: '+27821234567', email: 'john@plumbing.co.za', image: '/images/2ec34ce4ca57aef13fc8b3239a99345e.jpg' },
+  { id: 'sp2', name: 'Sparky Electrical', service: 'Electrical Work', rating: 4.9, reviewCount: 215, phone: '+27831234568', email: 'contact@sparky.co.za', image: '/images/841376502.webp' },
+  { id: 'sp3', name: 'Green Leaf Landscaping', service: 'Landscaping', rating: 4.7, reviewCount: 88, phone: '+27841234569', email: 'info@greenleaf.com', image: '/images/y6yoxxh75dq751wyygey.avif' },
+  { id: 'sp4', name: 'Swift Movers', service: 'Moving Services', rating: 4.9, reviewCount: 301, phone: '+27721234561', email: 'support@swiftmovers.co.za', image: '/images/383842941.jpg' },
+  { id: 'sp5', name: 'Eagle Eye Home Inspectors', service: 'Home Inspection', rating: 5.0, reviewCount: 95, phone: '+27731234562', email: 'inspect@eagleeye.com', image: '/images/a408cd7b7f6cd7d501bd7a2ee00f5374-cc_ft_960.jpg' },
+  { id: 'sp6', name: 'The Legal Eagles', service: 'Legal Services', rating: 4.8, reviewCount: 56, phone: '+27741234563', email: 'consult@legaleagles.co.za', image: '/images/getlstd-property-photo.jpg' },
+  { id: 'sp7', name: 'Prestige Painters', service: 'Painting', rating: 4.8, reviewCount: 74, phone: '+27741234564', email: 'quote@prestigepainters.co.za', image: '/images/50_88d3447798594a3781403aa23f0baf00_t_w_1440_h_900.jpg' },
+  { id: 'sp8', name: 'FinSecure Mortgages', service: 'Financial Services', rating: 4.9, reviewCount: 150, phone: '+27821112222', email: 'loans@finsecure.co.za', image: '/images/photo-1600596542815-ffad4c1539a9.avif' },
+  { id: 'sp9', name: 'CoverRight Insurance', service: 'Insurance', rating: 4.8, reviewCount: 210, phone: '+27845556666', email: 'quotes@coverright.co.za', image: '/images/280162474.jpg' },
   { id: 'sp10', name: 'ProManage Rentals', service: 'Property Management', rating: 4.7, reviewCount: 95, phone: '+27833334444', email: 'manage@promanage.co.za', image: '/images/tersia-kroonstad.webp' }
 ];
 

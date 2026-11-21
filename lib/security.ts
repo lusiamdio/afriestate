@@ -23,7 +23,7 @@ export const sanitizeText = (value: string | null | undefined, maxLength = 2000)
  */
 export const sanitizeSafeUrl = (
   url: string | null | undefined,
-  fallback = '/images/coastal_mansion_1779978805301.png'
+  fallback = '/images/photo-1600596542815-ffad4c1539a9.avif'
 ): string => {
   const cleaned = (url || '').trim();
   if (!cleaned) return fallback;

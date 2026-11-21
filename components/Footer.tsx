@@ -409,6 +409,15 @@ const Footer: React.FC<FooterProps> = ({
                         </button>
                       </li>
                     )}
+                    <li>
+                      <button
+                        type="button"
+                        onClick={() => onPageJump('book-flights')}
+                        className="text-slate-300 hover:text-amber-300 transition-colors font-normal"
+                      >
+                        Book Flights
+                      </button>
+                    </li>
                   </>
                 )}
               </ul>

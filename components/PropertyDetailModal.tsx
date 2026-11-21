@@ -103,7 +103,7 @@ const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
   onLeaveReview,
 }) => {
   const [activeTab, setActiveTab] = useState<DetailTab>('overview');
-  const images = property.images && property.images.length > 0 ? property.images : ['/images/house_suburbs_1779978598551.png'];
+  const images = property.images && property.images.length > 0 ? property.images : ['/images/2ec34ce4ca57aef13fc8b3239a99345e.jpg'];
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [isShareMenuOpen, setIsShareMenuOpen] = useState(false);
   const shareRef = useRef<HTMLDivElement>(null);
