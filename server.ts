@@ -49,20 +49,79 @@ app.use('/api/gemini', (req, res, next) => {
 // Enable JSON parsing with large body support for image/video base64 frames
 app.use(express.json({ limit: '25mb' }));
 
-// Initialize server-side Gemini client
-const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY || '';
-if (!apiKey) {
-  console.warn('[Server] Warning: GEMINI_API_KEY is not set in environment.');
+// Resolve server-side Gemini API key dynamically
+function getActiveApiKey(): string {
+  return (process.env.GEMINI_API_KEY || process.env.API_KEY || '').trim();
 }
 
-const ai = new GoogleGenAI({
-  apiKey,
-  httpOptions: {
-    headers: {
-      'User-Agent': 'aistudio-build',
+function getGeminiClient(): GoogleGenAI | null {
+  const key = getActiveApiKey();
+  if (!key) return null;
+  return new GoogleGenAI({
+    apiKey: key,
+    httpOptions: {
+      headers: {
+        'User-Agent': 'aistudio-build',
+      },
     },
-  },
-});
+  });
+}
+
+function parseGeminiError(error: any): { status: number; code: string; message: string } {
+  const rawMessage = typeof error?.message === 'string' ? error.message.trim() : String(error || 'Upstream Gemini request failed');
+  let parsedBody: any = null;
+  if (rawMessage.startsWith('{')) {
+    try {
+      parsedBody = JSON.parse(rawMessage);
+    } catch {
+      // ignore non-JSON message
+    }
+  }
+
+  const nested = parsedBody?.error || parsedBody;
+  const codeNum = Number(nested?.code || error?.status || error?.code || 502);
+  const statusStr = String(nested?.status || '').toUpperCase();
+  const detailReason = String(nested?.details?.[0]?.reason || '').toUpperCase();
+
+  if (codeNum === 403 || statusStr === 'PERMISSION_DENIED' || detailReason === 'ACCESS_DENIED' || rawMessage.includes('PERMISSION_DENIED')) {
+    return {
+      status: 403,
+      code: 'PERMISSION_DENIED',
+      message: 'Live AI service access was denied by the upstream Generative Language API (403 PERMISSION_DENIED).',
+    };
+  }
+  if (codeNum === 400 && (statusStr === 'INVALID_ARGUMENT' || rawMessage.includes('API_KEY_INVALID'))) {
+    return {
+      status: 400,
+      code: 'API_KEY_INVALID',
+      message: 'The configured server AI credential was rejected by the upstream service (400 API_KEY_INVALID).',
+    };
+  }
+  if (codeNum === 429 || statusStr === 'RESOURCE_EXHAUSTED') {
+    return {
+      status: 429,
+      code: 'RESOURCE_EXHAUSTED',
+      message: 'AI service quota or rate limit exceeded. Please try again shortly.',
+    };
+  }
+  if (codeNum === 404 || statusStr === 'NOT_FOUND') {
+    return {
+      status: 404,
+      code: 'NOT_FOUND',
+      message: 'Requested Gemini model or endpoint was not found.',
+    };
+  }
+
+  return {
+    status: codeNum >= 400 && codeNum < 600 ? codeNum : 502,
+    code: statusStr || 'UPSTREAM_ERROR',
+    message: typeof nested?.message === 'string' ? nested.message : rawMessage,
+  };
+}
+
+if (!getActiveApiKey()) {
+  console.warn('[Server] Warning: GEMINI_API_KEY is not set in environment.');
+}
 
 // Model normalizer ensuring only active, supported Gemini models are called
 function mapModel(modelName?: string): string {
@@ -91,6 +150,12 @@ function sanitizeConfig(config: any = {}) {
 // 1. Generate content (Text, Structured JSON, Multimodal analysis, Audio/TTS, Search Grounding)
 app.post('/api/gemini/generate', async (req, res) => {
   try {
+    const ai = getGeminiClient();
+    if (!ai) {
+      return res.status(503).json({
+        error: 'Live AI service is currently unavailable because server credentials are not configured.',
+      });
+    }
     const { model, contents, config } = req.body || {};
     if (!contents) {
       return res.status(400).json({ error: 'Missing contents payload' });
@@ -109,15 +174,21 @@ app.post('/api/gemini/generate', async (req, res) => {
       candidates: response.candidates || [],
     });
   } catch (error: any) {
-    const errorMsg = error?.message || 'Failed to generate content';
-    console.warn('[API /api/gemini/generate warning]:', errorMsg);
-    res.status(502).json({ error: errorMsg });
+    const parsed = parseGeminiError(error);
+    console.warn(`[API /api/gemini/generate warning] (${parsed.status} ${parsed.code}): ${parsed.message}`);
+    res.status(parsed.status).json({ error: parsed.message, code: parsed.code });
   }
 });
 
 // 2. Chat Streaming (SSE)
 app.post('/api/gemini/chat-stream', async (req, res) => {
   try {
+    const ai = getGeminiClient();
+    if (!ai) {
+      return res.status(503).json({
+        error: 'Live AI service is currently unavailable because server credentials are not configured.',
+      });
+    }
     const { model, message, history, systemInstruction, config } = req.body || {};
     if (typeof message !== 'string' || !message.trim()) {
       return res.status(400).json({ error: 'Message text is required' });
@@ -165,11 +236,12 @@ app.post('/api/gemini/chat-stream', async (req, res) => {
       res.end();
     }
   } catch (error: any) {
-    console.error('[API /api/gemini/chat-stream error]:', error);
+    const parsed = parseGeminiError(error);
+    console.warn(`[API /api/gemini/chat-stream warning] (${parsed.status} ${parsed.code}): ${parsed.message}`);
     if (!res.headersSent) {
-      res.status(502).json({ error: error?.message || 'Streaming failed' });
+      res.status(parsed.status).json({ error: parsed.message, code: parsed.code });
     } else if (!res.writableEnded) {
-      res.write(`data: ${JSON.stringify({ error: error?.message || 'Streaming failed' })}\n\n`);
+      res.write(`data: ${JSON.stringify({ error: parsed.message })}\n\n`);
       res.end();
     }
   }
@@ -178,6 +250,12 @@ app.post('/api/gemini/chat-stream', async (req, res) => {
 // 3. Image Generation
 app.post('/api/gemini/generate-images', async (req, res) => {
   try {
+    const ai = getGeminiClient();
+    if (!ai) {
+      return res.status(503).json({
+        error: 'Live AI service is currently unavailable because server credentials are not configured.',
+      });
+    }
     const { prompt, model, config } = req.body || {};
     if (typeof prompt !== 'string' || !prompt.trim()) {
       return res.status(400).json({ error: 'Prompt is required' });
@@ -190,14 +268,21 @@ app.post('/api/gemini/generate-images', async (req, res) => {
     });
     res.json(response);
   } catch (error: any) {
-    console.error('[API /api/gemini/generate-images error]:', error);
-    res.status(500).json({ error: error?.message || 'Image generation failed' });
+    const parsed = parseGeminiError(error);
+    console.warn(`[API /api/gemini/generate-images warning] (${parsed.status} ${parsed.code}): ${parsed.message}`);
+    res.status(parsed.status).json({ error: parsed.message, code: parsed.code });
   }
 });
 
 // 4. Video Generation & Operations
 app.post('/api/gemini/generate-videos', async (req, res) => {
   try {
+    const ai = getGeminiClient();
+    if (!ai) {
+      return res.status(503).json({
+        error: 'Live AI service is currently unavailable because server credentials are not configured.',
+      });
+    }
     const { prompt, model, config } = req.body || {};
     if (typeof prompt !== 'string' || !prompt.trim()) {
       return res.status(400).json({ error: 'Prompt is required' });
@@ -210,13 +295,20 @@ app.post('/api/gemini/generate-videos', async (req, res) => {
     });
     res.json(operation);
   } catch (error: any) {
-    console.error('[API /api/gemini/generate-videos error]:', error);
-    res.status(500).json({ error: error?.message || 'Video generation failed' });
+    const parsed = parseGeminiError(error);
+    console.warn(`[API /api/gemini/generate-videos warning] (${parsed.status} ${parsed.code}): ${parsed.message}`);
+    res.status(parsed.status).json({ error: parsed.message, code: parsed.code });
   }
 });
 
 app.post('/api/gemini/get-videos-operation', async (req, res) => {
   try {
+    const ai = getGeminiClient();
+    if (!ai) {
+      return res.status(503).json({
+        error: 'Live AI service is currently unavailable because server credentials are not configured.',
+      });
+    }
     const { operation } = req.body || {};
     if (!operation) {
       return res.status(400).json({ error: 'Missing operation payload' });
@@ -224,14 +316,19 @@ app.post('/api/gemini/get-videos-operation', async (req, res) => {
     const updatedOperation = await ai.operations.getVideosOperation({ operation });
     res.json(updatedOperation);
   } catch (error: any) {
-    console.error('[API /api/gemini/get-videos-operation error]:', error);
-    res.status(500).json({ error: error?.message || 'Failed to poll video operation' });
+    const parsed = parseGeminiError(error);
+    console.warn(`[API /api/gemini/get-videos-operation warning] (${parsed.status} ${parsed.code}): ${parsed.message}`);
+    res.status(parsed.status).json({ error: parsed.message, code: parsed.code });
   }
 });
 
 // 5. Video Secure Proxy (strict Google APIs host allowlist prevents SSRF & key exfiltration)
 app.get('/api/gemini/video-proxy', async (req, res) => {
   try {
+    const activeKey = getActiveApiKey();
+    if (!activeKey) {
+      return res.status(503).send('AI service key is not configured');
+    }
     const { uri } = req.query;
     if (!uri || typeof uri !== 'string') {
       return res.status(400).send('Missing uri query parameter');
@@ -255,7 +352,7 @@ app.get('/api/gemini/video-proxy', async (req, res) => {
 
     const videoRes = await fetch(parsedUrl.toString(), {
       headers: {
-        'x-goog-api-key': apiKey,
+        'x-goog-api-key': activeKey,
         'User-Agent': 'aistudio-build',
       },
     });
@@ -275,6 +372,7 @@ app.get('/api/gemini/video-proxy', async (req, res) => {
 // 5b. Real-Time Flight Tracker using Gemini Google Search Grounding
 app.post('/api/gemini/flight-tracker', async (req, res) => {
   try {
+    const ai = getGeminiClient();
     const { flightNumber, date } = req.body || {};
     const cleanFlight = typeof flightNumber === 'string' ? flightNumber.trim().toUpperCase().slice(0, 24) : '';
     const cleanDate = typeof date === 'string' ? date.trim().slice(0, 20) : '';
@@ -285,9 +383,9 @@ app.post('/api/gemini/flight-tracker', async (req, res) => {
     if (!cleanDate) {
       return res.status(400).json({ error: 'Flight date is required.' });
     }
-    if (!apiKey) {
+    if (!ai) {
       return res.status(503).json({
-        error: 'Live Search Grounding service key is not configured in Settings > Secrets.',
+        error: 'Live Search Grounding service is currently unavailable because server credentials are not configured.',
       });
     }
 
@@ -351,15 +449,16 @@ SUMMARY: <2 factual sentences on current status, recent performance on this rout
       sources,
     });
   } catch (error: any) {
-    const errorMsg = error?.message || 'Failed to retrieve live flight status';
-    console.warn('[API /api/gemini/flight-tracker warning]:', errorMsg);
-    res.status(502).json({ error: errorMsg });
+    const parsed = parseGeminiError(error);
+    console.warn(`[API /api/gemini/flight-tracker warning] (${parsed.status} ${parsed.code}): ${parsed.message}`);
+    res.status(parsed.status).json({ error: parsed.message, code: parsed.code });
   }
 });
 
 // 5b-2. Pan-African Visa & Consular Policy Advisor using Gemini Google Search Grounding
 app.post('/api/gemini/visa-advisor', async (req, res) => {
   try {
+    const ai = getGeminiClient();
     const { passportCountry, destinationCountry, travelPurpose } = req.body || {};
     const cleanPassport = typeof passportCountry === 'string' ? passportCountry.trim().slice(0, 60) : '';
     const cleanDest = typeof destinationCountry === 'string' ? destinationCountry.trim().slice(0, 60) : '';
@@ -368,9 +467,9 @@ app.post('/api/gemini/visa-advisor', async (req, res) => {
     if (!cleanPassport || !cleanDest) {
       return res.status(400).json({ error: 'Both passport nationality and African destination country are required.' });
     }
-    if (!apiKey) {
+    if (!ai) {
       return res.status(503).json({
-        error: 'Live Search Grounding service key is not configured in Settings > Secrets.',
+        error: 'Live Search Grounding service is currently unavailable because server credentials are not configured.',
       });
     }
 
@@ -431,9 +530,9 @@ PROPERTY_ADVISORY: <1-2 factual sentences on foreign visitor entry requirements 
       sources,
     });
   } catch (error: any) {
-    const errorMsg = error?.message || 'Failed to retrieve live visa policy update';
-    console.warn('[API /api/gemini/visa-advisor warning]:', errorMsg);
-    res.status(502).json({ error: errorMsg });
+    const parsed = parseGeminiError(error);
+    console.warn(`[API /api/gemini/visa-advisor warning] (${parsed.status} ${parsed.code}): ${parsed.message}`);
+    res.status(parsed.status).json({ error: parsed.message, code: parsed.code });
   }
 });
 
@@ -552,6 +651,14 @@ wss.on('connection', async (clientWs: WebSocket) => {
   let session: any = null;
 
   try {
+    const ai = getGeminiClient();
+    if (!ai) {
+      if (clientWs.readyState === WebSocket.OPEN) {
+        clientWs.send(JSON.stringify({ type: 'error', error: 'Live voice service is currently unavailable because server credentials are not configured.' }));
+        clientWs.close();
+      }
+      return;
+    }
     session = await ai.live.connect({
       model: 'gemini-3.8-live',
       config: {
