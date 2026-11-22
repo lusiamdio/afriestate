@@ -4,15 +4,14 @@ import {
   ArrowRightIcon,
   BellAlertIcon,
   ClockIcon,
+  GlobeAltIcon,
   LockClosedIcon,
-  QuestionMarkCircleIcon,
   ShieldCheckIcon,
   TagIcon,
 } from '@heroicons/react/24/outline';
 import type { User } from '../../types';
 import {
   ANYWHERE_DESTINATIONS,
-  VISA_INTELLIGENCE,
   getHubByCode,
   zarToUsd,
   type BookedTripRecord,
@@ -27,6 +26,7 @@ import {
   MyTripsPanel,
   PriceAlertsModal,
 } from '../flights/FlightOperationsPanels';
+import PanAfricanVisaHub from '../flights/PanAfricanVisaHub';
 import { useCurrency } from '../../contexts/CurrencyContext';
 
 interface BookFlightsPageProps {
@@ -104,7 +104,6 @@ const BookFlightsPage: React.FC<BookFlightsPageProps> = ({ currentUser, onBack, 
 
   const [statusQuery, setStatusQuery] = useState<string>('SA 317');
   const [statusDate, setStatusDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
-  const [visaPassportFilter, setVisaPassportFilter] = useState<string>('South Africa');
 
   const persistTrips = (next: BookedTripRecord[]) => {
     setTrips(next);
@@ -144,7 +143,6 @@ const BookFlightsPage: React.FC<BookFlightsPageProps> = ({ currentUser, onBack, 
   };
 
   const originHub = getHubByCode(search.origin);
-  const visaCards = useMemo(() => Object.values(VISA_INTELLIGENCE), []);
 
   const hasAlertForRoute = alerts.some(
     (a) => a.origin === search.origin && a.destination === search.destination
@@ -209,11 +207,11 @@ const BookFlightsPage: React.FC<BookFlightsPageProps> = ({ currentUser, onBack, 
                   <button
                     type="button"
                     onClick={() => setSection('visa')}
-                    className="p-1.5 rounded-lg bg-white/85 dark:bg-slate-800/85 border border-slate-200/80 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-[#008F45]"
-                    title="Visa & Travel Info"
-                    aria-label="Visa & Travel Info"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/85 dark:bg-slate-800/85 border border-slate-200/80 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:border-[#008F45]"
+                    title="Visa & Passport Requirements Across Africa"
                   >
-                    <QuestionMarkCircleIcon className="w-4 h-4" />
+                    <GlobeAltIcon className="w-4 h-4 text-[#008F45]" />
+                    <span>Visa &amp; Entry (54)</span>
                   </button>
                   <button
                     type="button"
@@ -387,6 +385,10 @@ const BookFlightsPage: React.FC<BookFlightsPageProps> = ({ currentUser, onBack, 
               ]);
             }}
               onApplyAiRoute={(orig, dest) => triggerSearch({ origin: orig, destination: dest })}
+              onOpenFullVisaHub={() => {
+                setSection('visa');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
             />
             {/* Embedded Real-Time Flight Tracker Section */}
             <section className="pt-2">
@@ -465,60 +467,8 @@ const BookFlightsPage: React.FC<BookFlightsPageProps> = ({ currentUser, onBack, 
         {/* Live Flight Status */}
         {section === 'status' && <FlightStatusPanel initialQuery={statusQuery} initialDate={statusDate} />}
 
-        {/* Visa & Entry Hub */}
-        {section === 'visa' && (
-          <div className="space-y-6">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-widest text-[#008F45]">
-                  AfriEstate Border &amp; Entry Intelligence
-                </p>
-                <h2 className="text-2xl font-bold mt-0.5">
-                  Visa &amp; Passport Requirements Across Africa
-                </h2>
-              </div>
-              <select
-                value={visaPassportFilter}
-                onChange={(e) => setVisaPassportFilter(e.target.value)}
-                className="px-3.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-semibold"
-              >
-                <option value="South Africa">South African Passport</option>
-                <option value="Nigeria">Nigerian Passport</option>
-                <option value="Kenya">Kenyan Passport</option>
-                <option value="Ghana">Ghanaian Passport</option>
-                <option value="Default">Other / International Passport</option>
-              </select>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {visaCards.map((vc) => {
-                const rule = vc.statusByPassport[visaPassportFilter] || vc.statusByPassport.Default;
-                return (
-                  <div
-                    key={vc.country}
-                    className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 space-y-3"
-                  >
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-lg font-bold text-slate-900 dark:text-white">
-                        {vc.flag} {vc.country}
-                      </h3>
-                      <span className="px-2.5 py-1 rounded-lg bg-[#E8F7EF] dark:bg-emerald-950/60 text-[#006B35] dark:text-emerald-300 text-xs font-bold">
-                        {rule.requirement}
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-700 dark:text-slate-300">
-                      <strong>Stay Limit:</strong> {rule.stayLimit} · <strong>Processing:</strong> {rule.processingTime}
-                    </p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">{rule.notes}</p>
-                    <p className="text-[11px] text-slate-400 pt-2 border-t border-slate-100 dark:border-slate-800">
-                      Source: {vc.source} · Updated {vc.lastUpdated}. Guidance only.
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
+        {/* Visa & Entry Hub (All 54 African Nations + Gemini Policy Check) */}
+        {section === 'visa' && <PanAfricanVisaHub />}
 
         {/* My Trips */}
         {section === 'trips' && (

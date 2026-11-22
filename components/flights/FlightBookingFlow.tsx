@@ -15,7 +15,6 @@ import {
   XMarkIcon,
 } from '@heroicons/react/24/outline';
 import {
-  AIRLINE_BADGE_STYLES,
   DESTINATION_PHOTOS,
   FARE_TIER_CONFIG,
   formatMinutes,
@@ -30,6 +29,7 @@ import type { User } from '../../types';
 import { useCurrency } from '../../contexts/CurrencyContext';
 import { useToast } from '../../contexts/ToastContext';
 import { isValidEmail, isValidPhone, sanitizeText } from '../../lib/security';
+import AirlineLogo from './AirlineLogo';
 
 export type BookingStage = 'fare' | 'travellers' | 'payment' | 'confirmed';
 
@@ -55,21 +55,9 @@ const PAYMENT_OPTIONS = [
   { id: 'Pay later (mobicred)', label: 'Pay later (mobicred)', markets: ['ZAR', 'NGN'] },
 ];
 
-const AirlineMiniBadge: React.FC<{ code: string; name: string }> = ({ code, name }) => {
-  const style = AIRLINE_BADGE_STYLES[code] || { bg: '#008F45', accent: '#FFFFFF', short: code };
-  return (
-    <span
-      aria-hidden="true"
-      className="w-6 h-6 rounded-full inline-flex items-center justify-center shrink-0 border border-slate-200 dark:border-slate-700 bg-white overflow-hidden"
-    >
-      <svg viewBox="0 0 24 24" className="w-5 h-5">
-        <circle cx="12" cy="12" r="11" fill={style.bg} />
-        <path d="M6 14 L18 9 L14 15 L10 13 Z" fill={style.accent} />
-      </svg>
-      <span className="sr-only">{name}</span>
-    </span>
-  );
-};
+const AirlineMiniBadge: React.FC<{ code: string; name: string }> = ({ code, name }) => (
+  <AirlineLogo code={code} name={name} size="sm" />
+);
 
 function formatDayDate(iso: string): string {
   if (!iso) return '';

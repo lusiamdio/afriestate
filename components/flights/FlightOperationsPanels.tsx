@@ -25,6 +25,7 @@ import {
 } from './flightData';
 import { useCurrency } from '../../contexts/CurrencyContext';
 import { useToast } from '../../contexts/ToastContext';
+import AirlineLogo from './AirlineLogo';
 
 interface MyTripsPanelProps {
   trips: BookedTripRecord[];
@@ -132,9 +133,12 @@ export const MyTripsPanel: React.FC<MyTripsPanelProps> = ({
                 <p className="text-sm font-bold text-slate-900 dark:text-white">
                   {trip.originCity} -&gt; {trip.destinationCity}
                 </p>
-                <p className="text-xs text-slate-600 dark:text-slate-300">
-                  {trip.airline} ({trip.flightNumber}) · {trip.departureTime} -&gt; {trip.arrivalTime}
-                </p>
+                <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                  <AirlineLogo name={trip.airline} size="xs" />
+                  <span>
+                    {trip.airline} ({trip.flightNumber}) · {trip.departureTime} -&gt; {trip.arrivalTime}
+                  </span>
+                </div>
                 <p className="text-[11px] font-mono text-slate-500">
                   Seat {trip.seatSelected} · +{trip.extraBagKg}kg bag · {formatMinutes(trip.durationMinutes)}
                 </p>
@@ -531,9 +535,12 @@ export const FlightStatusPanel: React.FC<FlightStatusPanelProps> = ({
                 <h3 className="text-xl sm:text-2xl font-bold font-heading text-slate-900 dark:text-white mt-0.5">
                   {liveResult.parsed.route}
                 </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  {liveResult.parsed.airline} · {liveResult.parsed.aircraft}
-                </p>
+                <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  <AirlineLogo name={liveResult.parsed.airline} size="xs" />
+                  <span>
+                    {liveResult.parsed.airline} · {liveResult.parsed.aircraft}
+                  </span>
+                </div>
               </div>
               <span className={`px-3 py-1.5 rounded-xl text-xs font-bold ${statusBadgeColor(liveResult.parsed.status)}`}>
                 Status: {liveResult.parsed.status}

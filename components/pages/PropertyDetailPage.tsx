@@ -27,6 +27,8 @@ import {
   ChevronRightIcon,
   ArrowsRightLeftIcon,
   CubeTransparentIcon,
+  QrCodeIcon,
+  XMarkIcon,
 } from '@heroicons/react/24/outline';
 import {
   SolarIcon,
@@ -38,6 +40,7 @@ import {
 } from '../icons/AfricanInfrastructureIcons';
 import { FacebookIcon, TwitterIcon, WhatsAppIcon } from '../icons/SocialIcons';
 import { useCurrency } from '../../contexts/CurrencyContext';
+import PropertyQrCodeCard, { buildPropertyShareUrl } from '../PropertyQrCodeCard';
 
 interface ShareMenuProps {
   propertyTitle: string;
@@ -171,8 +174,10 @@ const PropertyDetailPage: React.FC<PropertyDetailPageProps> = ({
   const images = property.images && property.images.length > 0 ? property.images : [FALLBACK_IMAGE];
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [isShareMenuOpen, setIsShareMenuOpen] = useState(false);
+  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
   const shareRef = useRef<HTMLDivElement>(null);
   const { formatCurrency } = useCurrency();
+  const directShareUrl = useMemo(() => buildPropertyShareUrl(property.id), [property.id]);
 
   const [isValuating, setIsValuating] = useState(false);
   const [valuation, setValuation] = useState<ValuationResult | null>(null);
@@ -186,6 +191,7 @@ const PropertyDetailPage: React.FC<PropertyDetailPageProps> = ({
     setActiveImageIndex(0);
     setActiveTab('overview');
     setValuation(null);
+    setIsQrModalOpen(false);
   }, [property.id]);
 
   useEffect(() => {
@@ -328,6 +334,16 @@ Provide estimated_value, confidence, and concise rationale.`;
               <span>{isCompared ? 'Comparing' : 'Compare'}</span>
             </button>
 
+            <button
+              type="button"
+              onClick={() => setIsQrModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 transition-colors"
+              title="Scan QR code to save link on mobile"
+            >
+              <QrCodeIcon className="w-3.5 h-3.5" />
+              <span>Mobile QR</span>
+            </button>
+
             <div className="relative" ref={shareRef}>
               <button
                 type="button"
@@ -338,7 +354,7 @@ Provide estimated_value, confidence, and concise rationale.`;
                 <span>Share</span>
               </button>
               {isShareMenuOpen && (
-                <ShareMenu propertyTitle={property.title} propertyUrl={window.location.href} />
+                <ShareMenu propertyTitle={property.title} propertyUrl={directShareUrl} />
               )}
             </div>
           </div>
@@ -1116,6 +1132,14 @@ Provide estimated_value, confidence, and concise rationale.`;
                 Rate Agent
               </button>
             </div>
+
+            {/* Scannable Mobile QR Card */}
+            <PropertyQrCodeCard
+              propertyId={property.id}
+              propertyTitle={property.title}
+              propertyLocation={`${property.address.city}, ${property.country || 'South Africa'}`}
+              variant="sidebar"
+            />
           </aside>
         </div>
 
@@ -1186,6 +1210,34 @@ Provide estimated_value, confidence, and concise rationale.`;
           </section>
         )}
       </div>
+
+      {/* Expanded Mobile QR Code Modal */}
+      {isQrModalOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setIsQrModalOpen(false)}
+        >
+          <div
+            className="relative w-full max-w-sm bg-white dark:bg-slate-900 rounded-2xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setIsQrModalOpen(false)}
+              aria-label="Close QR modal"
+              className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center transition-colors"
+            >
+              <XMarkIcon className="w-4 h-4" />
+            </button>
+            <PropertyQrCodeCard
+              propertyId={property.id}
+              propertyTitle={property.title}
+              propertyLocation={`${property.address.city}, ${property.country || 'South Africa'}`}
+              variant="modal"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

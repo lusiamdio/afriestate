@@ -357,6 +357,86 @@ SUMMARY: <2 factual sentences on current status, recent performance on this rout
   }
 });
 
+// 5b-2. Pan-African Visa & Consular Policy Advisor using Gemini Google Search Grounding
+app.post('/api/gemini/visa-advisor', async (req, res) => {
+  try {
+    const { passportCountry, destinationCountry, travelPurpose } = req.body || {};
+    const cleanPassport = typeof passportCountry === 'string' ? passportCountry.trim().slice(0, 60) : '';
+    const cleanDest = typeof destinationCountry === 'string' ? destinationCountry.trim().slice(0, 60) : '';
+    const cleanPurpose = typeof travelPurpose === 'string' ? travelPurpose.trim().slice(0, 80) : 'Property & Business';
+
+    if (!cleanPassport || !cleanDest) {
+      return res.status(400).json({ error: 'Both passport nationality and African destination country are required.' });
+    }
+    if (!apiKey) {
+      return res.status(503).json({
+        error: 'Live Search Grounding service key is not configured in Settings > Secrets.',
+      });
+    }
+
+    const prompt = `Search the live web for the latest official immigration, visa, and entry requirements for a "${cleanPassport}" passport holder traveling to "${cleanDest}" for "${cleanPurpose}".
+Provide accurate, factual bureaucratic guidance using this exact labeled format at the top, followed by clear actionable guidance:
+ENTRY_CATEGORY: <Visa-Free | eVisa / eTA | Visa on Arrival | Embassy Visa>
+STAY_LIMIT: <Maximum authorized stay duration>
+ESTIMATED_FEE: <Official visa/eTA/security fee or $0 Exempt>
+PROCESSING_TIME: <Typical processing turnaround>
+OFFICIAL_PORTAL: <Official government immigration portal domain or Embassy authority>
+BUREAUCRATIC_SUMMARY: <3-4 factual sentences covering exact step-by-step portal/consular application order, Yellow Fever ICVP vaccination rule, passport validity/blank page requirements, and any ECOWAS/EAC/SADC/CEMAC or AU exemption.>
+PROPERTY_ADVISORY: <1-2 factual sentences on foreign visitor entry requirements when inspecting, acquiring real estate, or registering corporate/tax IDs in ${cleanDest}.>`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-4-hydrogen',
+      contents: prompt,
+      config: {
+        tools: [{ googleSearch: {} }],
+      },
+    });
+
+    const reportText = (response.text || '').trim();
+    const rawChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
+    const seenUris = new Set<string>();
+    const sources: { title: string; uri: string }[] = [];
+    for (const chunk of rawChunks) {
+      const uri = chunk?.web?.uri;
+      const title = chunk?.web?.title;
+      if (uri && !seenUris.has(uri)) {
+        seenUris.add(uri);
+        sources.push({
+          title: title || uri,
+          uri,
+        });
+      }
+    }
+
+    const extractField = (key: string) => {
+      const match = reportText.match(new RegExp(`^${key}:\\s*(.+)$`, 'im'));
+      return match ? match[1].trim() : '';
+    };
+
+    res.json({
+      passportCountry: cleanPassport,
+      destinationCountry: cleanDest,
+      travelPurpose: cleanPurpose,
+      checkedAt: new Date().toISOString(),
+      reportText,
+      parsed: {
+        entryCategory: extractField('ENTRY_CATEGORY') || 'Verify via Official Portal',
+        stayLimit: extractField('STAY_LIMIT') || 'See diplomatic terms',
+        estimatedFee: extractField('ESTIMATED_FEE') || 'Official tariff applies',
+        processingTime: extractField('PROCESSING_TIME') || 'Check portal SLA',
+        officialPortal: extractField('OFFICIAL_PORTAL') || `${cleanDest} Immigration Authority`,
+        bureaucraticSummary: extractField('BUREAUCRATIC_SUMMARY') || reportText,
+        propertyAdvisory: extractField('PROPERTY_ADVISORY') || 'Verify non-resident deed & tax compliance locally.',
+      },
+      sources,
+    });
+  } catch (error: any) {
+    const errorMsg = error?.message || 'Failed to retrieve live visa policy update';
+    console.warn('[API /api/gemini/visa-advisor warning]:', errorMsg);
+    res.status(502).json({ error: errorMsg });
+  }
+});
+
 // 5c. Scoped Real-Time Payment Settlement (ONLY Flights, Short Stays, and Car Hire)
 const ALLOWED_PAYMENT_CATEGORIES = new Set(['flight', 'short-stay', 'car-hire']);
 const ALLOWED_PAYMENT_METHODS = new Set([

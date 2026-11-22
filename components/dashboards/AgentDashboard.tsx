@@ -26,9 +26,10 @@ import { Bars3Icon, XMarkIcon } from '../icons/InvestorDashboardIcons';
 import AgentInvestmentRequests from './agent/AgentInvestmentRequests';
 import AgentEarnings from './agent/AgentEarnings';
 import AgentBilling from './agent/AgentBilling';
-import { ChatBubbleLeftRightIcon } from '../icons/ActionIcons';
+import { ChatBubbleLeftRightIcon, TrophyIcon } from '../icons/ActionIcons';
 import { PlusIcon } from '@heroicons/react/24/outline';
 import AgentMessages from './agent/AgentMessages';
+import AgentLeaderboard from './agent/AgentLeaderboard';
 
 interface AgentDashboardProps {
   user: User;
@@ -58,6 +59,7 @@ export type AgentView =
   | 'listings'
   | 'leads'
   | 'analytics'
+  | 'leaderboard'
   | 'calendar'
   | 'profile'
   | 'support'
@@ -74,6 +76,7 @@ const viewMeta: Record<AgentView, { label: string; group: string }> = {
   leads: { label: 'Leads & Inquiries', group: 'Workspace' },
   messages: { label: 'Client Messages', group: 'Workspace' },
   investmentRequests: { label: 'Investment Briefs', group: 'Workspace' },
+  leaderboard: { label: 'Agent Leaderboard', group: 'Performance' },
   analytics: { label: 'Analytics & Funnel', group: 'Performance' },
   earnings: { label: 'Commissions & Payouts', group: 'Performance' },
   calendar: { label: 'Schedule & Tours', group: 'Performance' },
@@ -100,6 +103,7 @@ const Sidebar: React.FC<{
   ];
 
   const opsItems: { id: AgentView; label: string; icon: React.ElementType }[] = [
+    { id: 'leaderboard', label: 'Agent Leaderboard', icon: TrophyIcon },
     { id: 'analytics', label: 'Analytics', icon: AnalyticsIcon },
     { id: 'earnings', label: 'Earnings', icon: BanknotesIcon },
     { id: 'calendar', label: 'Calendar', icon: NavCalendarIcon },
@@ -191,6 +195,16 @@ const AgentDashboard: React.FC<AgentDashboardProps> = (props) => {
         return <AgentListingsManagement {...props} />;
       case 'analytics':
         return <AgentAnalytics {...props} />;
+      case 'leaderboard':
+        return (
+          <AgentLeaderboard
+            user={props.user}
+            allProperties={props.allProperties}
+            agentReviews={props.agentReviews}
+            messages={props.messages}
+            receivedInquiries={props.receivedInquiries}
+          />
+        );
       case 'calendar':
         return <AgentCalendar {...props} />;
       case 'profile':

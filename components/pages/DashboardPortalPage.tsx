@@ -13,6 +13,7 @@ import type {
   InvestorSettings,
   Currency,
   InvestmentRequest,
+  Notification,
 } from '../../types';
 import UserDashboard from '../dashboards/UserDashboard';
 import AgentDashboard from '../dashboards/AgentDashboard';
@@ -81,6 +82,7 @@ interface DashboardPortalPageProps {
   onOpenVRTour: (url: string) => void;
   onToggleCompare: (property: Property) => void;
   onSendMessage?: (property: Property, text: string) => Promise<void> | void;
+  onNotificationsDispatched?: (notifications: Notification[]) => void;
 }
 
 const roleMeta: Record<string, { title: string; badge: string }> = {

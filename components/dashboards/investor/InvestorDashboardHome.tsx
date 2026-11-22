@@ -10,11 +10,13 @@ import type { InvestorView } from '../InvestorDashboard';
 import {
   ArrowUpIcon,
   BanknotesIcon,
+  BellAlertIcon,
   BuildingOffice2Icon,
   ChartBarIcon,
   ArrowDownTrayIcon,
   EyeIcon,
 } from '@heroicons/react/24/outline';
+import { getInvestmentAlertRules, getInvestmentAlertTriggers } from '../../../lib/investmentAlerts';
 
 interface InvestorDashboardHomeProps {
   user: User;
@@ -232,7 +234,36 @@ const InvestorDashboardHome: React.FC<InvestorDashboardHomeProps> = ({
           <AIPortfolioSummary userProperties={userProperties} />
         </div>
 
-        <div className="lg:col-span-1">
+        <div className="lg:col-span-1 space-y-6">
+          <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <BellAlertIcon className="w-5 h-5 text-[#C9A35D]" />
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
+                  Real-Time Investment Alerts
+                </h3>
+              </div>
+              <span className="text-xs font-mono tabular-nums font-bold text-emerald-700 dark:text-emerald-400">
+                {getInvestmentAlertRules().filter((r) => r.isActive).length} active
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+              Get instant automated notifications whenever new properties match your target ROI and African regional criteria.
+            </p>
+            <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800 text-xs">
+              <span className="text-slate-500 dark:text-slate-400">
+                {getInvestmentAlertTriggers().length} matches dispatched
+              </span>
+              <button
+                type="button"
+                onClick={() => onNavigate?.('alerts')}
+                className="font-semibold text-[#0F2D25] dark:text-emerald-400 hover:underline"
+              >
+                Manage Alerts &rarr;
+              </button>
+            </div>
+          </div>
+
           <InvestorGamification
             investorAchievements={investorAchievements}
             userProperties={userProperties}

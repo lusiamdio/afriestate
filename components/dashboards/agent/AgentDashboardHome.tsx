@@ -1,16 +1,18 @@
 import React, { useMemo } from 'react';
-import type { Property, TourRequest, User, Achievement, Review } from '../../../types';
+import type { Property, TourRequest, User, Achievement, Review, Message } from '../../../types';
 import { PropertyStatus } from '../../../types';
-import { ChartBarIcon, EyeIcon, BellIcon, ArrowUpIcon, CalendarIcon, ChatBubbleLeftRightIcon } from '../../icons/ActionIcons';
+import { ChartBarIcon, EyeIcon, BellIcon, ArrowUpIcon, CalendarIcon, ChatBubbleLeftRightIcon, TrophyIcon } from '../../icons/ActionIcons';
 import { PlusIcon } from '@heroicons/react/24/outline';
 import { ListingsIcon } from '../../icons/AgentDashboardIcons';
 import AgentGamification from './AgentGamification';
+import { computeAgentLeaderboardData } from './AgentLeaderboard';
 import type { AgentView } from '../AgentDashboard';
 
 interface AgentDashboardHomeProps {
   user: User;
   allProperties: Property[];
   receivedInquiries: TourRequest[];
+  messages?: Message[];
   onListPropertyClick: () => void;
   achievements: Achievement[];
   agentReviews: Review[];
@@ -72,11 +74,18 @@ const AgentDashboardHome: React.FC<AgentDashboardHomeProps> = ({
   user,
   allProperties,
   receivedInquiries,
+  messages = [],
   onListPropertyClick,
   achievements,
   agentReviews,
   onNavigate,
 }) => {
+  const leaderboard = useMemo(
+    () => computeAgentLeaderboardData(allProperties, user, agentReviews, messages, receivedInquiries),
+    [allProperties, user, agentReviews, messages, receivedInquiries]
+  );
+  const myRankIndex = leaderboard.findIndex((entry) => entry.isCurrentUser);
+  const myEntry = myRankIndex >= 0 ? leaderboard[myRankIndex] : null;
   const userProperties = useMemo(() => {
     return allProperties.filter((p) => p.agent.name === user.username);
   }, [allProperties, user.username]);
@@ -238,6 +247,49 @@ const AgentDashboardHome: React.FC<AgentDashboardHomeProps> = ({
                 <span className="text-slate-400">&rarr;</span>
               </button>
             </div>
+          </div>
+
+          {/* Agent Leaderboard Snapshot */}
+          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5 space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <TrophyIcon className="w-5 h-5 text-[#C9A35D]" />
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-white uppercase tracking-wider font-sans">
+                  Agent Leaderboard
+                </h3>
+              </div>
+              {myEntry && (
+                <span className="text-xs font-mono tabular-nums font-bold text-emerald-700 dark:text-emerald-400">
+                  Your Rank #{myRankIndex + 1}
+                </span>
+              )}
+            </div>
+
+            <div className="divide-y divide-slate-100 dark:divide-slate-800">
+              {leaderboard.slice(0, 3).map((agent, idx) => (
+                <div key={agent.id} className="py-2.5 first:pt-0 last:pb-0 flex items-center justify-between gap-2 text-xs">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-slate-900 dark:text-white truncate">
+                      #{idx + 1} {agent.agentName} {agent.isCurrentUser ? '(You)' : ''}
+                    </p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono tabular-nums">
+                      {agent.verifiedSalesCount} sales · {agent.rating.toFixed(1)} rating · {agent.responsivenessPct}% SLA
+                    </p>
+                  </div>
+                  <span className="font-mono tabular-nums font-bold text-slate-900 dark:text-white shrink-0">
+                    {agent.compositeScore}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => onNavigate?.('leaderboard')}
+              className="w-full py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-semibold text-[#0F2D25] dark:text-emerald-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+            >
+              View Full Leaderboard &rarr;
+            </button>
           </div>
 
           {/* Activity Alerts */}

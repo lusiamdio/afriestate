@@ -39,17 +39,28 @@ const CompareBar: React.FC<CompareBarProps> = ({ properties, onCompare, onClear,
             <Square2StackIcon className="w-8 h-8 text-brand-gold" />
           </div>
           <div className="flex-grow min-w-0">
-            <h3 className="font-bold text-lg">Compare Properties ({properties.length}/4)</h3>
+            <h3 className="font-bold text-lg">Compare Properties ({Math.min(properties.length, 3)}/3)</h3>
             <div className="flex items-center gap-3 mt-2 flex-wrap">
-                {properties.map(p => (
+                {properties.slice(0, 3).map(p => (
                     <div key={p.id} className="relative group flex-shrink-0">
-                        <img src={p.images[0]} alt={p.title} className="w-12 h-12 rounded-md object-cover"/>
-                        <button onClick={() => onRemove(p)} className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <img
+                          src={p.images?.[0] || '/images/2ec34ce4ca57aef13fc8b3239a99345e.jpg'}
+                          alt={p.title}
+                          referrerPolicy="no-referrer"
+                          onError={(e) => {
+                            if (!e.currentTarget.dataset.fb) {
+                              e.currentTarget.dataset.fb = '1';
+                              e.currentTarget.src = '/images/2ec34ce4ca57aef13fc8b3239a99345e.jpg';
+                            }
+                          }}
+                          className="w-12 h-12 rounded-md object-cover"
+                        />
+                        <button onClick={() => onRemove(p)} aria-label={`Remove ${p.title}`} className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                             <CloseIcon className="w-3 h-3" />
                         </button>
                     </div>
                 ))}
-                {[...Array(4 - properties.length)].map((_, i) => (
+                {[...Array(Math.max(0, 3 - properties.length))].map((_, i) => (
                     <div key={i} className="w-12 h-12 rounded-md bg-slate-700 border-2 border-dashed border-slate-500 hidden md:block"></div>
                 ))}
             </div>
@@ -59,10 +70,10 @@ const CompareBar: React.FC<CompareBarProps> = ({ properties, onCompare, onClear,
           <button onClick={onClear} className="flex-1 sm:flex-none bg-slate-600 hover:bg-slate-500 text-sm font-semibold px-4 py-2.5 rounded-lg transition-colors">Clear</button>
           <button 
             onClick={onCompare} 
-            disabled={properties.length < 2}
-            className="flex-1 sm:flex-none bg-brand-primary hover:bg-opacity-90 text-white font-semibold px-6 py-2.5 rounded-lg transition-all duration-300 disabled:bg-slate-500 disabled:cursor-not-allowed"
+            disabled={properties.length < 1}
+            className="flex-1 sm:flex-none bg-brand-primary hover:bg-opacity-90 text-white font-semibold px-6 py-2.5 rounded-lg transition-all duration-300 disabled:bg-slate-500 disabled:cursor-not-allowed whitespace-nowrap"
           >
-            Compare
+            {properties.length >= 2 ? `Compare Side-by-Side (${Math.min(properties.length, 3)})` : 'Open Compare View'}
           </button>
         </div>
       </div>

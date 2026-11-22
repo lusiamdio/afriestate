@@ -84,6 +84,7 @@ import MapInterface from './components/MapInterface';
 import ExploreAfricaMap from './components/ExploreAfricaMap';
 import BookingStyleFilterSidebar from './components/BookingStyleFilterSidebar';
 import PropertyVerificationModal from './components/PropertyVerificationModal';
+import { evaluatePropertyAgainstInvestmentAlerts } from './lib/investmentAlerts';
 
 import SuperAdminDashboard from './components/dashboards/SuperAdminDashboard';
 
@@ -101,8 +102,9 @@ import HotelRegistrationPage from './components/pages/HotelRegistrationPage';
 import ServiceListingPage from './components/pages/ServiceListingPage';
 import DashboardPortalPage from './components/pages/DashboardPortalPage';
 import BookFlightsPage from './components/pages/BookFlightsPage';
+import ComparePropertiesPage from './components/pages/ComparePropertiesPage';
 
-type Page = 'home' | 'about' | 'services' | 'contact' | 'pricing' | 'rent-a-car' | 'find-wellness' | 'book-a-stay' | 'long-term-stays' | 'book-flights' | 'auth' | 'property-detail' | 'neighborhood-explorer' | 'find-professional' | 'hotel-registration' | 'list-service' | 'list-transport' | 'list-wellness' | 'dashboard' | 'seeker-dashboard' | 'agent-platform' | 'investor-platform';
+type Page = 'home' | 'about' | 'services' | 'contact' | 'pricing' | 'rent-a-car' | 'find-wellness' | 'book-a-stay' | 'long-term-stays' | 'book-flights' | 'auth' | 'property-detail' | 'neighborhood-explorer' | 'find-professional' | 'hotel-registration' | 'list-service' | 'list-transport' | 'list-wellness' | 'dashboard' | 'seeker-dashboard' | 'agent-platform' | 'investor-platform' | 'compare';
 
 const initialFilters: SearchFilters = {
     location: '',
@@ -166,6 +168,17 @@ const App: React.FC = () => {
   const [filters, setFilters] = useState<SearchFilters>(initialFilters);
   
   const scrollToSection = (targetPage: Page, sectionId?: string) => {
+    if (targetPage !== 'property-detail') {
+      try {
+        const nextUrl = new URL(window.location.href);
+        if (nextUrl.searchParams.has('property')) {
+          nextUrl.searchParams.delete('property');
+          window.history.replaceState({}, '', nextUrl.toString());
+        }
+      } catch {
+        // ignore URL manipulation issues
+      }
+    }
     if (page !== targetPage) {
       setPage(targetPage);
       setTimeout(() => {
@@ -607,6 +620,19 @@ const App: React.FC = () => {
         setInvestmentProperties(investmentProps);
         setIsLoadingProperties(false);
 
+        try {
+          const sharedPropertyId = new URLSearchParams(window.location.search).get('property');
+          if (sharedPropertyId) {
+            const matched = hydratedProps.find(p => String(p.id) === sharedPropertyId);
+            if (matched) {
+              setSelectedProperty(matched);
+              setPage('property-detail');
+            }
+          }
+        } catch {
+          // ignore query param parsing errors
+        }
+
         if (currentUser) {
             setSavedPropertyIds(await getSavedPropertiesForUser(currentUser.username));
             setTourRequests(await getTourRequests(currentUser.username));
@@ -983,6 +1009,13 @@ const App: React.FC = () => {
     withRoleGate(property, async (p) => {
         setSelectedProperty(p);
         setPage('property-detail');
+        try {
+          const nextUrl = new URL(window.location.href);
+          nextUrl.searchParams.set('property', String(p.id));
+          window.history.replaceState({}, '', nextUrl.toString());
+        } catch {
+          // ignore URL history issues
+        }
         window.scrollTo({ top: 0, behavior: 'smooth' });
         await incrementPropertyView(p.id);
         setAllProperties(prev => prev.map(item => item.id === p.id ? { ...item, views: (item.views || 0) + 1 } : item));
@@ -1020,15 +1053,18 @@ const App: React.FC = () => {
 
   const handleToggleCompare = (property: Property) => {
     withRoleGate(property, (p) => {
-        setCompareList(prev => {
-            if (prev.some(item => item.id === p.id)) {
-                return prev.filter(item => item.id !== p.id);
-            }
-            if (prev.length < 4) {
-                return [...prev, p];
-            }
-            return prev;
-        });
+        const exists = compareList.some(item => item.id === p.id);
+        if (exists) {
+            setCompareList(prev => prev.filter(item => item.id !== p.id));
+            addToast(`Removed "${p.title}" from comparison.`, 'info');
+            return;
+        }
+        if (compareList.length >= 3) {
+            addToast('You can compare up to 3 properties at a time. Remove one to add another.', 'info');
+            return;
+        }
+        setCompareList(prev => [...prev, p]);
+        addToast(`Added "${p.title}" to comparison (${compareList.length + 1}/3).`, 'success');
     });
   };
   
@@ -1156,7 +1192,21 @@ const App: React.FC = () => {
     addToast('Listing removed from platform directory.', 'info');
   };
 
-  const handleSaveProperty = async (property: Property) => {
+    const dispatchInvestmentAlerts = (savedRecord: Property) => {
+      const result = evaluatePropertyAgainstInvestmentAlerts(savedRecord);
+      if (result.notifications.length > 0) {
+        setNotifications(prev => {
+          const seen = new Set(prev.map(n => n.id));
+          return [...result.notifications.filter(n => !seen.has(n.id)), ...prev];
+        });
+        addToast(
+          `Investment Alert Triggered: "${savedRecord.title}" matched ${result.matchedRules.length} subscription${result.matchedRules.length === 1 ? '' : 's'}!`,
+          'info'
+        );
+      }
+    };
+
+    const handleSaveProperty = async (property: Property) => {
     const existing = allProperties.find(p => p.id === property.id);
     const shouldQueueModeration =
       !existing &&
@@ -1175,6 +1225,9 @@ const App: React.FC = () => {
     setAllProperties(newProperties);
     setInvestmentProperties(newProperties.filter(p => p.listingType === ListingType.FOR_INVESTMENT));
     setIsPropertyFormOpen(false);
+    if (!shouldQueueModeration && savedRecord.status === PropertyStatus.ACTIVE) {
+      dispatchInvestmentAlerts(savedRecord);
+    }
 
     if (shouldQueueModeration) {
       addToast(`"${savedRecord.title}" queued in Super Admin moderation before public release.`, 'info');
@@ -1537,6 +1590,24 @@ const App: React.FC = () => {
             );
           }
           return null;
+      case 'compare':
+          return (
+            <ComparePropertiesPage
+              properties={compareList}
+              allProperties={governedProperties}
+              onBack={() => scrollToSection('home', 'all-listings')}
+              onRemoveProperty={(prop) => {
+                setCompareList(prev => prev.filter(item => item.id !== prop.id));
+              }}
+              onAddProperty={(prop) => handleToggleCompare(prop)}
+              onClearAll={() => {
+                setCompareList([]);
+                addToast('Comparison list cleared.', 'info');
+              }}
+              onSelectProperty={handleOpenDetailModal}
+              onMessageAgent={handleMessageAgent}
+            />
+          );
       case 'about':
           return <AboutPage onExploreProperties={() => openAuthPage('login')} />;
       case 'services':
@@ -1604,6 +1675,9 @@ const App: React.FC = () => {
               }
               onListingPublished={(publishedProperty, targetRoute) => {
                 setAllProperties(prev => [publishedProperty, ...prev.filter(p => p.id !== publishedProperty.id)]);
+                if (publishedProperty.status === PropertyStatus.ACTIVE) {
+                  dispatchInvestmentAlerts(publishedProperty);
+                }
                 scrollToSection(targetRoute);
               }}
             />
@@ -1713,7 +1787,7 @@ const App: React.FC = () => {
               onUpdateInvestorAchievements={setInvestorAchievements}
               onUpdateInvestorSettings={handleUpdateInvestorSettings}
               onThemeToggle={handleThemeToggle}
-              onCompareClick={() => setIsCompareModalOpen(true)}
+              onCompareClick={() => scrollToSection('compare')}
               onCurrencyChange={setCurrency}
               onUpgradeAccountRequest={handleUpgradeAccountRequest}
               onSaveToggle={handleSaveToggle}
@@ -1725,6 +1799,12 @@ const App: React.FC = () => {
               onToggleCompare={handleToggleCompare}
               onOpenVRTour={handleOpenVRTour}
               onSendMessage={(prop, text) => handleSendMessage(text, prop)}
+              onNotificationsDispatched={(dispatched) => {
+                setNotifications(prev => {
+                  const seen = new Set(prev.map(n => n.id));
+                  return [...dispatched.filter(n => !seen.has(n.id)), ...prev];
+                });
+              }}
             />
           );
       case 'hotel-registration':
@@ -1739,6 +1819,9 @@ const App: React.FC = () => {
                   ? { ...propertyRecord, status: PropertyStatus.PENDING }
                   : propertyRecord;
                 setAllProperties(prev => [normalizedProp, ...prev.filter(p => p.id !== normalizedProp.id)]);
+                if (normalizedProp.status === PropertyStatus.ACTIVE) {
+                  dispatchInvestmentAlerts(normalizedProp);
+                }
               }}
               onViewLiveStays={() => scrollToSection('book-a-stay')}
             />
@@ -2312,7 +2395,14 @@ const App: React.FC = () => {
       
       {selectedProperty && <MortgageCalculator isOpen={isCalculatorOpen} onClose={() => setIsCalculatorOpen(false)} propertyPrice={selectedProperty.price} propertyTitle={selectedProperty.title} />}
       {selectedProperty && <ScheduleTourModal isOpen={isTourModalOpen} onClose={() => setIsTourModalOpen(false)} propertyTitle={selectedProperty.title} propertyId={selectedProperty.id} agentName={selectedProperty.agent.name} onSubmit={handleScheduleTour} />}
-      {compareList.length > 0 && <CompareBar properties={compareList} onCompare={() => setIsCompareModalOpen(true)} onClear={() => setCompareList([])} onRemove={(p) => setCompareList(prev => prev.filter(item => item.id !== p.id))} />}
+      {compareList.length > 0 && page !== 'compare' && (
+        <CompareBar
+          properties={compareList}
+          onCompare={() => scrollToSection('compare')}
+          onClear={() => setCompareList([])}
+          onRemove={(p) => setCompareList(prev => prev.filter(item => item.id !== p.id))}
+        />
+      )}
       <CompareModal isOpen={isCompareModalOpen} onClose={() => setIsCompareModalOpen(false)} properties={compareList} />
       {currentUser && (
         <PropertyFormModal
@@ -2335,6 +2425,9 @@ const App: React.FC = () => {
           onOpenWebPage={(target) => scrollToSection(target)}
           onListingPublished={(publishedProperty, targetRoute) => {
             setAllProperties(prev => [publishedProperty, ...prev.filter(p => p.id !== publishedProperty.id)]);
+            if (publishedProperty.status === PropertyStatus.ACTIVE) {
+              dispatchInvestmentAlerts(publishedProperty);
+            }
             if (targetRoute === 'book-a-stay') {
               setPublishedStayProfiles(getPublishedStayProfiles());
             }

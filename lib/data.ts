@@ -6,6 +6,11 @@ import type { StayPropertyProfile } from '../data/stayDetailData';
 import { FLAGSHIP_AFRICAN_GRAND_HOTEL } from '../data/stayDetailData';
 import { supabase } from './supabase';
 import { generateListingSignature, generateSecureBookingRef, sanitizeSafeUrl, sanitizeText } from './security';
+import {
+    getLocalAlertNotifications,
+    getLocalReadAlertNotificationIds,
+    markLocalAlertNotificationsRead,
+} from './investmentAlerts';
 
 const PUBLISHED_PROPERTIES_KEY = 'afriestate_published_properties_v1';
 const PUBLISHED_STAYS_KEY = 'afriestate_published_stays_v1';
@@ -1029,34 +1034,47 @@ export const deleteEvent = async (username: string, eventId: string): Promise<vo
 
 // --- Notifications ---
 export const getNotifications = async (user: User): Promise<Notification[]> => {
+    const localAlerts = getLocalAlertNotifications();
     try {
         const { data, error } = await supabase.from('notifications').select('*').eq('username', user.username);
-        if (error) {
-             return [];
+        if (error || !Array.isArray(data)) {
+             return localAlerts;
         }
-        return data.map(n => ({
+        const remote = data.map(n => ({
             ...n,
             isRead: n.is_read,
             propertyId: n.property_id
-        })) || [];
+        }));
+        const seen = new Set(remote.map(n => n.id));
+        return [...localAlerts.filter(n => !seen.has(n.id)), ...remote];
     } catch (e) {
-        return [];
+        return localAlerts;
     }
 };
 
 export const markNotificationsAsRead = async (username: string, ids: string[]): Promise<Set<string>> => {
+    const localRead = markLocalAlertNotificationsRead(ids);
     try {
         await supabase.from('notifications').update({ is_read: true }).in('id', ids);
         const { data } = await supabase.from('notifications').select('id').eq('username', username).eq('is_read', true);
-        return new Set(data?.map(n => n.id) || []);
-    } catch (e) { return new Set(ids); } // Optimistic
+        const combined = new Set<string>(localRead);
+        (data || []).forEach(n => combined.add(n.id));
+        return combined;
+    } catch (e) {
+        return localRead;
+    }
 };
 
 export const getReadNotificationIds = async (username: string): Promise<Set<string>> => {
+    const localRead = getLocalReadAlertNotificationIds();
     try {
         const { data } = await supabase.from('notifications').select('id').eq('username', username).eq('is_read', true);
-        return new Set(data?.map(n => n.id) || []);
-    } catch (e) { return new Set(); }
+        const combined = new Set<string>(localRead);
+        (data || []).forEach(n => combined.add(n.id));
+        return combined;
+    } catch (e) {
+        return localRead;
+    }
 };
 
 // --- Leads ---

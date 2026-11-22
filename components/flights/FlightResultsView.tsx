@@ -20,7 +20,7 @@ import {
   XMarkIcon,
 } from '@heroicons/react/24/outline';
 import {
-  AIRLINE_BADGE_STYLES,
+  AFRICAN_AIRLINE_DIRECTORY,
   ANYWHERE_DESTINATIONS,
   CABIN_MULTIPLIERS,
   DESTINATION_PHOTOS,
@@ -36,6 +36,7 @@ import {
 import type { FlightSearchParams } from './FlightSearchWidget';
 import { useCurrency } from '../../contexts/CurrencyContext';
 import { useToast } from '../../contexts/ToastContext';
+import AirlineLogo from './AirlineLogo';
 
 interface FlightResultsViewProps {
   search: FlightSearchParams;
@@ -48,6 +49,7 @@ interface FlightResultsViewProps {
   onOpenPriceAlert: (suggestedZar: number) => void;
   onSubscribeDealsEmail?: (email: string) => void;
   onApplyAiRoute: (origin: string, destination: string, directOnly?: boolean) => void;
+  onOpenFullVisaHub?: () => void;
 }
 
 function formatShortDate(iso: string): string {
@@ -60,36 +62,16 @@ function formatShortDate(iso: string): string {
   });
 }
 
-const AirlineMark: React.FC<{ code: string; name: string }> = ({ code, name }) => {
-  const style = AIRLINE_BADGE_STYLES[code] || { bg: '#008F45', accent: '#FFFFFF', short: code };
-  return (
-    <div
-      aria-hidden="true"
-      className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 border border-slate-200 dark:border-slate-700 overflow-hidden bg-white dark:bg-slate-800 shadow-2xs"
-    >
-      <svg viewBox="0 0 32 32" className="w-6 h-6">
-        <circle cx="16" cy="16" r="14" fill={style.bg} />
-        <path
-          d="M8 18 L24 12 L19 20 L14 18 Z"
-          fill={style.accent}
-          opacity="0.92"
-        />
-        <text
-          x="16"
-          y="25"
-          textAnchor="middle"
-          fontSize="6"
-          fontWeight="700"
-          fill="#FFFFFF"
-        >
-          {name.slice(0, 2).toUpperCase()}
-        </text>
-      </svg>
-    </div>
-  );
-};
+const AirlineMark: React.FC<{ code: string; name: string }> = ({ code, name }) => (
+  <AirlineLogo code={code} name={name} size="md" />
+);
 
-const ALL_AIRLINES = Array.from(new Set(FLIGHT_INVENTORY.map((f) => f.airline)));
+const ALL_AIRLINES = Array.from(
+  new Set([
+    ...AFRICAN_AIRLINE_DIRECTORY.map((a) => a.name),
+    ...FLIGHT_INVENTORY.map((f) => f.airline),
+  ])
+);
 
 const FlightResultsView: React.FC<FlightResultsViewProps> = ({
   search,
@@ -102,6 +84,7 @@ const FlightResultsView: React.FC<FlightResultsViewProps> = ({
   onOpenPriceAlert,
   onSubscribeDealsEmail,
   onApplyAiRoute,
+  onOpenFullVisaHub,
 }) => {
   const { formatCurrency } = useCurrency();
   const formatZar = (zar: number) => formatCurrency(zarToUsd(zar));
@@ -333,7 +316,19 @@ const FlightResultsView: React.FC<FlightResultsViewProps> = ({
   }, [search.cabin, search.tripType]);
 
   const filteredFlights = useMemo(() => {
-    const list = baseMatchedFlights.filter((f) => {
+    const sourcePool =
+      selectedAirlines.size > 0
+        ? Array.from(
+            new Map(
+              [
+                ...baseMatchedFlights,
+                ...FLIGHT_INVENTORY.filter((f) => selectedAirlines.has(f.airline)),
+              ].map((item) => [item.id, item])
+            ).values()
+          )
+        : baseMatchedFlights;
+
+    const list = sourcePool.filter((f) => {
       const adultPrice = computeAdultZar(f);
       if (adultPrice > maxPriceZar) return false;
       if (f.durationMinutes > maxDurationHours * 60) return false;
@@ -615,13 +610,14 @@ const FlightResultsView: React.FC<FlightResultsViewProps> = ({
                   key={airline}
                   className="flex items-center justify-between text-xs text-slate-700 dark:text-slate-300 cursor-pointer"
                 >
-                  <span className="flex items-center gap-2.5 min-w-0">
+                  <span className="flex items-center gap-2 min-w-0">
                     <input
                       type="checkbox"
                       checked={selectedAirlines.has(airline)}
                       onChange={() => toggleAirlineFilter(airline)}
                       className="rounded border-slate-300 text-[#008F45] focus:ring-[#008F45] w-4 h-4 shrink-0"
                     />
+                    <AirlineLogo name={airline} size="xs" />
                     <span className="truncate">{airline}</span>
                   </span>
                   <span className="font-mono text-[11px] text-slate-500 tabular-nums shrink-0 ml-2">
@@ -636,7 +632,7 @@ const FlightResultsView: React.FC<FlightResultsViewProps> = ({
                 onClick={() => setShowAllAirlines((v) => !v)}
                 className="text-xs font-semibold text-[#008F45] hover:underline"
               >
-                {showAllAirlines ? 'View less' : 'View more'}
+                {showAllAirlines ? 'View less' : `View all ${displayedAirlines.length} airlines`}
               </button>
             )}
           </div>
@@ -1179,9 +1175,12 @@ const FlightResultsView: React.FC<FlightResultsViewProps> = ({
                                     {seg.from} {seg.departTime}{' '}
                                     <span className="font-normal text-slate-500">· {seg.fromAirport}</span>
                                   </p>
-                                  <p className="text-[11px] font-mono text-slate-500">
-                                    <ClockIcon className="w-3.5 h-3.5 inline mr-1" />
-                                    {formatMinutes(seg.durationMinutes)} · {seg.carrier} {seg.flightNumber} ({seg.aircraft})
+                                  <p className="text-[11px] font-mono text-slate-500 flex items-center flex-wrap gap-1.5">
+                                    <ClockIcon className="w-3.5 h-3.5 inline shrink-0" />
+                                    <AirlineLogo name={seg.carrier} size="xs" />
+                                    <span>
+                                      {formatMinutes(seg.durationMinutes)} · {seg.carrier} {seg.flightNumber} ({seg.aircraft})
+                                    </span>
                                   </p>
                                   <p className="font-bold text-slate-900 dark:text-white">
                                     {seg.to} {seg.arriveTime}{' '}
@@ -1563,13 +1562,27 @@ const FlightResultsView: React.FC<FlightResultsViewProps> = ({
               </p>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setIsVisaModalOpen(false)}
-              className="w-full py-2.5 rounded-xl bg-[#008F45] text-white text-xs font-bold"
-            >
-              Close Entry Guide
-            </button>
+            <div className="flex flex-col sm:flex-row gap-2">
+              {onOpenFullVisaHub && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsVisaModalOpen(false);
+                    onOpenFullVisaHub();
+                  }}
+                  className="flex-1 py-2.5 px-3 rounded-xl bg-[#0F2D25] hover:bg-[#173f34] text-white text-xs font-bold"
+                >
+                  Open 54-Nation Visa Hub &rarr;
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setIsVisaModalOpen(false)}
+                className="flex-1 py-2.5 px-3 rounded-xl bg-[#008F45] text-white text-xs font-bold"
+              >
+                Close Entry Guide
+              </button>
+            </div>
           </div>
         </div>
       )}

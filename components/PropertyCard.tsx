@@ -30,9 +30,10 @@ import { ChevronLeftIcon, ChevronRightIcon, ShieldCheckIcon } from '@heroicons/r
 interface ShareMenuProps {
   propertyTitle: string;
   propertyUrl: string;
+  onCopied?: () => void;
 }
 
-const ShareMenu: React.FC<ShareMenuProps> = ({ propertyTitle, propertyUrl }) => {
+const ShareMenu: React.FC<ShareMenuProps> = ({ propertyTitle, propertyUrl, onCopied }) => {
   const [copied, setCopied] = useState(false);
   const shareText = `Check out this property on AfriEstate: ${propertyTitle}`;
   
@@ -43,10 +44,22 @@ const ShareMenu: React.FC<ShareMenuProps> = ({ propertyTitle, propertyUrl }) => 
     email: `mailto:?subject=${encodeURIComponent(propertyTitle)}&body=${encodeURIComponent(`${shareText}\n\n${propertyUrl}`)}`
   };
 
-  const handleCopy = (e: React.MouseEvent) => {
+  const handleCopy = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    navigator.clipboard.writeText(propertyUrl);
+    try {
+      await navigator.clipboard.writeText(propertyUrl);
+    } catch {
+      const textarea = document.createElement('textarea');
+      textarea.value = propertyUrl;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+    }
     setCopied(true);
+    onCopied?.();
     setTimeout(() => setCopied(false), 2000);
   };
 
@@ -66,7 +79,7 @@ const ShareMenu: React.FC<ShareMenuProps> = ({ propertyTitle, propertyUrl }) => 
       </a>
       <div className="h-px bg-slate-100 dark:bg-slate-800 my-1"></div>
       <button onClick={handleCopy} className="w-full text-left px-4 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-3">
-        {copied ? <><CheckIcon className="w-4 h-4 text-green-500"/><span>Copied!</span></> : <><LinkIcon className="w-4 h-4 text-slate-400" /><span>Copy Link</span></>}
+        {copied ? <><CheckIcon className="w-4 h-4 text-green-500"/><span>Copied!</span></> : <><LinkIcon className="w-4 h-4 text-slate-400" /><span>Copy Direct Link</span></>}
       </button>
     </div>
   );
@@ -106,12 +119,44 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
 }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isShareMenuOpen, setIsShareMenuOpen] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
   const shareRef = useRef<HTMLDivElement>(null);
   const { formatCurrency, currency } = useCurrency();
   const { addToast } = useToast();
 
   const isInvestment = property.listingType === ListingType.FOR_INVESTMENT || property.targetReturn !== undefined;
   const isRent = property.listingType === ListingType.RENT;
+
+  const getDirectPropertyUrl = () => {
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set('property', property.id);
+      url.hash = '';
+      return url.toString();
+    } catch {
+      return `${window.location.origin}/?property=${encodeURIComponent(property.id)}`;
+    }
+  };
+
+  const handleCopyDirectLink = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const directUrl = getDirectPropertyUrl();
+    try {
+      await navigator.clipboard.writeText(directUrl);
+    } catch {
+      const textarea = document.createElement('textarea');
+      textarea.value = directUrl;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+    }
+    setLinkCopied(true);
+    addToast(`Direct link to "${property.title}" copied to clipboard.`, 'success');
+    window.setTimeout(() => setLinkCopied(false), 2000);
+  };
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -163,7 +208,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
   return (
     <article 
       onClick={() => onOpenDetailModal(property)}
-      className="group cursor-pointer bg-white dark:bg-slate-900 rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-200 flex flex-col border border-slate-200/70 dark:border-slate-800"
+      className="group cursor-pointer bg-white dark:bg-slate-900 rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transform-gpu transition-all duration-300 ease-out hover:scale-[1.02] hover:-translate-y-0.5 active:scale-[0.99] flex flex-col border border-slate-200/70 dark:border-slate-800"
     >
       {/* Media Viewport */}
       <div className="relative h-36 bg-slate-100 dark:bg-slate-800 overflow-hidden">
@@ -240,7 +285,11 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
                 <ShareIcon className="w-4 h-4" />
               </button>
               {isShareMenuOpen && (
-                <ShareMenu propertyTitle={property.title} propertyUrl={window.location.href} />
+                <ShareMenu
+                  propertyTitle={property.title}
+                  propertyUrl={getDirectPropertyUrl()}
+                  onCopied={() => addToast(`Direct link to "${property.title}" copied to clipboard.`, 'success')}
+                />
               )}
             </div>
           </div>
@@ -398,16 +447,42 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onOpenDetailModal(property);
-            }}
-            className="px-3 py-1.5 text-[11px] font-semibold rounded-lg bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 transition shadow-sm shrink-0"
-          >
-            {isInvestment ? 'View Investment' : 'View Property'}
-          </button>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={handleCopyDirectLink}
+              aria-label={`Share ${property.title}`}
+              title="Copy direct link to this property"
+              className={`inline-flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold rounded-lg border transition-colors ${
+                linkCopied
+                  ? 'border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
+                  : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700'
+              }`}
+            >
+              {linkCopied ? (
+                <>
+                  <CheckIcon className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                  <span>Copied!</span>
+                </>
+              ) : (
+                <>
+                  <ShareIcon className="w-3.5 h-3.5" />
+                  <span>Share</span>
+                </>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenDetailModal(property);
+              }}
+              className="px-3 py-1.5 text-[11px] font-semibold rounded-lg bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 transition shadow-sm"
+            >
+              {isInvestment ? 'View Investment' : 'View Property'}
+            </button>
+          </div>
         </div>
       </div>
     </article>

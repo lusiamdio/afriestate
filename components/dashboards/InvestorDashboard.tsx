@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { User, Property, Achievement, InvestorSettings, Currency, Message } from '../../types';
+import type { User, Property, Achievement, InvestorSettings, Currency, Message, Notification } from '../../types';
 import {
   DashboardIcon,
   PortfolioIcon,
@@ -18,10 +18,12 @@ import InvestorFinancialTools from './investor/InvestorFinancialTools';
 import InvestorGlobalMarketplace from './investor/InvestorGlobalMarketplace';
 import { InvestorCommunity } from './investor/InvestorCommunity';
 import InvestorSettingsPage from './investor/InvestorSettings';
-import { ChartBarIcon, DocumentTextIcon, ChatBubbleLeftRightIcon } from '../icons/ActionIcons';
+import { BellIcon, ChartBarIcon, DocumentTextIcon, ChatBubbleLeftRightIcon } from '../icons/ActionIcons';
 import InvestorReturns from './investor/InvestorReturns';
 import InvestorDocuments from './investor/InvestorDocuments';
 import InvestorMessages from './investor/InvestorMessages';
+import InvestorAlertsPanel from './investor/InvestorAlertsPanel';
+import { getInvestmentAlertRules } from '../../lib/investmentAlerts';
 
 interface InvestorDashboardProps {
   user: User;
@@ -45,12 +47,14 @@ interface InvestorDashboardProps {
   onOpenDetailModal: (property: Property) => void;
   onOpenVRTour: (url: string) => void;
   onToggleCompare: (property: Property) => void;
+  onNotificationsDispatched?: (notifications: Notification[]) => void;
 }
 
 export type InvestorView =
   | 'dashboard'
   | 'portfolio'
   | 'discovery'
+  | 'alerts'
   | 'tools'
   | 'marketplace'
   | 'community'
@@ -65,6 +69,7 @@ const viewMeta: Record<InvestorView, { label: string; group: string }> = {
   returns: { label: 'Returns & Dividends', group: 'Portfolio' },
   documents: { label: 'Contracts & Statements', group: 'Portfolio' },
   discovery: { label: 'Deal Marketplace', group: 'Acquisition' },
+  alerts: { label: 'Investment Alerts', group: 'Acquisition' },
   tools: { label: 'Financial & ROI Lab', group: 'Acquisition' },
   marketplace: { label: 'Global Hotspots', group: 'Acquisition' },
   messages: { label: 'Developer Messages', group: 'Network' },
@@ -77,7 +82,8 @@ const Sidebar: React.FC<{
   setActiveView: (view: InvestorView) => void;
   closeSidebar: () => void;
   investmentCount: number;
-}> = ({ activeView, setActiveView, closeSidebar, investmentCount }) => {
+  activeAlertCount: number;
+}> = ({ activeView, setActiveView, closeSidebar, investmentCount, activeAlertCount }) => {
   const portfolioItems: { id: InvestorView; label: string; icon: React.ElementType }[] = [
     { id: 'dashboard', label: 'Portfolio Snapshot', icon: DashboardIcon },
     { id: 'portfolio', label: 'My Investments', icon: PortfolioIcon },
@@ -87,6 +93,7 @@ const Sidebar: React.FC<{
 
   const discoveryItems: { id: InvestorView; label: string; icon: React.ElementType; badge?: number }[] = [
     { id: 'discovery', label: 'Deal Marketplace', icon: DiscoveryIcon, badge: investmentCount },
+    { id: 'alerts', label: 'Investment Alerts', icon: BellIcon, badge: activeAlertCount },
     { id: 'tools', label: 'Financial & ROI Lab', icon: ToolsIcon },
     { id: 'marketplace', label: 'Global Markets', icon: MarketplaceIcon },
   ];
@@ -167,6 +174,8 @@ const InvestorDashboard: React.FC<InvestorDashboardProps> = (props) => {
 
   const currentMeta = viewMeta[activeView];
 
+  const activeAlertCount = getInvestmentAlertRules(props.user.username).filter((r) => r.isActive).length;
+
   const renderContent = () => {
     switch (activeView) {
       case 'dashboard':
@@ -179,6 +188,16 @@ const InvestorDashboard: React.FC<InvestorDashboardProps> = (props) => {
         return <InvestorDocuments {...props} />;
       case 'discovery':
         return <InvestorPropertyDiscovery {...props} />;
+      case 'alerts':
+        return (
+          <InvestorAlertsPanel
+            user={props.user}
+            allProperties={props.allProperties}
+            currency={props.currency}
+            onOpenDetailModal={props.onOpenDetailModal}
+            onNotificationsGenerated={props.onNotificationsDispatched}
+          />
+        );
       case 'tools':
         return <InvestorFinancialTools currency={props.currency} />;
       case 'marketplace':
@@ -219,6 +238,7 @@ const InvestorDashboard: React.FC<InvestorDashboardProps> = (props) => {
           setActiveView={setActiveView}
           closeSidebar={() => setIsSidebarOpen(false)}
           investmentCount={props.investmentProperties.length}
+          activeAlertCount={activeAlertCount}
         />
       </div>
 

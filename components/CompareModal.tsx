@@ -17,7 +17,8 @@ const CompareModal: React.FC<CompareModalProps> = ({ isOpen, onClose, properties
   const { formatCurrency } = useCurrency();
   if (!isOpen) return null;
   
-  const allAmenities = [...new Set(properties.flatMap(p => p.amenities))].sort();
+  const displayed = properties.slice(0, 3);
+  const allAmenities = [...new Set(displayed.flatMap(p => p.amenities))].sort();
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-[100] p-4" onClick={onClose}>
@@ -27,7 +28,7 @@ const CompareModal: React.FC<CompareModalProps> = ({ isOpen, onClose, properties
       >
         <header className="relative flex justify-center sm:justify-between items-center p-4 border-b border-slate-200 dark:border-slate-700 flex-shrink-0">
           <button onClick={onClose} className="sm:hidden absolute left-4 top-1/2 -translate-y-1/2 text-sm font-semibold text-brand-primary hover:underline">&larr; Back</button>
-          <h2 className="text-xl font-bold text-brand-dark dark:text-white">Compare Properties</h2>
+          <h2 className="text-xl font-bold text-brand-dark dark:text-white">Compare Properties ({displayed.length}/3)</h2>
           <button onClick={onClose} className="p-2 rounded-full text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors hidden sm:block">
             <CloseIcon className="w-6 h-6" />
           </button>
@@ -35,14 +36,25 @@ const CompareModal: React.FC<CompareModalProps> = ({ isOpen, onClose, properties
 
         <div className="flex-grow overflow-auto">
             <div className="overflow-x-auto">
-                <table className="w-full text-sm text-left min-w-[800px]">
+                <table className="w-full text-sm text-left min-w-[720px]">
                     <thead className="sticky top-0 glass-panel shadow-sm z-10">
                         <tr>
-                            <th className="p-4 font-semibold text-slate-600 dark:text-slate-300 w-[15%]">Feature</th>
-                            {properties.map(p => (
-                                <th key={p.id} className="p-4 border-l dark:border-slate-700 w-[21.25%]">
+                            <th className="p-4 font-semibold text-slate-600 dark:text-slate-300 w-[18%]">Feature</th>
+                            {displayed.map(p => (
+                                <th key={p.id} className="p-4 border-l dark:border-slate-700 w-[27.33%]">
                                     <div className="flex flex-col">
-                                        <img src={p.images[0]} alt={p.title} className="w-full h-32 object-cover rounded-md mb-2"/>
+                                        <img
+                                          src={p.images?.[0] || '/images/2ec34ce4ca57aef13fc8b3239a99345e.jpg'}
+                                          alt={p.title}
+                                          referrerPolicy="no-referrer"
+                                          onError={(e) => {
+                                            if (!e.currentTarget.dataset.fb) {
+                                              e.currentTarget.dataset.fb = '1';
+                                              e.currentTarget.src = '/images/2ec34ce4ca57aef13fc8b3239a99345e.jpg';
+                                            }
+                                          }}
+                                          className="w-full h-32 object-cover rounded-md mb-2"
+                                        />
                                         <h3 className="font-bold text-brand-dark dark:text-white truncate">{p.title}</h3>
                                         <p className="text-slate-500 dark:text-slate-400 text-xs truncate">{p.address.street}, {p.address.city}</p>
                                     </div>
