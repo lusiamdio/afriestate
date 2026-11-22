@@ -25,7 +25,7 @@ import {
 import { FacebookIcon, TwitterIcon, WhatsAppIcon } from './icons/SocialIcons';
 import { useCurrency } from '../contexts/CurrencyContext';
 import { useToast } from '../contexts/ToastContext';
-import { ChevronLeftIcon, ChevronRightIcon, ShieldCheckIcon } from '@heroicons/react/20/solid';
+import { ChevronLeftIcon, ChevronRightIcon, FireIcon } from '@heroicons/react/20/solid';
 
 interface ShareMenuProps {
   propertyTitle: string;
@@ -100,6 +100,8 @@ export interface PropertyCardProps {
   onEdit: (property: Property) => void;
   onDelete: (propertyId: string) => void;
   onOpenVerificationModal?: (property: Property) => void;
+  enquiryCount?: number;
+  isHighDemand?: boolean;
 }
 
 const PropertyCard: React.FC<PropertyCardProps> = ({
@@ -116,6 +118,8 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
   onEdit,
   onDelete,
   onOpenVerificationModal,
+  enquiryCount = 0,
+  isHighDemand = false,
 }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isShareMenuOpen, setIsShareMenuOpen] = useState(false);
@@ -331,9 +335,20 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
       <div className="p-3 flex-1 flex flex-col justify-between">
         {/* Title & Neighbourhood */}
         <div>
-          <h3 className="text-sm font-bold text-slate-900 dark:text-white line-clamp-1 group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">
-            {property.title}
-          </h3>
+          <div className="flex items-start justify-between gap-2">
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white line-clamp-1 group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">
+              {property.title}
+            </h3>
+            {isHighDemand && (
+              <span
+                title={`${enquiryCount} enquiries (above market average)`}
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 text-[10px] font-bold uppercase tracking-wide shrink-0"
+              >
+                <FireIcon className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+                <span>High Demand</span>
+              </span>
+            )}
+          </div>
           <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-1 mt-0.5">
             {property.address.street}
           </p>

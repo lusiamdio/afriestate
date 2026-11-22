@@ -20,6 +20,7 @@ import {
 } from '../icons/ActionIcons';
 import {
   ArrowLeftIcon,
+  ArrowPathIcon,
   ArrowRightIcon,
   DocumentCheckIcon,
   CalendarDaysIcon,
@@ -41,6 +42,9 @@ import {
 import { FacebookIcon, TwitterIcon, WhatsAppIcon } from '../icons/SocialIcons';
 import { useCurrency } from '../../contexts/CurrencyContext';
 import PropertyQrCodeCard, { buildPropertyShareUrl } from '../PropertyQrCodeCard';
+import NeighborhoodGoogleMap from '../maps/NeighborhoodGoogleMap';
+import GroundingIntelligencePanel from '../maps/GroundingIntelligencePanel';
+import { fetchJsonStrict } from '../../lib/http';
 
 interface ShareMenuProps {
   propertyTitle: string;
@@ -139,7 +143,7 @@ interface PropertyDetailPageProps {
   onToggleCompare: (property: Property) => void;
   onOpenCalculator: (property: Property) => void;
   onOpenTourModal: (property: Property) => void;
-  onOpenVRTour: (url: string) => void;
+  onOpenVRTour: (url: string, property?: Property) => void;
   onMessageAgent: (property: Property) => void;
   onLeaveReview: (agent: Property['agent']) => void;
 }
@@ -181,6 +185,15 @@ const PropertyDetailPage: React.FC<PropertyDetailPageProps> = ({
 
   const [isValuating, setIsValuating] = useState(false);
   const [valuation, setValuation] = useState<ValuationResult | null>(null);
+  const [safetyIndexData, setSafetyIndexData] = useState<{
+    isLive?: boolean;
+    upstreamWarning?: string;
+    matched: { rank: number; city: string; country: string; crimeIndex: number | null; safetyIndex: number | null } | null;
+    totalRankedCities: number;
+    providerUsed: string;
+  } | null>(null);
+  const [safetyLoading, setSafetyLoading] = useState(false);
+  const [safetyRetryCount, setSafetyRetryCount] = useState(0);
 
   const isInvestment =
     property.listingType === ListingType.FOR_INVESTMENT || property.targetReturn !== undefined;
@@ -193,6 +206,26 @@ const PropertyDetailPage: React.FC<PropertyDetailPageProps> = ({
     setValuation(null);
     setIsQrModalOpen(false);
   }, [property.id]);
+
+  useEffect(() => {
+    if (activeTab !== 'neighbourhood') return;
+    const controller = new AbortController();
+    setSafetyLoading(true);
+    fetchJsonStrict<{
+      isLive?: boolean;
+      upstreamWarning?: string;
+      matched: { rank: number; city: string; country: string; crimeIndex: number | null; safetyIndex: number | null } | null;
+      totalRankedCities: number;
+      providerUsed: string;
+    }>(
+      `/api/neighborhood/safety-index?city=${encodeURIComponent(property.address.city)}&country=${encodeURIComponent(property.country || 'South Africa')}`,
+      { timeoutMs: 12000, retries: 0, signal: controller.signal }
+    )
+      .then((res) => setSafetyIndexData(res))
+      .catch(() => setSafetyIndexData(null))
+      .finally(() => setSafetyLoading(false));
+    return () => controller.abort();
+  }, [activeTab, property.address.city, property.country, safetyRetryCount]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -464,16 +497,14 @@ Provide estimated_value, confidence, and concise rationale.`;
                 </span>
               </div>
 
-              {property.virtualTourUrl && (
-                <button
-                  type="button"
-                  onClick={() => onOpenVRTour(property.virtualTourUrl!)}
-                  className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-semibold transition-colors shadow-lg"
-                >
-                  <CubeTransparentIcon className="w-4 h-4" />
-                  <span>Launch 3D Tour</span>
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => onOpenVRTour(property.virtualTourUrl || '', property)}
+                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-semibold transition-colors shadow-lg"
+              >
+                <CubeTransparentIcon className="w-4 h-4" />
+                <span>Explore 3D Twin</span>
+              </button>
             </div>
           </div>
 
@@ -933,6 +964,103 @@ Provide estimated_value, confidence, and concise rationale.`;
                     </span>
                   </div>
                 </div>
+
+                {/* Interactive Google Map with Places SearchNearby */}
+                <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 sm:p-6 shadow-sm space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+                        Interactive District Map &amp; Nearby Places
+                      </p>
+                      <h4 className="text-base font-bold font-heading text-slate-900 dark:text-white">
+                        Explore Surroundings Around {property.title}
+                      </h4>
+                    </div>
+                    <span className="text-xs font-mono tabular-nums text-slate-500 dark:text-slate-400">
+                      {property.coordinates.lat.toFixed(4)}, {property.coordinates.lng.toFixed(4)}
+                    </span>
+                  </div>
+
+                  <NeighborhoodGoogleMap
+                    lat={property.coordinates.lat}
+                    lng={property.coordinates.lng}
+                    label={property.title}
+                    subtitle={`${property.address.street}, ${property.address.city}`}
+                    heightClass="h-[340px]"
+                    enableNearbyFilter={true}
+                  />
+                </div>
+
+                {/* Live Ranked Crime Cities Benchmark */}
+                <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm space-y-3 border border-slate-100 dark:border-slate-800">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+                        Global City Safety Benchmark
+                      </p>
+                      <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                        {safetyIndexData?.matched
+                          ? `${safetyIndexData.matched.city}, ${safetyIndexData.matched.country}`
+                          : `${property.address.city}, ${property.country || 'Africa'}`}
+                      </h4>
+                    </div>
+                    <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
+                      {safetyIndexData?.providerUsed || 'Ranked Crime Cities RapidAPI'}
+                    </span>
+                  </div>
+
+                  {safetyLoading ? (
+                    <p className="text-xs text-slate-500">Checking live city crime &amp; safety index...</p>
+                  ) : safetyIndexData?.isLive !== false && safetyIndexData?.matched ? (
+                    <div className="grid grid-cols-3 gap-3 text-xs">
+                      <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800">
+                        <span className="text-slate-500 block">Safety Index</span>
+                        <span className="font-mono font-bold tabular-nums text-emerald-700 dark:text-emerald-400 text-sm">
+                          {safetyIndexData.matched.safetyIndex ?? 'N/A'}
+                        </span>
+                      </div>
+                      <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800">
+                        <span className="text-slate-500 block">Crime Index</span>
+                        <span className="font-mono font-bold tabular-nums text-slate-900 dark:text-white text-sm">
+                          {safetyIndexData.matched.crimeIndex ?? 'N/A'}
+                        </span>
+                      </div>
+                      <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800">
+                        <span className="text-slate-500 block">Global Rank</span>
+                        <span className="font-mono font-bold tabular-nums text-slate-900 dark:text-white text-sm">
+                          #{safetyIndexData.matched.rank} / {safetyIndexData.totalRankedCities}
+                        </span>
+                      </div>
+                    </div>
+                  ) : safetyIndexData?.isLive === true ? (
+                    <p className="text-xs text-slate-600 dark:text-slate-300">
+                      Live check complete: {property.address.city} is not listed among the top {safetyIndexData.totalRankedCities || 99} highest-crime global cities.
+                    </p>
+                  ) : (
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600 dark:text-slate-300">
+                      <span>
+                        Not verified live: {safetyIndexData?.upstreamWarning || 'Safety index unavailable'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setSafetyRetryCount((n) => n + 1)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 font-semibold"
+                      >
+                        <ArrowPathIcon className="w-3.5 h-3.5" />
+                        <span>Retry</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Google Maps & Google Search Grounding Intelligence */}
+                <GroundingIntelligencePanel
+                  city={property.address.city}
+                  country={property.country || 'South Africa'}
+                  lat={property.coordinates.lat}
+                  lng={property.coordinates.lng}
+                  title="Nearby Places & Market Grounding"
+                />
               </div>
             )}
 

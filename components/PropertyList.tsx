@@ -21,6 +21,8 @@ interface PropertyListProps {
   onDelete: (propertyId: string) => void;
   isLoading?: boolean;
   onOpenVerificationModal?: (property: Property) => void;
+  enquiryCounts?: Record<string, number>;
+  averageEnquiryCount?: number;
 }
 
 const PropertyList: React.FC<PropertyListProps> = (props) => {
@@ -38,8 +40,20 @@ const PropertyList: React.FC<PropertyListProps> = (props) => {
     compareList,
     onEdit,
     onDelete,
-    isLoading
+    isLoading,
+    enquiryCounts,
+    averageEnquiryCount,
   } = props;
+
+  const resolvedAverageEnquiryCount = React.useMemo(() => {
+    if (typeof averageEnquiryCount === 'number' && Number.isFinite(averageEnquiryCount)) {
+      return averageEnquiryCount;
+    }
+    if (!enquiryCounts) return Infinity;
+    const positiveCounts = Object.values(enquiryCounts).filter((n) => typeof n === 'number' && n > 0);
+    if (positiveCounts.length === 0) return Infinity;
+    return positiveCounts.reduce((acc, n) => acc + n, 0) / positiveCounts.length;
+  }, [averageEnquiryCount, enquiryCounts]);
 
   if (isLoading) {
     return (
@@ -51,25 +65,31 @@ const PropertyList: React.FC<PropertyListProps> = (props) => {
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      {properties.map(property => (
-        <PropertyCard 
-          key={property.id} 
-          property={property} 
-          isSaved={savedPropertyIds.has(property.id)}
-          isCompared={compareList.some(p => p.id === property.id)}
-          isOwner={currentUser?.username === property.agent.name}
-          onSaveToggle={onSaveToggle}
-          onOpenCalculator={onOpenCalculator}
-          onOpenTourModal={onOpenTourModal}
-          onFindSimilar={onFindSimilar}
-          onOpenDetailModal={onOpenDetailModal}
-          onOpenVRTour={onOpenVRTour}
-          onToggleCompare={onToggleCompare}
-          onEdit={onEdit}
-          onDelete={onDelete}
-          onOpenVerificationModal={props.onOpenVerificationModal}
-        />
-      ))}
+      {properties.map(property => {
+        const count = enquiryCounts ? enquiryCounts[property.id] || 0 : 0;
+        const isHighDemand = Boolean(enquiryCounts && count > resolvedAverageEnquiryCount);
+        return (
+          <PropertyCard 
+            key={property.id} 
+            property={property} 
+            isSaved={savedPropertyIds.has(property.id)}
+            isCompared={compareList.some(p => p.id === property.id)}
+            isOwner={currentUser?.username === property.agent.name}
+            onSaveToggle={onSaveToggle}
+            onOpenCalculator={onOpenCalculator}
+            onOpenTourModal={onOpenTourModal}
+            onFindSimilar={onFindSimilar}
+            onOpenDetailModal={onOpenDetailModal}
+            onOpenVRTour={onOpenVRTour}
+            onToggleCompare={onToggleCompare}
+            onEdit={onEdit}
+            onDelete={onDelete}
+            onOpenVerificationModal={props.onOpenVerificationModal}
+            enquiryCount={count}
+            isHighDemand={isHighDemand}
+          />
+        );
+      })}
     </div>
   );
 };

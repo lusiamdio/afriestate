@@ -26,6 +26,7 @@ import {
 import { useCurrency } from '../../contexts/CurrencyContext';
 import { useToast } from '../../contexts/ToastContext';
 import AirlineLogo from './AirlineLogo';
+import { fetchJsonStrict } from '../../lib/http';
 
 interface MyTripsPanelProps {
   trips: BookedTripRecord[];
@@ -332,6 +333,7 @@ interface FlightTrackerResult {
   flightNumber: string;
   date: string;
   checkedAt: string;
+  providerUsed?: string;
   reportText: string;
   parsed: {
     airline: string;
@@ -352,7 +354,7 @@ interface FlightStatusPanelProps {
   initialDate?: string;
 }
 
-const POPULAR_FLIGHT_CODES = ['SA 317', 'ET 846', 'KQ 763', 'BA 055', 'WB 102', 'AT 550'];
+const POPULAR_FLIGHT_CODES = ['SA 317', 'ET 846', 'KQ 763', 'BA 055', 'AS 2223', 'AT 550'];
 
 export const FlightStatusPanel: React.FC<FlightStatusPanelProps> = ({
   initialQuery = 'SA 317',
@@ -361,6 +363,7 @@ export const FlightStatusPanel: React.FC<FlightStatusPanelProps> = ({
   const defaultDate = initialDate || new Date().toISOString().split('T')[0];
   const [flightNumber, setFlightNumber] = useState(initialQuery);
   const [flightDate, setFlightDate] = useState(defaultDate);
+  const [preferredProvider, setPreferredProvider] = useState<'auto' | 'aerodatabox' | 'gemini'>('auto');
   const [isTracking, setIsTracking] = useState(false);
   const [trackerError, setTrackerError] = useState<string | null>(null);
   const [liveResult, setLiveResult] = useState<FlightTrackerResult | null>(null);
@@ -381,25 +384,31 @@ export const FlightStatusPanel: React.FC<FlightStatusPanelProps> = ({
     setIsTracking(true);
     setTrackerError(null);
     try {
-      const response = await fetch('/api/gemini/flight-tracker', {
+      const data = await fetchJsonStrict<FlightTrackerResult>('/api/gemini/flight-tracker', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           flightNumber: cleanNum,
           date: targetDate,
+          preferredProvider,
         }),
+        timeoutMs: 25000,
+        retries: 1,
       });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data?.error || 'Live flight lookup failed.');
-      }
-      setLiveResult(data as FlightTrackerResult);
+      setLiveResult(data);
     } catch (err: any) {
       setTrackerError(err?.message || 'Unable to retrieve live search-grounded flight status.');
     } finally {
       setIsTracking(false);
     }
   };
+
+  useEffect(() => {
+    const clean = (initialQuery || '').trim();
+    if (!clean) return;
+    runLiveTrack(clean, defaultDate);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialQuery]);
 
   const handleTrackSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -464,6 +473,34 @@ export const FlightStatusPanel: React.FC<FlightStatusPanelProps> = ({
                 onChange={(e) => setFlightDate(e.target.value)}
                 className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-mono font-semibold focus:outline-none focus:border-[#008F45]"
               />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">
+              Data Feed Rotation
+            </label>
+            <div className="grid grid-cols-3 gap-1.5">
+              {(
+                [
+                  { id: 'auto', label: 'Auto-Rotate' },
+                  { id: 'aerodatabox', label: 'AeroDataBox' },
+                  { id: 'gemini', label: 'Gemini Search' },
+                ] as const
+              ).map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setPreferredProvider(opt.id)}
+                  className={`py-2 px-2 rounded-lg text-[11px] font-semibold border transition-colors ${
+                    preferredProvider === opt.id
+                      ? 'bg-[#008F45] text-white border-[#008F45]'
+                      : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-[#008F45]'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
             </div>
           </div>
 
@@ -542,9 +579,16 @@ export const FlightStatusPanel: React.FC<FlightStatusPanelProps> = ({
                   </span>
                 </div>
               </div>
-              <span className={`px-3 py-1.5 rounded-xl text-xs font-bold ${statusBadgeColor(liveResult.parsed.status)}`}>
-                Status: {liveResult.parsed.status}
-              </span>
+              <div className="flex flex-col items-end gap-1">
+                <span className={`px-3 py-1.5 rounded-xl text-xs font-bold ${statusBadgeColor(liveResult.parsed.status)}`}>
+                  Status: {liveResult.parsed.status}
+                </span>
+                {liveResult.providerUsed && (
+                  <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                    Source: {liveResult.providerUsed}
+                  </span>
+                )}
+              </div>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

@@ -26,7 +26,7 @@ See [`docs/afriestate-platform-diagnostic.md`](docs/afriestate-platform-diagnost
 
 ## Production hardening
 
-Apply `supabase_production_hardening.sql` to remove the legacy plaintext password surface, align table columns with the frontend data layer, add investor deal/commitment foundations, and replace prototype public policies with role-aware RLS. Keep `VITE_DEMO_MODE=false` in production so failed backend writes surface as errors instead of demo fallbacks.
+Apply `supabase_production_hardening.sql` to remove the legacy plaintext password surface, align table columns with the frontend data layer, add investor deal/commitment foundations, and replace prototype public policies with role-aware RLS.
 
 ## Validation
 

@@ -4,8 +4,10 @@ import { ListingType, PropertyType } from '../../types';
 import { NEIGHBORHOOD_GUIDES } from '../../constants';
 import { useCurrency } from '../../contexts/CurrencyContext';
 import { useToast } from '../../contexts/ToastContext';
-import { GoogleGenAI } from '../../lib/ai';
 import LifestyleMatcherModal from '../LifestyleMatcherModal';
+import NeighborhoodGoogleMap from '../maps/NeighborhoodGoogleMap';
+import GroundingIntelligencePanel from '../maps/GroundingIntelligencePanel';
+import { fetchJsonStrict } from '../../lib/http';
 import {
   COUNTRY_MARKET_GUIDES,
   POSITIONING_MATRIX,
@@ -17,6 +19,7 @@ import {
 } from '../../data/africanNeighborhoodDatabase';
 import {
   ArrowLeftIcon,
+  ArrowPathIcon,
   ArrowRightIcon,
   MapPinIcon,
   ShieldCheckIcon,
@@ -57,6 +60,25 @@ interface NeighborhoodExplorerPageProps {
 }
 
 type ExplorerTab = 'profile' | 'countries' | 'benchmarks';
+
+interface CitySafetyBenchmarkRow {
+  rank: number;
+  city: string;
+  country: string;
+  crimeIndex: number | null;
+  safetyIndex: number | null;
+}
+
+interface SafetyIndexResponse {
+  isLive?: boolean;
+  upstreamWarning?: string;
+  matched: CitySafetyBenchmarkRow | null;
+  countryPeerCount: number;
+  sampleAfricanPeers: CitySafetyBenchmarkRow[];
+  totalRankedCities: number;
+  providerUsed: string;
+  checkedAt: string;
+}
 
 const TIER_FILTERS: ('All' | MarketPositioningTier)[] = [
   'All',
@@ -210,13 +232,22 @@ const NeighborhoodExplorerPage: React.FC<NeighborhoodExplorerPageProps> = ({
   const [inventoryFilter, setInventoryFilter] = useState<'rent' | 'sale'>('rent');
   const [activeGalleryIdx, setActiveGalleryIdx] = useState(0);
   const [commuteDestination, setCommuteDestination] = useState('');
+  const [submittedCommuteQuery, setSubmittedCommuteQuery] = useState('');
+  const [liveRouteInfo, setLiveRouteInfo] = useState<{ distanceText: string; durationText: string; destination: string } | null>(null);
   const [customCommute, setCustomCommute] = useState<{ drive: number; transit: number; bike: number } | null>(null);
   const [isLifestyleMatcherOpen, setIsLifestyleMatcherOpen] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
 
   // AI Neighbourhood Insights state (Section 12, item 15)
   const [aiBriefText, setAiBriefText] = useState<string | null>(null);
+  const [aiBriefSources, setAiBriefSources] = useState<{ title: string; uri: string }[]>([]);
   const [isGeneratingAiBrief, setIsGeneratingAiBrief] = useState(false);
+
+  // Live Ranked Crime Cities API Benchmark state (Point 13)
+  const [safetyBenchmark, setSafetyBenchmark] = useState<SafetyIndexResponse | null>(null);
+  const [safetyLoading, setSafetyLoading] = useState(false);
+  const [safetyError, setSafetyError] = useState<string | null>(null);
+  const [safetyRetryNonce, setSafetyRetryNonce] = useState(0);
 
   const shareRef = useRef<HTMLDivElement>(null);
 
@@ -250,6 +281,35 @@ const NeighborhoodExplorerPage: React.FC<NeighborhoodExplorerPageProps> = ({
     [selectedQuery]
   );
 
+  useEffect(() => {
+    const controller = new AbortController();
+    setSafetyLoading(true);
+    setSafetyError(null);
+
+    fetchJsonStrict<SafetyIndexResponse>(
+      `/api/neighborhood/safety-index?city=${encodeURIComponent(profile.city)}&country=${encodeURIComponent(profile.country)}`,
+      {
+        timeoutMs: 12000,
+        retries: 0,
+        signal: controller.signal,
+      }
+    )
+      .then((data) => {
+        setSafetyBenchmark(data);
+      })
+      .catch((err: any) => {
+        if (!String(err?.message || '').includes('was cancelled')) {
+          setSafetyBenchmark(null);
+          setSafetyError(err?.message || 'Live city safety benchmark unavailable.');
+        }
+      })
+      .finally(() => {
+        setSafetyLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [profile.city, profile.country, safetyRetryNonce]);
+
   const comparedProfile = useMemo(
     () => getStructuredNeighborhoodProfile(compareNeighborhoodName),
     [compareNeighborhoodName]
@@ -267,7 +327,10 @@ const NeighborhoodExplorerPage: React.FC<NeighborhoodExplorerPageProps> = ({
     setActiveTab('profile');
     setActiveGalleryIdx(0);
     setCustomCommute(null);
+    setLiveRouteInfo(null);
+    setSubmittedCommuteQuery('');
     setAiBriefText(null);
+    setAiBriefSources([]);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -329,8 +392,11 @@ const NeighborhoodExplorerPage: React.FC<NeighborhoodExplorerPageProps> = ({
 
   const handleCalculateCommute = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!commuteDestination.trim()) return;
-    const seed = commuteDestination.trim().length;
+    const trimmed = commuteDestination.trim();
+    if (!trimmed) return;
+    setLiveRouteInfo(null);
+    setSubmittedCommuteQuery(trimmed);
+    const seed = trimmed.length;
     setCustomCommute({
       drive: 14 + (seed % 18),
       transit: 24 + (seed % 24),
@@ -340,16 +406,25 @@ const NeighborhoodExplorerPage: React.FC<NeighborhoodExplorerPageProps> = ({
 
   const handleGenerateAiBrief = async () => {
     setIsGeneratingAiBrief(true);
+    setAiBriefSources([]);
     try {
-      const ai = new GoogleGenAI();
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
-        contents: `Provide a concise, factual real estate investor and resident intelligence note (3 short sentences) for ${profile.neighborhood} in ${profile.city}, ${profile.country}. Positioning: ${profile.propertyMarket}. Avg Asking: $${profile.purchaseMetricsUsd.avgAskingUsd}, Avg Rent: $${profile.rentalRangesUsd.avgMonthlyUsd}/mo, Gross Yield: ${profile.yieldEstimates.grossYieldPct}%. Emphasize street-level due diligence on utilities and title verification.`,
+      const prompt = `Provide a concise, factual real estate investor and resident intelligence note (3 short sentences) for ${profile.neighborhood} in ${profile.city}, ${profile.country}. Positioning: ${profile.propertyMarket}. Avg Asking: $${profile.purchaseMetricsUsd.avgAskingUsd}, Avg Rent: $${profile.rentalRangesUsd.avgMonthlyUsd}/mo, Gross Yield: ${profile.yieldEstimates.grossYieldPct}%. Emphasize recent municipal infrastructure, utility reliability, and title verification.`;
+      const data = await fetchJsonStrict('/api/gemini/search-grounding', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: prompt,
+          city: `${profile.neighborhood}, ${profile.city}`,
+          country: profile.country,
+        }),
+        timeoutMs: 25000,
+        retries: 1,
       });
-      if (response.text && response.text.trim().length > 20) {
-        setAiBriefText(response.text.trim());
+      if (data?.summary && String(data.summary).trim().length > 20) {
+        setAiBriefText(String(data.summary).trim());
+        setAiBriefSources(Array.isArray(data.sources) ? data.sources : []);
       } else {
-        throw new Error('Empty response');
+        throw new Error('Empty grounded response');
       }
     } catch {
       // Structured deterministic intelligence brief fallback — never exposes API errors to users
@@ -1020,15 +1095,16 @@ const NeighborhoodExplorerPage: React.FC<NeighborhoodExplorerPageProps> = ({
                   </span>
                 </div>
 
-                <div className="flex-1 min-h-[320px] rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800">
-                  <iframe
-                    title={`Map of ${profile.neighborhood}, ${profile.city}`}
-                    className="w-full h-full min-h-[320px]"
-                    loading="lazy"
-                    allowFullScreen
-                    src={`https://maps.google.com/maps?q=${encodeURIComponent(`${profile.neighborhood}, ${profile.city}, ${profile.country}`)}&ll=${profile.coordinates.lat},${profile.coordinates.lng}&z=13&output=embed`}
-                  />
-                </div>
+                <NeighborhoodGoogleMap
+                  lat={profile.coordinates.lat}
+                  lng={profile.coordinates.lng}
+                  label={`${profile.neighborhood}, ${profile.city}`}
+                  subtitle={`${profile.country} · ${profile.propertyMarket}`}
+                  heightClass="h-[340px]"
+                  enableNearbyFilter={true}
+                  routeDestinationQuery={submittedCommuteQuery}
+                  onRouteCalculated={(info) => setLiveRouteInfo(info)}
+                />
               </div>
 
               {/* 11. Transport & Accessibility + Custom Commute Estimator */}
@@ -1086,7 +1162,20 @@ const NeighborhoodExplorerPage: React.FC<NeighborhoodExplorerPageProps> = ({
                       <span>Estimate</span>
                     </button>
                   </div>
-                  {customCommute && (
+                  {liveRouteInfo && (
+                    <div className="p-3.5 rounded-xl bg-emerald-950 text-white flex flex-wrap items-center justify-between gap-2 text-xs">
+                      <div>
+                        <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-300 block">
+                          Live Google Maps Route
+                        </span>
+                        <span className="font-semibold">{liveRouteInfo.destination}</span>
+                      </div>
+                      <div className="font-mono font-bold tabular-nums text-emerald-300">
+                        {liveRouteInfo.durationText} · {liveRouteInfo.distanceText}
+                      </div>
+                    </div>
+                  )}
+                  {customCommute && !liveRouteInfo && (
                     <div className="grid grid-cols-3 gap-3 pt-1">
                       <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-center">
                         <span className="text-lg font-bold font-mono tabular-nums text-emerald-900 dark:text-emerald-200">
@@ -1111,6 +1200,16 @@ const NeighborhoodExplorerPage: React.FC<NeighborhoodExplorerPageProps> = ({
                 </form>
               </div>
             </section>
+
+            {/* Live Grounding Intelligence: Maps Places & Search Brief */}
+            <GroundingIntelligencePanel
+              city={profile.city}
+              country={profile.country}
+              neighborhood={profile.neighborhood}
+              lat={profile.coordinates.lat}
+              lng={profile.coordinates.lng}
+              title="Verified Maps Places & Live Search Brief"
+            />
 
             {/* Points 07, 09, 10, 12: Price Trends & Local Infrastructure Anchors */}
             <section className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -1284,6 +1383,81 @@ const NeighborhoodExplorerPage: React.FC<NeighborhoodExplorerPageProps> = ({
                       {profile.safetyAndEnvironment.infrastructureCaveat}
                     </p>
                   </div>
+
+                  {/* Live Ranked Crime Cities Benchmark */}
+                  <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+                          Live Global City Safety Benchmark
+                        </p>
+                        <p className="text-xs font-semibold text-slate-900 dark:text-white mt-0.5">
+                          {safetyBenchmark?.matched
+                            ? `${safetyBenchmark.matched.city}, ${safetyBenchmark.matched.country}`
+                            : `${profile.city}, ${profile.country}`}
+                        </p>
+                      </div>
+                      <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+                        {safetyBenchmark?.providerUsed || 'Ranked Crime Cities RapidAPI'}
+                      </span>
+                    </div>
+
+                    {safetyLoading ? (
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                        Loading city safety &amp; crime index for {profile.city}...
+                      </p>
+                    ) : safetyBenchmark?.isLive !== false && safetyBenchmark?.matched ? (
+                      <div className="space-y-2.5">
+                        <div className="grid grid-cols-3 gap-2.5">
+                          <div className="p-2.5 rounded-lg bg-[#FAF8F5] dark:bg-slate-800">
+                            <span className="text-[10px] text-slate-500 dark:text-slate-400 block">Safety Index</span>
+                            <span className="text-sm font-mono font-bold tabular-nums text-emerald-700 dark:text-emerald-400">
+                              {safetyBenchmark.matched.safetyIndex ?? 'N/A'}
+                            </span>
+                          </div>
+                          <div className="p-2.5 rounded-lg bg-[#FAF8F5] dark:bg-slate-800">
+                            <span className="text-[10px] text-slate-500 dark:text-slate-400 block">Crime Index</span>
+                            <span className="text-sm font-mono font-bold tabular-nums text-slate-900 dark:text-white">
+                              {safetyBenchmark.matched.crimeIndex ?? 'N/A'}
+                            </span>
+                          </div>
+                          <div className="p-2.5 rounded-lg bg-[#FAF8F5] dark:bg-slate-800">
+                            <span className="text-[10px] text-slate-500 dark:text-slate-400 block">Global Rank</span>
+                            <span className="text-sm font-mono font-bold tabular-nums text-slate-900 dark:text-white">
+                              #{safetyBenchmark.matched.rank} / {safetyBenchmark.totalRankedCities}
+                            </span>
+                          </div>
+                        </div>
+
+                        {safetyBenchmark.sampleAfricanPeers.length > 0 && (
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500 dark:text-slate-400">
+                            <span className="font-semibold text-slate-700 dark:text-slate-300">African Peers:</span>
+                            {safetyBenchmark.sampleAfricanPeers.slice(0, 3).map((peer) => (
+                              <span key={`${peer.city}-${peer.rank}`} className="font-mono tabular-nums">
+                                {peer.city} ({peer.safetyIndex ?? '-'})
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ) : safetyError || safetyBenchmark?.upstreamWarning ? (
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600 dark:text-slate-300">
+                        <span>Not verified live: {safetyError || safetyBenchmark?.upstreamWarning}</span>
+                        <button
+                          type="button"
+                          onClick={() => setSafetyRetryNonce((n) => n + 1)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-xs font-semibold text-slate-800 dark:text-slate-200"
+                        >
+                          <ArrowPathIcon className="w-3.5 h-3.5" />
+                          <span>Retry</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                        No global index record returned for {profile.city}; street-level verification notice above applies.
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -1311,8 +1485,23 @@ const NeighborhoodExplorerPage: React.FC<NeighborhoodExplorerPageProps> = ({
                   </div>
 
                   {aiBriefText && (
-                    <div className="p-3.5 rounded-xl bg-white/10 text-xs sm:text-sm text-amber-100 leading-relaxed">
-                      {aiBriefText}
+                    <div className="p-3.5 rounded-xl bg-white/10 text-xs sm:text-sm text-amber-100 leading-relaxed space-y-2">
+                      <p>{aiBriefText}</p>
+                      {aiBriefSources.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 pt-1 border-t border-white/10">
+                          {aiBriefSources.slice(0, 4).map((src, i) => (
+                            <a
+                              key={`${src.uri}-${i}`}
+                              href={src.uri}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-2 py-0.5 rounded bg-white/10 hover:bg-white/20 text-[10px] font-medium text-amber-200 truncate max-w-[180px]"
+                            >
+                              {src.title}
+                            </a>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
 

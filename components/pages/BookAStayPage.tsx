@@ -1,10 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+  ArrowPathIcon,
   ArrowRightIcon,
   BookmarkIcon,
   BuildingOffice2Icon,
   CalendarDaysIcon,
   CheckBadgeIcon,
+  GlobeAltIcon,
   HeartIcon,
   HomeIcon,
   MagnifyingGlassIcon,
@@ -34,6 +36,7 @@ import { useToast } from '../../contexts/ToastContext';
 import { SharePropertyModal } from '../stay/StayModals';
 import { getPublishedStayProfiles } from '../../lib/data';
 import { generateListingSignature, sanitizeSafeUrl, sanitizeText } from '../../lib/security';
+import { fetchJsonStrict } from '../../lib/http';
 
 interface BookAStayPageProps {
   properties?: Property[];
@@ -87,6 +90,42 @@ const BookAStayPage: React.FC<BookAStayPageProps> = ({
   const [compareIds, setCompareIds] = useState<string[]>([]);
   const [isCompareOpen, setIsCompareOpen] = useState<boolean>(false);
   const [shareTarget, setShareTarget] = useState<StayPropertyProfile | null>(null);
+  const [stayLanguages, setStayLanguages] = useState<Array<{ code: string; name: string }>>([
+    { code: 'en-gb', name: 'English (UK)' },
+    { code: 'fr', name: 'Français' },
+    { code: 'pt', name: 'Português' },
+    { code: 'ar', name: 'العربية' },
+  ]);
+  const [selectedStayLanguage, setSelectedStayLanguage] = useState('en-gb');
+  const [stayLanguageProvider, setStayLanguageProvider] = useState<string | null>(null);
+  const [isRotatingStayLang, setIsRotatingStayLang] = useState(false);
+
+  const loadStayLanguages = async (vertical: 'stays' | 'rotate') => {
+    setIsRotatingStayLang(true);
+    try {
+      const res = await fetchJsonStrict<{
+        providerUsed?: string;
+        languages?: Array<{ code: string; name: string }>;
+      }>(`/api/travel/languages?vertical=${vertical}`, {
+        timeoutMs: 12000,
+        retries: 0,
+      });
+      if (Array.isArray(res.languages) && res.languages.length > 0) {
+        setStayLanguages(res.languages.slice(0, 60));
+        if (res.providerUsed) {
+          setStayLanguageProvider(res.providerUsed);
+        }
+      }
+    } catch {
+      // Keep default fallback when RapidAPI is unconfigured
+    } finally {
+      setIsRotatingStayLang(false);
+    }
+  };
+
+  useEffect(() => {
+    loadStayLanguages('stays');
+  }, []);
 
   useEffect(() => {
     setTermMode(initialTermMode);
@@ -742,6 +781,31 @@ const BookAStayPage: React.FC<BookAStayPageProps> = ({
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-[#E4E1D9] dark:border-slate-700">
+                <GlobeAltIcon className="w-3.5 h-3.5 text-[#123B2A] dark:text-[#C99A3D] shrink-0" />
+                <select
+                  aria-label="Stay booking language"
+                  value={selectedStayLanguage}
+                  onChange={(e) => setSelectedStayLanguage(e.target.value)}
+                  className="bg-transparent text-xs font-semibold text-[#151515] dark:text-slate-200 focus:outline-none max-w-[125px]"
+                  title={stayLanguageProvider ? `Source: ${stayLanguageProvider}` : 'Hospitality Localization'}
+                >
+                  {stayLanguages.map((lang) => (
+                    <option key={lang.code} value={lang.code}>
+                      {lang.name}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => loadStayLanguages('rotate')}
+                  disabled={isRotatingStayLang}
+                  title={stayLanguageProvider ? `${stayLanguageProvider} — Rotate feed` : 'Rotate language feed'}
+                  className="p-0.5 text-[#6B6B6B] hover:text-[#123B2A] dark:hover:text-[#C99A3D] disabled:opacity-50"
+                >
+                  <ArrowPathIcon className={`w-3.5 h-3.5 ${isRotatingStayLang ? 'animate-spin' : ''}`} />
+                </button>
+              </div>
               <button
                 type="button"
                 onClick={() => setSavedOnly((v) => !v)}

@@ -1,6 +1,7 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ArrowLeftIcon,
+  ArrowPathIcon,
   ArrowRightIcon,
   BellAlertIcon,
   ClockIcon,
@@ -28,6 +29,7 @@ import {
 } from '../flights/FlightOperationsPanels';
 import PanAfricanVisaHub from '../flights/PanAfricanVisaHub';
 import { useCurrency } from '../../contexts/CurrencyContext';
+import { fetchJsonStrict } from '../../lib/http';
 
 interface BookFlightsPageProps {
   currentUser: User | null;
@@ -104,6 +106,42 @@ const BookFlightsPage: React.FC<BookFlightsPageProps> = ({ currentUser, onBack, 
 
   const [statusQuery, setStatusQuery] = useState<string>('SA 317');
   const [statusDate, setStatusDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
+  const [travelLanguages, setTravelLanguages] = useState<Array<{ code: string; name: string }>>([
+    { code: 'en', name: 'English' },
+    { code: 'fr', name: 'Français' },
+    { code: 'pt', name: 'Português' },
+    { code: 'ar', name: 'العربية' },
+  ]);
+  const [selectedLanguageCode, setSelectedLanguageCode] = useState('en');
+  const [languageProviderUsed, setLanguageProviderUsed] = useState<string | null>(null);
+  const [isRotatingLanguages, setIsRotatingLanguages] = useState(false);
+
+  const loadTravelLanguages = async (vertical: 'flights' | 'rotate') => {
+    setIsRotatingLanguages(true);
+    try {
+      const res = await fetchJsonStrict<{
+        providerUsed?: string;
+        languages?: Array<{ code: string; name: string }>;
+      }>(`/api/travel/languages?vertical=${vertical}`, {
+        timeoutMs: 12000,
+        retries: 0,
+      });
+      if (Array.isArray(res.languages) && res.languages.length > 0) {
+        setTravelLanguages(res.languages.slice(0, 60));
+        if (res.providerUsed) {
+          setLanguageProviderUsed(res.providerUsed);
+        }
+      }
+    } catch {
+      // Keep default multilingual fallback if RapidAPI is unconfigured
+    } finally {
+      setIsRotatingLanguages(false);
+    }
+  };
+
+  useEffect(() => {
+    loadTravelLanguages('flights');
+  }, []);
 
   const persistTrips = (next: BookedTripRecord[]) => {
     setTrips(next);
@@ -221,6 +259,30 @@ const BookFlightsPage: React.FC<BookFlightsPageProps> = ({ currentUser, onBack, 
                     <BellAlertIcon className="w-4 h-4 text-[#008F45]" />
                     <span>{alerts.length}</span>
                   </button>
+                  <div className="inline-flex items-center gap-1 bg-white/85 dark:bg-slate-800/85 border border-slate-200/80 dark:border-slate-700 rounded-lg px-2 py-1">
+                    <select
+                      aria-label="Flight locale language"
+                      value={selectedLanguageCode}
+                      onChange={(e) => setSelectedLanguageCode(e.target.value)}
+                      className="bg-transparent text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none max-w-[115px]"
+                      title={languageProviderUsed ? `Source: ${languageProviderUsed}` : 'Flight Localization'}
+                    >
+                      {travelLanguages.map((lang) => (
+                        <option key={lang.code} value={lang.code}>
+                          {lang.name}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => loadTravelLanguages('rotate')}
+                      disabled={isRotatingLanguages}
+                      title={languageProviderUsed ? `Active: ${languageProviderUsed} — Click to rotate provider` : 'Rotate language feed'}
+                      className="p-0.5 rounded text-slate-500 hover:text-[#008F45] disabled:opacity-50"
+                    >
+                      <ArrowPathIcon className={`w-3.5 h-3.5 ${isRotatingLanguages ? 'animate-spin' : ''}`} />
+                    </button>
+                  </div>
                 </div>
               </div>
 

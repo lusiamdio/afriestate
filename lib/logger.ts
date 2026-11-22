@@ -10,5 +10,3 @@ export const logger = {
   warn: (...args: unknown[]) => { if (shouldLog('warn')) console.warn('[AfriEstate]', ...args); },
   error: (...args: unknown[]) => { if (shouldLog('error')) console.error('[AfriEstate]', ...args); },
 };
-
-export const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true';

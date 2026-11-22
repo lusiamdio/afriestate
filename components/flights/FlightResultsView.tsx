@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   AdjustmentsHorizontalIcon,
   ArrowPathIcon,
@@ -37,6 +37,7 @@ import type { FlightSearchParams } from './FlightSearchWidget';
 import { useCurrency } from '../../contexts/CurrencyContext';
 import { useToast } from '../../contexts/ToastContext';
 import AirlineLogo from './AirlineLogo';
+import { fetchJsonStrict } from '../../lib/http';
 
 interface FlightResultsViewProps {
   search: FlightSearchParams;
@@ -122,6 +123,41 @@ const FlightResultsView: React.FC<FlightResultsViewProps> = ({
   // Visa Intelligence state
   const [passportNationality, setPassportNationality] = useState<string>('South Africa');
   const [isVisaModalOpen, setIsVisaModalOpen] = useState(false);
+  const [liveVisaMap, setLiveVisaMap] = useState<Record<string, { regime: string; colorTier: string }>>({});
+  const [visaMapStatus, setVisaMapStatus] = useState<{
+    isLive: boolean;
+    providerUsed: string | null;
+    upstreamWarning?: string;
+  }>({ isLive: false, providerUsed: null });
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchJsonStrict<{
+      regimeByIso2?: Record<string, { regime: string; colorTier: string }>;
+      isLive?: boolean;
+      providerUsed?: string;
+      upstreamWarning?: string;
+    }>('/api/visa/map', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ passport: passportNationality === 'Default' ? 'US' : passportNationality }),
+      timeoutMs: 12000,
+      retries: 0,
+      signal: controller.signal,
+    })
+      .then((res) => {
+        setLiveVisaMap(res?.regimeByIso2 || {});
+        setVisaMapStatus({
+          isLive: Boolean(res?.isLive),
+          providerUsed: res?.providerUsed || null,
+          upstreamWarning: res?.upstreamWarning,
+        });
+      })
+      .catch(() => {
+        setLiveVisaMap({});
+      });
+    return () => controller.abort();
+  }, [passportNationality]);
 
   // Top Deals email subscription
   const [dealsEmail, setDealsEmail] = useState('');
@@ -405,7 +441,12 @@ const FlightResultsView: React.FC<FlightResultsViewProps> = ({
     return VISA_INTELLIGENCE[code] || VISA_INTELLIGENCE.NG;
   }, [destHub]);
 
-  const visaRule = visaInfo.statusByPassport[passportNationality] || visaInfo.statusByPassport.Default;
+  const baseVisaRule = visaInfo.statusByPassport[passportNationality] || visaInfo.statusByPassport.Default;
+  const destIso2 = destHub?.countryCode || 'NG';
+  const liveDestVisaRegime = liveVisaMap[destIso2]?.regime;
+  const visaRule = liveDestVisaRegime
+    ? { ...baseVisaRule, requirement: liveDestVisaRegime }
+    : baseVisaRule;
 
   const toggleStopFilter = (stopVal: number) => {
     setStopsFilter((prev) => {
@@ -1307,6 +1348,13 @@ const FlightResultsView: React.FC<FlightResultsViewProps> = ({
               <p className="text-xs font-semibold text-slate-900 dark:text-white">
                 {visaRule.requirement}
               </p>
+              {visaMapStatus.providerUsed && (
+                <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                  {visaMapStatus.isLive
+                    ? `Live via ${visaMapStatus.providerUsed}`
+                    : 'Curated dossier (Visa Map API not verified live)'}
+                </p>
+              )}
             </div>
 
             <button

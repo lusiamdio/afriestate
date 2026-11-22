@@ -28,6 +28,7 @@ import {
   type TripType,
 } from './flightData';
 import { useCurrency } from '../../contexts/CurrencyContext';
+import { fetchJsonStrict } from '../../lib/http';
 
 export interface FlightSearchParams {
   tripType: TripType;
@@ -127,6 +128,10 @@ const FlightSearchWidget: React.FC<FlightSearchWidgetProps> = ({
   const [swapRotated, setSwapRotated] = useState(false);
   const [calendarBaseMonth, setCalendarBaseMonth] = useState(() => ({ year: 2027, month: 5 }));
   const [selectingField, setSelectingField] = useState<'depart' | 'return'>('depart');
+  const [remoteAirports, setRemoteAirports] = useState<AirportHub[]>([]);
+  const [airportSearchLoading, setAirportSearchLoading] = useState(false);
+  const [airportProviderLabel, setAirportProviderLabel] = useState<string | null>(null);
+  const [externalHubCache, setExternalHubCache] = useState<Record<string, AirportHub>>({});
 
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -140,22 +145,82 @@ const FlightSearchWidget: React.FC<FlightSearchWidgetProps> = ({
     return () => document.removeEventListener('mousedown', handleOutside);
   }, []);
 
-  const originHub = useMemo(() => HUBS.find((h) => h.code === value.origin), [value.origin]);
-  const destHub = useMemo(() => HUBS.find((h) => h.code === value.destination), [value.destination]);
+  useEffect(() => {
+    const q = locationQuery.trim();
+    const isAirportPickerOpen = openPicker === 'origin' || openPicker === 'destination';
+    if (!isAirportPickerOpen || q.length < 2) {
+      setRemoteAirports([]);
+      setAirportSearchLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      setAirportSearchLoading(true);
+      try {
+        const res = await fetchJsonStrict<{
+          airports?: Array<{ code: string; city: string; country: string; airport: string }>;
+          providerUsed?: string;
+        }>(`/api/travel/airports/search?query=${encodeURIComponent(q)}`, {
+          timeoutMs: 10000,
+          retries: 0,
+          signal: controller.signal,
+        });
+        const mapped: AirportHub[] = (res.airports || []).map((a) => ({
+          code: a.code,
+          city: a.city,
+          country: a.country,
+          countryCode: a.code.slice(0, 2),
+          region: 'International',
+          airport: a.airport,
+          flag: '',
+          popular: false,
+          terminalNote: res.providerUsed || 'Global International Terminal',
+          avgWeatherC: 21,
+        }));
+        setRemoteAirports(mapped);
+        setAirportProviderLabel(res.providerUsed || 'TripAdvisor Flights Search API');
+      } catch {
+        setRemoteAirports([]);
+      } finally {
+        setAirportSearchLoading(false);
+      }
+    }, 300);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [locationQuery, openPicker]);
+
+  const originHub = useMemo(
+    () => HUBS.find((h) => h.code === value.origin) || externalHubCache[value.origin],
+    [value.origin, externalHubCache]
+  );
+  const destHub = useMemo(
+    () => HUBS.find((h) => h.code === value.destination) || externalHubCache[value.destination],
+    [value.destination, externalHubCache]
+  );
 
   const filteredHubs = useMemo(() => {
     const q = locationQuery.trim().toLowerCase();
     if (!q) return HUBS;
-    return HUBS.filter(
+    const localMatches = HUBS.filter(
       (h) =>
         h.city.toLowerCase().includes(q) ||
         h.code.toLowerCase().includes(q) ||
         h.country.toLowerCase().includes(q) ||
         h.airport.toLowerCase().includes(q)
     );
-  }, [locationQuery]);
+    const localCodes = new Set(localMatches.map((h) => h.code));
+    const remoteUnique = remoteAirports.filter((r) => !localCodes.has(r.code));
+    return [...localMatches, ...remoteUnique];
+  }, [locationQuery, remoteAirports]);
 
-  const handleSelectLocation = (field: 'origin' | 'destination', code: string) => {
+  const handleSelectLocation = (field: 'origin' | 'destination', code: string, hubObj?: AirportHub) => {
+    if (hubObj && !HUBS.some((h) => h.code === hubObj.code)) {
+      setExternalHubCache((prev) => ({ ...prev, [hubObj.code]: hubObj }));
+    }
     if (field === 'origin') {
       onChange({ ...value, origin: code });
       setRecentCodes((prev) => [code, ...prev.filter((c) => c !== code)].slice(0, 4));
@@ -166,6 +231,7 @@ const FlightSearchWidget: React.FC<FlightSearchWidgetProps> = ({
       }
     }
     setLocationQuery('');
+    setRemoteAirports([]);
     setOpenPicker(null);
   };
 
@@ -279,20 +345,27 @@ const FlightSearchWidget: React.FC<FlightSearchWidgetProps> = ({
 
           {locationQuery.trim() ? (
             <div className="space-y-1">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                Matching Airports ({filteredHubs.length})
-              </p>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  Matching Airports ({filteredHubs.length})
+                </p>
+                {airportSearchLoading ? (
+                  <span className="text-[10px] text-[#008F45] font-medium">Searching global airports...</span>
+                ) : remoteAirports.length > 0 && airportProviderLabel ? (
+                  <span className="text-[10px] text-slate-400 truncate max-w-[170px]">{airportProviderLabel}</span>
+                ) : null}
+              </div>
               {filteredHubs.length > 0 ? (
                 filteredHubs.map((hub) => (
                   <button
                     key={hub.code}
                     type="button"
-                    onClick={() => handleSelectLocation(field, hub.code)}
+                    onClick={() => handleSelectLocation(field, hub.code, hub)}
                     className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-left transition-colors"
                   >
                     <div className="min-w-0">
                       <p className="text-xs font-semibold text-slate-900 dark:text-white truncate">
-                        {hub.flag} {hub.city} · {hub.country}
+                        {hub.city} · {hub.country}
                       </p>
                       <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
                         {hub.airport}
@@ -304,7 +377,9 @@ const FlightSearchWidget: React.FC<FlightSearchWidgetProps> = ({
                   </button>
                 ))
               ) : (
-                <p className="text-xs text-slate-500 py-4 text-center">No matching airports found.</p>
+                <p className="text-xs text-slate-500 py-4 text-center">
+                  {airportSearchLoading ? 'Querying global airports...' : 'No matching airports found.'}
+                </p>
               )}
             </div>
           ) : (
@@ -931,8 +1006,8 @@ const FlightSearchWidget: React.FC<FlightSearchWidgetProps> = ({
                     }
                     className="px-2 py-1 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-semibold"
                   >
-                    {HUBS.map((h) => (
-                      <option key={h.code} value={h.code}>
+                    {[...HUBS, ...Object.values(externalHubCache)].map((h) => (
+                      <option key={`leg-orig-${h.code}`} value={h.code}>
                         {h.city} ({h.code})
                       </option>
                     ))}
@@ -950,8 +1025,8 @@ const FlightSearchWidget: React.FC<FlightSearchWidgetProps> = ({
                     }
                     className="px-2 py-1 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-semibold"
                   >
-                    {HUBS.map((h) => (
-                      <option key={h.code} value={h.code}>
+                    {[...HUBS, ...Object.values(externalHubCache)].map((h) => (
+                      <option key={`leg-dest-${h.code}`} value={h.code}>
                         {h.city} ({h.code})
                       </option>
                     ))}

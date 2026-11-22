@@ -2,6 +2,8 @@
 // All Gemini API calls run securely through the application server (/api/gemini/* and /api/live).
 // The client never imports @google/genai or handles API keys directly.
 
+import { fetchJsonStrict } from './http';
+
 export enum Type {
   TYPE_UNSPECIFIED = "TYPE_UNSPECIFIED",
   STRING = "STRING",
@@ -83,66 +85,43 @@ export class GoogleGenAI {
   constructor(_options: { apiKey?: string } = {}) {
     this.models = {
       generateContent: async ({ model, contents, config }) => {
-        const response = await fetch('/api/gemini/generate', {
+        const data = await fetchJsonStrict('/api/gemini/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ model, contents, config }),
+          timeoutMs: 30000,
+          retries: 1,
         });
-
-        if (!response.ok) {
-          const errData = await response.json().catch(() => ({}));
-          throw new Error(errData.error || `Server generateContent failed with status ${response.status}`);
-        }
-
-        const data = await response.json();
         return new GenerateContentResponse(data);
       },
 
       generateImages: async ({ model, prompt, config }) => {
-        const response = await fetch('/api/gemini/generate-images', {
+        return fetchJsonStrict('/api/gemini/generate-images', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ model, prompt, config }),
+          timeoutMs: 45000,
         });
-
-        if (!response.ok) {
-          const errData = await response.json().catch(() => ({}));
-          throw new Error(errData.error || `Server image generation failed with status ${response.status}`);
-        }
-
-        return response.json();
       },
 
       generateVideos: async ({ model, prompt, config }) => {
-        const response = await fetch('/api/gemini/generate-videos', {
+        return fetchJsonStrict('/api/gemini/generate-videos', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ model, prompt, config }),
+          timeoutMs: 45000,
         });
-
-        if (!response.ok) {
-          const errData = await response.json().catch(() => ({}));
-          throw new Error(errData.error || `Server video generation failed with status ${response.status}`);
-        }
-
-        return response.json();
       },
     };
 
     this.operations = {
       getVideosOperation: async ({ operation }) => {
-        const response = await fetch('/api/gemini/get-videos-operation', {
+        return fetchJsonStrict('/api/gemini/get-videos-operation', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ operation }),
+          timeoutMs: 25000,
         });
-
-        if (!response.ok) {
-          const errData = await response.json().catch(() => ({}));
-          throw new Error(errData.error || `Failed to fetch video operation with status ${response.status}`);
-        }
-
-        return response.json();
       },
     };
 

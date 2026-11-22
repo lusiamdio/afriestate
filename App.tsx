@@ -13,6 +13,7 @@ import Chatbot from './components/Chatbot';
 import MortgageCalculator from './components/MortgageCalculator';
 import ScheduleTourModal from './components/ScheduleTourModal';
 import MarketInsights from './components/MarketInsights';
+import MarketPriceInsightCard from './components/MarketPriceInsightCard';
 import RecommendedProperties from './components/RecommendedProperties';
 import PropertyDetailPage from './components/pages/PropertyDetailPage';
 import CompareBar from './components/CompareBar';
@@ -85,6 +86,7 @@ import ExploreAfricaMap from './components/ExploreAfricaMap';
 import BookingStyleFilterSidebar from './components/BookingStyleFilterSidebar';
 import PropertyVerificationModal from './components/PropertyVerificationModal';
 import { evaluatePropertyAgainstInvestmentAlerts } from './lib/investmentAlerts';
+import { GoogleMapsProvider } from './components/maps/GoogleMapsProvider';
 
 import SuperAdminDashboard from './components/dashboards/SuperAdminDashboard';
 
@@ -293,6 +295,8 @@ const App: React.FC = () => {
   const [isAIResponseModalOpen, setIsAIResponseModalOpen] = useState(false);
   const [isAgentContactModalOpen, setIsAgentContactModalOpen] = useState(false);
   const [isVRTourOpen, setIsVRTourOpen] = useState(false);
+  const [vrTourProperty, setVrTourProperty] = useState<Property | null>(null);
+  const [gmpQuotaExceeded, setGmpQuotaExceeded] = useState(false);
   const [isMessageModalOpen, setIsMessageModalOpen] = useState(false);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [isAIImprovementModalOpen, setIsAIImprovementModalOpen] = useState(false);
@@ -859,6 +863,12 @@ const App: React.FC = () => {
       return merged;
   }, [enquiryCounts, tourRequests, messages]);
 
+  const averageEnquiryCount = useMemo(() => {
+      const positiveCounts = Object.values(computedEnquiryCounts).filter((n) => typeof n === 'number' && n > 0);
+      if (positiveCounts.length === 0) return Infinity;
+      return positiveCounts.reduce((acc, n) => acc + n, 0) / positiveCounts.length;
+  }, [computedEnquiryCounts]);
+
   const recordPropertyEnquiry = (propertyId: string) => {
       setEnquiryCounts(prev => {
         const next = { ...prev, [propertyId]: (prev[propertyId] || 0) + 1 };
@@ -1096,8 +1106,15 @@ const App: React.FC = () => {
     });
   };
 
-  const handleOpenVRTour = (url: string) => {
+  useEffect(() => {
+    const onQuotaExceeded = () => setGmpQuotaExceeded(true);
+    window.addEventListener('gmp-quota-exceeded', onQuotaExceeded);
+    return () => window.removeEventListener('gmp-quota-exceeded', onQuotaExceeded);
+  }, []);
+
+  const handleOpenVRTour = (url: string, property?: Property) => {
     setVrTourUrl(url);
+    setVrTourProperty(property || null);
     setIsVRTourOpen(true);
   };
   
@@ -1914,6 +1931,8 @@ const App: React.FC = () => {
                           onEdit={handleEditProperty}
                           onDelete={handleDeleteProperty}
                           isLoading={isLoadingProperties}
+                          enquiryCounts={computedEnquiryCounts}
+                          averageEnquiryCount={averageEnquiryCount}
                       />
                   </div>
                   </section>
@@ -1940,6 +1959,8 @@ const App: React.FC = () => {
                       onEdit={handleEditProperty}
                       onDelete={handleDeleteProperty}
                       isLoading={isLoadingProperties}
+                      enquiryCounts={computedEnquiryCounts}
+                      averageEnquiryCount={averageEnquiryCount}
                       />
                   </div>
                   </section>
@@ -2048,6 +2069,13 @@ const App: React.FC = () => {
                           </div>
                       </div>
 
+                      {/* Market Price Insight Summary Card */}
+                      <MarketPriceInsightCard
+                        properties={activeTab === 'all' ? filteredProperties : savedProperties}
+                        locationLabel={filters.location || filters.region || ''}
+                        enquiryCounts={computedEnquiryCounts}
+                      />
+
                       {/* Main 2-Column Content: Sidebar + Cards */}
                       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
                           {/* Desktop Sidebar (col-span-3) */}
@@ -2087,6 +2115,8 @@ const App: React.FC = () => {
                                           onDelete={handleDeleteProperty}
                                           isLoading={isLoadingProperties}
                                           onOpenVerificationModal={handleOpenVerificationModal}
+                                          enquiryCounts={computedEnquiryCounts}
+                                          averageEnquiryCount={averageEnquiryCount}
                                       />
                                   ) : (
                                       <div className="bg-white dark:bg-slate-900 rounded-xl p-12 text-center shadow-sm">
@@ -2123,6 +2153,8 @@ const App: React.FC = () => {
                                           onDelete={handleDeleteProperty}
                                           isLoading={isLoadingProperties}
                                           onOpenVerificationModal={handleOpenVerificationModal}
+                                          enquiryCounts={computedEnquiryCounts}
+                                          averageEnquiryCount={averageEnquiryCount}
                                       />
                                   ) : (
                                       <div className="bg-white dark:bg-slate-900 rounded-xl p-12 text-center shadow-sm">
@@ -2254,7 +2286,31 @@ const App: React.FC = () => {
   const isPublicMaintenanceActive = settings.maintenanceMode && !isSuperAdminLoggedIn && page !== 'auth';
 
   return (
+    <GoogleMapsProvider>
     <div className={`font-sans min-h-screen flex flex-col ${theme}`}>
+      {gmpQuotaExceeded && (
+        <div className="sticky top-0 z-50 bg-amber-50 border-b border-amber-200 text-amber-900 px-4 py-2.5 text-xs md:text-sm flex flex-wrap items-center justify-center gap-3 shadow-sm">
+          <span>
+            Google Maps Platform quota reached. If you are the app owner, visit{' '}
+            <a
+              href="https://developers.google.com/maps/ai/ai-studio?utm_campaign=gmp_mcp_codeassist_v1_aistudio#quota_exceeded_errors"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline font-semibold text-amber-950 hover:text-amber-800"
+            >
+              maps developer site
+            </a>{' '}
+            for instructions to update your account.
+          </span>
+          <button
+            type="button"
+            onClick={() => setGmpQuotaExceeded(false)}
+            className="px-2 py-0.5 rounded bg-amber-200/70 hover:bg-amber-200 text-amber-950 text-xs font-semibold"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
       {isSuperAdminLoggedIn && (
         <SuperAdminDashboard
           onClose={() => setIsSuperAdminLoggedIn(false)}
@@ -2439,7 +2495,7 @@ const App: React.FC = () => {
       )}
       {inquiryForResponse && <AIResponseModal isOpen={isAIResponseModalOpen} onClose={() => setIsAIResponseModalOpen(false)} tourRequest={inquiryForResponse} />}
       <AgentContactModal isOpen={isAgentContactModalOpen} onClose={() => setIsAgentContactModalOpen(false)} mode={agentContactMode} agentName={agentContactName} />
-      <VRTourModal isOpen={isVRTourOpen} onClose={() => setIsVRTourOpen(false)} url={vrTourUrl} />
+      <VRTourModal isOpen={isVRTourOpen} onClose={() => setIsVRTourOpen(false)} url={vrTourUrl} property={vrTourProperty} />
       {selectedProperty && <MessageModal isOpen={isMessageModalOpen} onClose={() => setIsMessageModalOpen(false)} property={selectedProperty} onSend={handleSendMessage} />}
       {agentForReview && <AgentReviewModal isOpen={isReviewModalOpen} onClose={() => setIsReviewModalOpen(false)} agentName={agentForReview.name} onSubmit={handleSubmitReview} />}
       {aiImprovementProperty && <AIImprovementModal isOpen={isAIImprovementModalOpen} onClose={() => setIsAIImprovementModalOpen(false)} property={aiImprovementProperty} />}
@@ -2530,6 +2586,7 @@ const App: React.FC = () => {
          </div>
        )}
     </div>
+    </GoogleMapsProvider>
   );
 };
 
