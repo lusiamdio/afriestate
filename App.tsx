@@ -2393,7 +2393,6 @@ const App: React.FC = () => {
               scrollToSection('home', 'all-listings');
             }}
             onStayClick={() => scrollToSection('book-a-stay')}
-            onLongTermClick={() => scrollToSection('long-term-stays')}
             onTransportClick={() => scrollToSection('rent-a-car')}
             onWellnessClick={() => scrollToSection('find-wellness')}
             onFlightsClick={() => scrollToSection('book-flights')}

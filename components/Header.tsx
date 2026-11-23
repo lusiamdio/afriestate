@@ -25,7 +25,6 @@ interface HeaderProps {
   onBuyClick?: () => void;
   onRentClick?: () => void;
   onStayClick?: () => void;
-  onLongTermClick?: () => void;
   onTransportClick?: () => void;
   onWellnessClick?: () => void;
   onFlightsClick?: () => void;
@@ -59,7 +58,6 @@ const Header: React.FC<HeaderProps> = (props) => {
     onBuyClick,
     onRentClick,
     onStayClick,
-    onLongTermClick,
     onTransportClick,
     onWellnessClick,
     onFlightsClick,
@@ -158,15 +156,6 @@ const Header: React.FC<HeaderProps> = (props) => {
               className="hover:text-slate-900 dark:hover:text-white transition-colors whitespace-nowrap"
             >
               Short Stays
-            </button>
-          )}
-          {flags.longTerm && (
-            <button 
-              type="button"
-              onClick={onLongTermClick || onStayClick || onRentClick}
-              className="hover:text-slate-900 dark:hover:text-white transition-colors whitespace-nowrap"
-            >
-              Long-Term
             </button>
           )}
           {flags.transport && (
@@ -360,14 +349,6 @@ const Header: React.FC<HeaderProps> = (props) => {
                 className="p-2 text-center rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 text-xs font-bold"
               >
                 Short Stays
-              </button>
-            )}
-            {flags.longTerm && (
-              <button
-                onClick={() => { (onLongTermClick || onStayClick)?.(); setIsMobileMenuOpen(false); }}
-                className="p-2 text-center rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 text-xs font-bold"
-              >
-                Long-Term
               </button>
             )}
             {flags.transport && (
