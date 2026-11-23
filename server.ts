@@ -98,6 +98,11 @@ function getRapidApiKeys(): string[] {
     .filter(Boolean);
 }
 
+let rapidKeyRotationIdx = 0;
+let flightTrackerRotationIdx = 0;
+let visaAdvisorRotationIdx = 0;
+let travelLanguagesRotationIdx = 0;
+
 function getRapidApiKey(): string {
   const keys = getRapidApiKeys();
   if (keys.length === 0) return '';
@@ -282,11 +287,6 @@ async function callRapidApi<T = any>(
     clearTimeout(timer);
   }
 }
-
-let rapidKeyRotationIdx = 0;
-let flightTrackerRotationIdx = 0;
-let visaAdvisorRotationIdx = 0;
-let travelLanguagesRotationIdx = 0;
 
 const PASSPORT_NAME_TO_ISO2: Record<string, string> = {
   'south africa': 'ZA',

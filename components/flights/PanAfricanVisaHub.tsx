@@ -125,9 +125,9 @@ const ItemVerificationMeta: React.FC<ItemVerificationMetaProps> = ({
 
       {item.sources.length > 0 && (
         <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 pt-0.5">
-          {item.sources.slice(0, 3).map((src) => (
+          {item.sources.slice(0, 3).map((src, idx) => (
             <a
-              key={src.url}
+              key={`${src.url}-${idx}`}
               href={src.url}
               target="_blank"
               rel="noopener noreferrer"
@@ -722,11 +722,11 @@ export const PanAfricanVisaHub: React.FC = () => {
                   Grounded Sources ({advisorResult.sources.length})
                 </p>
                 <div className="flex flex-wrap gap-3 text-xs">
-                  {advisorResult.sources.slice(0, 6).map((src) => {
+                  {advisorResult.sources.slice(0, 6).map((src, idx) => {
                     const href = src.url || src.uri || '#';
                     return (
                       <a
-                        key={href}
+                        key={`${href}-${idx}`}
                         href={href}
                         target="_blank"
                         rel="noopener noreferrer"

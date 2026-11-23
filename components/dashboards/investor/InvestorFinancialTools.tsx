@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { GoogleGenAI, Type } from '../../../lib/ai';
+import { GoogleGenAI, Type, parseAiJson } from '../../../lib/ai';
 import type { TaxLegalInfo, Currency } from '../../../types';
 import { ToolsIcon, BuildingLibraryIcon } from '../../icons/InvestorDashboardIcons';
 import { CpuChipIcon, ArrowUpIcon, ArrowDownIcon, ChartBarIcon } from '../../icons/ActionIcons';
@@ -454,7 +454,7 @@ const TaxLegalHub: React.FC = () => {
         contents: prompt,
         config: { responseMimeType: 'application/json', responseSchema: taxLegalSchema },
       });
-      setReport(JSON.parse(response.text.trim()));
+      setReport(parseAiJson<TaxLegalInfo>(response.text));
     } catch {
       setReport(TAX_LEGAL_FALLBACKS[country] || TAX_LEGAL_FALLBACKS['South Africa']);
     } finally {

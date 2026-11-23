@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { GoogleGenAI, Type } from '../../../lib/ai';
+import { GoogleGenAI, Type, parseAiJson } from '../../../lib/ai';
 import type { MarketHotspot, Property, ExclusiveDeal, MarketComparison } from '../../../types';
 import { DealType } from '../../../types';
 import { MarketplaceIcon, TagIcon, ScaleIcon } from '../../icons/InvestorDashboardIcons';
@@ -142,7 +142,7 @@ const AIHotspots: React.FC = () => {
           },
         },
       });
-      setHotspots(JSON.parse(response.text.trim()));
+      setHotspots(parseAiJson<MarketHotspot[]>(response.text));
     } catch {
       setHotspots(DEFAULT_HOTSPOTS);
     } finally {
@@ -299,7 +299,7 @@ const CrossBorderAnalysis: React.FC = () => {
         contents: prompt,
         config: { responseMimeType: 'application/json', responseSchema: comparisonSchema },
       });
-      setComparison(JSON.parse(response.text.trim()));
+      setComparison(parseAiJson<MarketComparison>(response.text));
     } catch {
       setComparison({
         country_a: {

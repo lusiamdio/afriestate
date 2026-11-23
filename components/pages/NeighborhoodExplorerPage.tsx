@@ -1630,11 +1630,11 @@ const NeighborhoodExplorerPage: React.FC<NeighborhoodExplorerPageProps> = ({
                           </td>
                           <td className="py-3.5 px-4">
                             <div className="flex flex-wrap gap-1.5">
-                              {row.neighborhoods.map((nb) => {
+                              {row.neighborhoods.map((nb, nbIdx) => {
                                 const isPriority = activeCountryGuide.launchPriorityAreas.includes(nb);
                                 return (
                                   <button
-                                    key={nb}
+                                    key={`${row.city}-${nb}-${nbIdx}`}
                                     type="button"
                                     onClick={() => selectNeighborhood(nb, row.city, activeCountryGuide.code)}
                                     className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
@@ -1665,8 +1665,8 @@ const NeighborhoodExplorerPage: React.FC<NeighborhoodExplorerPageProps> = ({
                     Top 5 Recommended Areas in {activeCountryGuide.name}
                   </h3>
                   <div className="space-y-2.5">
-                    {activeCountryGuide.topRecommendations.map((rec) => (
-                      <div key={rec.rank} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs sm:text-sm py-1.5 border-b border-slate-200/70 dark:border-slate-700/60 last:border-0">
+                    {activeCountryGuide.topRecommendations.map((rec, idx) => (
+                      <div key={`rec-${rec.rank}-${idx}`} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs sm:text-sm py-1.5 border-b border-slate-200/70 dark:border-slate-700/60 last:border-0">
                         <div>
                           <span className="font-mono font-bold text-emerald-700 dark:text-amber-300 mr-2">
                             0{rec.rank}.
@@ -1730,9 +1730,9 @@ const NeighborhoodExplorerPage: React.FC<NeighborhoodExplorerPageProps> = ({
                         {country.name}
                       </h4>
                       <div className="mt-3 flex flex-wrap gap-1.5">
-                        {country.launchPriorityAreas.map((area) => (
+                        {country.launchPriorityAreas.map((area, idx) => (
                           <button
-                            key={area}
+                            key={`${country.code}-prio-${area}-${idx}`}
                             type="button"
                             onClick={() => selectNeighborhood(area, undefined, country.code)}
                             className="px-2.5 py-1 rounded-lg bg-[#FAF8F5] dark:bg-slate-800 hover:bg-[#0B1F1A] hover:text-amber-300 dark:hover:bg-amber-400 dark:hover:text-slate-950 text-xs font-semibold text-slate-800 dark:text-slate-200 transition-colors"
@@ -1794,9 +1794,9 @@ const NeighborhoodExplorerPage: React.FC<NeighborhoodExplorerPageProps> = ({
                         </td>
                         <td className="py-3.5 px-4">
                           <div className="flex flex-wrap gap-1.5">
-                            {row.bestValue.map((area) => (
+                            {row.bestValue.map((area, idx) => (
                               <button
-                                key={area}
+                                key={`${row.countryCode}-val-${area}-${idx}`}
                                 type="button"
                                 onClick={() => selectNeighborhood(area, undefined, row.countryCode)}
                                 className="px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300 text-xs font-medium hover:underline"
@@ -1808,9 +1808,9 @@ const NeighborhoodExplorerPage: React.FC<NeighborhoodExplorerPageProps> = ({
                         </td>
                         <td className="py-3.5 px-4">
                           <div className="flex flex-wrap gap-1.5">
-                            {row.bestGrowth.map((area) => (
+                            {row.bestGrowth.map((area, idx) => (
                               <button
-                                key={area}
+                                key={`${row.countryCode}-gro-${area}-${idx}`}
                                 type="button"
                                 onClick={() => selectNeighborhood(area, undefined, row.countryCode)}
                                 className="px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 text-xs font-medium hover:underline"
@@ -1822,9 +1822,9 @@ const NeighborhoodExplorerPage: React.FC<NeighborhoodExplorerPageProps> = ({
                         </td>
                         <td className="py-3.5 pl-4">
                           <div className="flex flex-wrap gap-1.5">
-                            {row.premium.map((area) => (
+                            {row.premium.map((area, idx) => (
                               <button
-                                key={area}
+                                key={`${row.countryCode}-pre-${area}-${idx}`}
                                 type="button"
                                 onClick={() => selectNeighborhood(area, undefined, row.countryCode)}
                                 className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs font-medium hover:underline"

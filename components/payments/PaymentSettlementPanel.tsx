@@ -9,6 +9,7 @@ import {
   LockClosedIcon,
   ShieldCheckIcon,
 } from '@heroicons/react/24/outline';
+import { fetchJsonStrict } from '../../lib/http';
 
 export type AllowedSettlementCategory = 'flight' | 'short-stay' | 'car-hire';
 
@@ -113,9 +114,10 @@ export const PaymentSettlementPanel: React.FC<PaymentSettlementPanelProps> = ({
 
     setIsSettling(true);
     try {
-      const response = await fetch('/api/payments/settle', {
+      const settledReceipt = await fetchJsonStrict<SettlementReceipt>('/api/payments/settle', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        timeoutMs: 25000,
         body: JSON.stringify({
           bookingCategory,
           itemId,
@@ -136,12 +138,6 @@ export const PaymentSettlementPanel: React.FC<PaymentSettlementPanelProps> = ({
         }),
       });
 
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data?.error || 'Settlement authorization declined.');
-      }
-
-      const settledReceipt = data as SettlementReceipt;
       setReceipt(settledReceipt);
       await onSettled(settledReceipt);
     } catch (err: any) {

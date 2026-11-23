@@ -70,7 +70,7 @@ import { useTranslations } from './contexts/LanguageContext';
 import InvestmentRequestModal from './components/InvestmentRequestModal';
 import { useCurrency } from './contexts/CurrencyContext';
 import UpgradeToInvestorModal from './components/UpgradeToInvestorModal';
-import { GoogleGenAI, Type } from "./lib/ai";
+import { GoogleGenAI, Type, parseAiJson } from "./lib/ai";
 import PrivacyPolicyModal from './components/PrivacyPolicyModal';
 import TermsOfServiceModal from './components/TermsOfServiceModal';
 import CareersModal from './components/CareersModal';
@@ -976,7 +976,7 @@ const App: React.FC = () => {
             }
         });
         
-        const parsedFilters = JSON.parse(response.text.trim());
+        const parsedFilters = parseAiJson<Partial<SearchFilters>>(response.text);
         const newFilters = { ...initialFilters, ...parsedFilters };
 
         setFilters(newFilters);
@@ -1205,7 +1205,6 @@ const App: React.FC = () => {
     setAllProperties(newProperties);
     setInvestmentProperties(newProperties.filter(p => p.listingType === ListingType.FOR_INVESTMENT));
     await removePublishedProperty(propertyId);
-    await saveProperties(newProperties);
     addToast('Listing removed from platform directory.', 'info');
   };
 
@@ -2072,7 +2071,7 @@ const App: React.FC = () => {
                       {/* Market Price Insight Summary Card */}
                       <MarketPriceInsightCard
                         properties={activeTab === 'all' ? filteredProperties : savedProperties}
-                        locationLabel={filters.location || filters.region || ''}
+                        locationLabel={filters.location || filters.country || filters.region || ''}
                         enquiryCounts={computedEnquiryCounts}
                       />
 

@@ -591,8 +591,8 @@ const FindProfessionalPage: React.FC<FindProfessionalPageProps> = ({
                 aria-label="Filter by neighborhood"
                 className="w-full px-4 py-3 rounded-xl bg-white/10 text-white text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
               >
-                {neighborhoodOptions.map((nb) => (
-                  <option key={nb} value={nb} className="bg-slate-900 text-white">
+                {neighborhoodOptions.map((nb, idx) => (
+                  <option key={`nb-opt-${nb}-${idx}`} value={nb} className="bg-slate-900 text-white">
                     {nb === 'All Neighborhoods' ? 'Neighborhood Coverage: All Districts' : nb}
                   </option>
                 ))}
@@ -770,9 +770,9 @@ const FindProfessionalPage: React.FC<FindProfessionalPageProps> = ({
                         {provider.neighborhoodExpertise}
                       </p>
                       <div className="flex flex-wrap gap-1.5 pt-1">
-                        {provider.neighborhoodsServed.map((nb) => (
+                        {provider.neighborhoodsServed.map((nb, idx) => (
                           <button
-                            key={nb}
+                            key={`${provider.id}-nb-${nb}-${idx}`}
                             type="button"
                             onClick={() => setSelectedNeighborhood(nb)}
                             className={`px-2 py-0.5 rounded-md text-[11px] font-medium transition-colors ${

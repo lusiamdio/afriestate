@@ -29,6 +29,7 @@ import type { User } from '../../types';
 import { useCurrency } from '../../contexts/CurrencyContext';
 import { useToast } from '../../contexts/ToastContext';
 import { isValidEmail, isValidPhone, sanitizeText } from '../../lib/security';
+import { fetchJsonStrict } from '../../lib/http';
 import AirlineLogo from './AirlineLogo';
 
 export type BookingStage = 'fare' | 'travellers' | 'payment' | 'confirmed';
@@ -230,9 +231,10 @@ const FlightBookingFlow: React.FC<FlightBookingFlowProps> = ({
 
     setIsProcessingPayment(true);
     try {
-      const response = await fetch('/api/payments/settle', {
+      const data = await fetchJsonStrict('/api/payments/settle', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        timeoutMs: 25000,
         body: JSON.stringify({
           bookingCategory: 'flight',
           itemId: flight.id,
@@ -256,11 +258,6 @@ const FlightBookingFlow: React.FC<FlightBookingFlowProps> = ({
           },
         }),
       });
-
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data?.error || 'Real-time payment settlement declined.');
-      }
 
       const ref = data.transactionRef || `AFR${Math.floor(100000 + Math.random() * 899999)}`;
       const record: BookedTripRecord = {

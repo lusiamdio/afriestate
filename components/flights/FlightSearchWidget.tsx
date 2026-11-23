@@ -212,10 +212,26 @@ const FlightSearchWidget: React.FC<FlightSearchWidgetProps> = ({
         h.country.toLowerCase().includes(q) ||
         h.airport.toLowerCase().includes(q)
     );
-    const localCodes = new Set(localMatches.map((h) => h.code));
-    const remoteUnique = remoteAirports.filter((r) => !localCodes.has(r.code));
+    const seenCodes = new Set(localMatches.map((h) => h.code));
+    const remoteUnique: AirportHub[] = [];
+    for (const r of remoteAirports) {
+      if (!seenCodes.has(r.code)) {
+        seenCodes.add(r.code);
+        remoteUnique.push(r);
+      }
+    }
     return [...localMatches, ...remoteUnique];
   }, [locationQuery, remoteAirports]);
+
+  const combinedMultiCityHubs = useMemo(() => {
+    const byCode = new Map<string, AirportHub>();
+    for (const hub of [...HUBS, ...Object.values(externalHubCache)]) {
+      if (!byCode.has(hub.code)) {
+        byCode.set(hub.code, hub);
+      }
+    }
+    return Array.from(byCode.values());
+  }, [externalHubCache]);
 
   const handleSelectLocation = (field: 'origin' | 'destination', code: string, hubObj?: AirportHub) => {
     if (hubObj && !HUBS.some((h) => h.code === hubObj.code)) {
@@ -1006,8 +1022,8 @@ const FlightSearchWidget: React.FC<FlightSearchWidgetProps> = ({
                     }
                     className="px-2 py-1 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-semibold"
                   >
-                    {[...HUBS, ...Object.values(externalHubCache)].map((h) => (
-                      <option key={`leg-orig-${h.code}`} value={h.code}>
+                    {combinedMultiCityHubs.map((h) => (
+                      <option key={`${leg.id}-orig-${h.code}`} value={h.code}>
                         {h.city} ({h.code})
                       </option>
                     ))}
@@ -1025,8 +1041,8 @@ const FlightSearchWidget: React.FC<FlightSearchWidgetProps> = ({
                     }
                     className="px-2 py-1 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-semibold"
                   >
-                    {[...HUBS, ...Object.values(externalHubCache)].map((h) => (
-                      <option key={`leg-dest-${h.code}`} value={h.code}>
+                    {combinedMultiCityHubs.map((h) => (
+                      <option key={`${leg.id}-dest-${h.code}`} value={h.code}>
                         {h.city} ({h.code})
                       </option>
                     ))}

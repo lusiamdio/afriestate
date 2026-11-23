@@ -3075,8 +3075,8 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({
                       { place: `${hotelCity} CBD`, dist: '2.8 km' },
                       { place: 'Major Hospital & Medical Center', dist: '2.1 km' },
                       { place: 'Convention & Conference Precinct', dist: '3.6 km' },
-                    ].map((loc) => (
-                      <div key={loc.place} className="flex items-center justify-between text-xs sm:text-sm py-1.5 border-b border-slate-200/70 dark:border-slate-700 last:border-b-0">
+                    ].map((loc, idx) => (
+                      <div key={`loc-${idx}-${loc.place}`} className="flex items-center justify-between text-xs sm:text-sm py-1.5 border-b border-slate-200/70 dark:border-slate-700 last:border-b-0">
                         <span className="text-slate-800 dark:text-slate-200">{loc.place}</span>
                         <span className="font-mono font-bold text-emerald-700 dark:text-amber-300">{loc.dist}</span>
                       </div>
@@ -3674,8 +3674,8 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({
                   </div>
 
                   <div className="grid grid-cols-7 gap-1.5 text-center text-xs">
-                    {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d) => (
-                      <div key={d} className="font-bold text-slate-500 py-1">{d}</div>
+                    {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d, i) => (
+                      <div key={`${d}-${i}`} className="font-bold text-slate-500 py-1">{d}</div>
                     ))}
                     {Array.from({ length: 6 }).map((_, emptyIdx) => (
                       <div key={`empty-${emptyIdx}`} />

@@ -32,6 +32,7 @@ import {
 } from '../../data/stayDetailData';
 import { ListingType, PropertyType, type Property } from '../../types';
 import { GoogleGenAI } from '../../lib/ai';
+import { resolveProvinceForCity } from '../../lib/data';
 import { useToast } from '../../contexts/ToastContext';
 import { SharePropertyModal } from '../stay/StayModals';
 import { getPublishedStayProfiles } from '../../lib/data';
@@ -172,6 +173,11 @@ const BookAStayPage: React.FC<BookAStayPageProps> = ({
       const cleanTitle = sanitizeText(p.title, 120);
       const cleanCity = sanitizeText(p.address?.city || 'Cape Town', 60);
       const cleanCountry = sanitizeText(p.country || 'South Africa', 60);
+      const rawSuburb = sanitizeText(p.address?.street || '', 80);
+      const cleanSuburb =
+        rawSuburb && rawSuburb.toLowerCase() !== cleanCity.toLowerCase()
+          ? rawSuburb
+          : 'Central District';
       const verificationSig =
         p.verificationDetails?.titleDeedNumber ||
         generateListingSignature(p.id, p.agent?.name || 'afriestate', basePrice);
@@ -182,9 +188,9 @@ const BookAStayPage: React.FC<BookAStayPageProps> = ({
         name: cleanTitle,
         subtitle: `${p.propertyType} · Ref ${verificationSig}`,
         country: cleanCountry,
-        province: cleanCity,
+        province: resolveProvinceForCity(cleanCity, cleanCountry, p.region),
         city: cleanCity,
-        suburb: sanitizeText(p.address?.street || cleanCity, 80),
+        suburb: cleanSuburb,
         category,
         propertyType: isHotel ? 'Hotel' : isMonthlyRental ? 'Serviced Apartment' : 'Villa',
         starRating: 5,
@@ -790,8 +796,8 @@ const BookAStayPage: React.FC<BookAStayPageProps> = ({
                   className="bg-transparent text-xs font-semibold text-[#151515] dark:text-slate-200 focus:outline-none max-w-[125px]"
                   title={stayLanguageProvider ? `Source: ${stayLanguageProvider}` : 'Hospitality Localization'}
                 >
-                  {stayLanguages.map((lang) => (
-                    <option key={lang.code} value={lang.code}>
+                  {stayLanguages.map((lang, idx) => (
+                    <option key={`${lang.code}-${idx}`} value={lang.code}>
                       {lang.name}
                     </option>
                   ))}

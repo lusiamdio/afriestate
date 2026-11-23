@@ -61,6 +61,42 @@ export class GenerateContentResponse {
   }
 }
 
+/**
+ * Safely parses JSON returned by AI models, stripping optional markdown code fences
+ * or surrounding prose before invoking JSON.parse.
+ */
+export function parseAiJson<T = any>(rawText: string): T {
+  const trimmed = (rawText || '').trim();
+  if (!trimmed) {
+    throw new Error('AI returned an empty JSON response.');
+  }
+
+  const unfenced = trimmed
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/```\s*$/i, '')
+    .trim();
+
+  try {
+    return JSON.parse(unfenced) as T;
+  } catch {
+    const objStart = unfenced.indexOf('{');
+    const objEnd = unfenced.lastIndexOf('}');
+    const arrStart = unfenced.indexOf('[');
+    const arrEnd = unfenced.lastIndexOf(']');
+
+    const hasObj = objStart !== -1 && objEnd > objStart;
+    const hasArr = arrStart !== -1 && arrEnd > arrStart;
+
+    if (hasArr && (!hasObj || arrStart < objStart)) {
+      return JSON.parse(unfenced.slice(arrStart, arrEnd + 1)) as T;
+    }
+    if (hasObj) {
+      return JSON.parse(unfenced.slice(objStart, objEnd + 1)) as T;
+    }
+    throw new Error('AI response did not contain valid JSON.');
+  }
+}
+
 export class GoogleGenAI {
   readonly models: {
     generateContent: (request: { model?: string; contents: any; config?: any }) => Promise<GenerateContentResponse>;
@@ -144,7 +180,21 @@ export class GoogleGenAI {
             });
 
             if (!response.ok) {
-              throw new Error(`Chat stream failed with status ${response.status}`);
+              let detail = '';
+              const ct = (response.headers.get('content-type') || '').toLowerCase();
+              if (ct.includes('application/json')) {
+                try {
+                  const errJson = await response.json();
+                  detail = errJson?.error || errJson?.message || '';
+                } catch {
+                  // ignore
+                }
+              }
+              throw new Error(
+                detail
+                  ? `${detail} (HTTP ${response.status} from /api/gemini/chat-stream)`
+                  : `Chat stream failed with HTTP ${response.status}`
+              );
             }
 
             const reader = response.body?.getReader();
@@ -211,6 +261,14 @@ export class GoogleGenAI {
           const wsUrl = `${protocol}//${window.location.host}/api/live`;
 
           const ws = new WebSocket(wsUrl);
+          let didOpen = false;
+          let settled = false;
+
+          const fireOpenOnce = () => {
+            if (didOpen) return;
+            didOpen = true;
+            options.callbacks?.onopen?.();
+          };
 
           const session: LiveSession = {
             sendRealtimeInput: (input) => {
@@ -221,24 +279,32 @@ export class GoogleGenAI {
             close: () => {
               try {
                 ws.close();
-              } catch (e) {
+              } catch {
                 // ignore
               }
             },
           };
 
           ws.onopen = () => {
-            options.callbacks?.onopen?.();
-            resolve(session);
+            fireOpenOnce();
+            if (!settled) {
+              settled = true;
+              resolve(session);
+            }
           };
 
           ws.onmessage = (event) => {
             try {
               const data = JSON.parse(event.data);
               if (data.type === 'open') {
-                options.callbacks?.onopen?.();
+                fireOpenOnce();
               } else if (data.type === 'error') {
-                options.callbacks?.onerror?.(new Error(data.error || 'Live API error'));
+                const err = new Error(data.error || 'Live API error');
+                options.callbacks?.onerror?.(err);
+                if (!settled) {
+                  settled = true;
+                  reject(err);
+                }
               } else if (data.type === 'close') {
                 options.callbacks?.onclose?.();
               } else {
@@ -251,10 +317,17 @@ export class GoogleGenAI {
 
           ws.onerror = (event) => {
             options.callbacks?.onerror?.(event);
-            reject(event);
+            if (!settled) {
+              settled = true;
+              reject(event);
+            }
           };
 
           ws.onclose = (event) => {
+            if (!settled) {
+              settled = true;
+              reject(new Error('Live voice session closed before opening.'));
+            }
             options.callbacks?.onclose?.(event);
           };
         });

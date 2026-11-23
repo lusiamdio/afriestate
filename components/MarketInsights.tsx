@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { GoogleGenAI, ThinkingLevel, Type } from '../lib/ai';
+import { GoogleGenAI, ThinkingLevel, Type, parseAiJson } from '../lib/ai';
 import { TrendingUpIcon } from './icons/NavIcons';
 import { MagnifyingGlassIcon, ArrowTopRightOnSquareIcon } from '@heroicons/react/24/outline';
 import ReactMarkdown from 'react-markdown';
@@ -158,7 +158,7 @@ const MarketInsights: React.FC = () => {
         config,
       });
 
-      const parsed = JSON.parse(response.text.trim());
+      const parsed = parseAiJson<MarketReportData>(response.text);
       setReport(parsed);
     } catch {
       // Seamless curated continental data fallback when AI service is unavailable

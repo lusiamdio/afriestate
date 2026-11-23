@@ -1,7 +1,7 @@
 
 
 import React, { useState, useEffect } from 'react';
-import { GoogleGenAI, Type } from '../lib/ai';
+import { GoogleGenAI, Type, parseAiJson } from '../lib/ai';
 import type { Property, User } from '../types';
 import PropertyList from './PropertyList';
 import { SparklesIcon } from './icons/ActionIcons';
@@ -89,13 +89,13 @@ const PersonalizedMatches: React.FC<PersonalizedMatchesProps> = (props) => {
                     }
                 });
                 
-                const jsonText = response.text.trim();
-                const result = JSON.parse(jsonText);
+                const result = parseAiJson<{ matched_ids?: unknown[] }>(response.text);
                 const ids = result.matched_ids;
 
                 if (Array.isArray(ids)) {
-                    const matchedProps = ids
-                        .map(id => allProperties.find(p => p.id === id))
+                    const uniqueIds = Array.from(new Set(ids.map(String))).filter(id => !savedPropertyIds.has(id));
+                    const matchedProps = uniqueIds
+                        .map(id => allProperties.find(p => String(p.id) === id))
                         .filter((p): p is Property => p !== undefined);
                     setMatches(matchedProps);
                 } else {

@@ -1,7 +1,7 @@
 
 
 import React, { createContext, useState, useContext, useEffect, useMemo } from 'react';
-import { GoogleGenAI } from "../lib/ai";
+import { GoogleGenAI, parseAiJson } from "../lib/ai";
 import { Language } from '../types';
 import { translations as englishTranslations } from '../translations';
 
@@ -97,7 +97,7 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                       responseMimeType: 'application/json',
                   }
               });
-              translatedJson = JSON.parse(response.text.trim());
+              translatedJson = parseAiJson(response.text);
           } catch (apiError: any) {
               console.warn(`Translation API unavailable for ${lang}, using mock translation. Error:`, apiError?.message || apiError);
               

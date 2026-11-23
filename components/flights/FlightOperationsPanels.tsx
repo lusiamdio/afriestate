@@ -637,9 +637,9 @@ export const FlightStatusPanel: React.FC<FlightStatusPanelProps> = ({
                   Live Search Grounding Sources ({liveResult.sources.length})
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {liveResult.sources.map((src) => (
+                  {liveResult.sources.map((src, idx) => (
                     <a
-                      key={src.uri}
+                      key={`${src.uri}-${idx}`}
                       href={src.uri}
                       target="_blank"
                       rel="noopener noreferrer"

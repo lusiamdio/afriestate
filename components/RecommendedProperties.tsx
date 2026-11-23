@@ -1,7 +1,7 @@
 
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { GoogleGenAI, Type } from '../lib/ai';
+import { GoogleGenAI, Type, parseAiJson } from '../lib/ai';
 import type { Property, User } from '../types';
 import PropertyList from './PropertyList';
 import { SparklesIcon } from './icons/ActionIcons';
@@ -83,13 +83,13 @@ const RecommendedProperties: React.FC<RecommendedPropertiesProps> = (props) => {
                     }
                 });
                 
-                const jsonText = response.text.trim();
-                const result = JSON.parse(jsonText);
+                const result = parseAiJson<{ similar_ids?: unknown[] }>(response.text);
                 const ids = result.similar_ids;
 
                 if (Array.isArray(ids)) {
-                    const recommendedProps = ids
-                        .map(id => allProperties.find(p => p.id === id))
+                    const uniqueIds = Array.from(new Set(ids.map(String))).filter(id => id !== String(targetProperty.id));
+                    const recommendedProps = uniqueIds
+                        .map(id => allProperties.find(p => String(p.id) === id))
                         .filter((p): p is Property => p !== undefined);
                     setRecommended(recommendedProps);
                 } else {

@@ -90,7 +90,7 @@ const BookConsultationModal: React.FC<BookConsultationModalProps> = ({ isOpen, o
                                 </div>
                             </div>
                             <div className="grid grid-cols-7 text-center text-xs font-semibold text-slate-500 mb-2">
-                                {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(d => <div key={d}>{d}</div>)}
+                                {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, idx) => <div key={`${d}-${idx}`}>{d}</div>)}
                             </div>
                             <div className="grid grid-cols-7">
                                 {Array.from({ length: startingDayOfWeek }).map((_, i) => <div key={`empty-${i}`}></div>)}

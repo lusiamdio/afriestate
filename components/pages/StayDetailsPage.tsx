@@ -493,9 +493,11 @@ const StayDetailsPage: React.FC<StayDetailsPageProps> = ({
 
         {/* Geographic Breadcrumb Navigation */}
         <nav aria-label="Breadcrumb" className="flex flex-wrap items-center gap-1.5 text-xs text-[#6B6B6B] dark:text-slate-400">
-          {['Africa', profile.country, profile.province, profile.city, profile.suburb, profile.category, profile.name].map(
-            (crumb, i, arr) => (
-              <React.Fragment key={crumb}>
+          {['Africa', profile.country, profile.province, profile.city, profile.suburb, profile.category, profile.name]
+            .map((crumb) => (typeof crumb === 'string' ? crumb.trim() : ''))
+            .filter((crumb, idx, list) => Boolean(crumb) && list.findIndex((c) => c.toLowerCase() === crumb.toLowerCase()) === idx)
+            .map((crumb, i, arr) => (
+              <React.Fragment key={`crumb-${i}-${crumb}`}>
                 <button
                   type="button"
                   onClick={() => {
@@ -509,8 +511,7 @@ const StayDetailsPage: React.FC<StayDetailsPageProps> = ({
                 </button>
                 {i < arr.length - 1 && <ChevronRightIcon className="w-3 h-3 text-slate-400" />}
               </React.Fragment>
-            )
-          )}
+            ))}
         </nav>
 
         {/* Property Header */}

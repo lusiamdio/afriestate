@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { GoogleGenAI, Type } from '../../../lib/ai';
+import { GoogleGenAI, Type, parseAiJson } from '../../../lib/ai';
 import { blobToBase64 } from '../../../lib/utils';
 import { VideoCameraIcon, CameraIcon, SparklesIcon, CpuChipIcon } from '../../icons/ActionIcons';
 import { PropertyType } from '../../../types';
@@ -189,7 +189,7 @@ const PricingRecommender: React.FC = () => {
         contents: prompt,
         config: { responseMimeType: 'application/json', responseSchema: pricingRecommenderSchema },
       });
-      setPriceRec(JSON.parse(response.text?.trim() || '{}'));
+      setPriceRec(parseAiJson(response.text || '{}'));
     } catch {
       const base = Number(priceInputs.area || 120) * 1950 + Number(priceInputs.beds || 2) * 28000;
       setPriceRec({
@@ -493,7 +493,12 @@ const VideoGenerator: React.FC = () => {
       }
       const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
       if (downloadLink) {
-        const response = await fetch(`/api/gemini/video-proxy?uri=${encodeURIComponent(downloadLink)}`);
+        const videoUrlProxy = `/api/gemini/video-proxy?uri=${encodeURIComponent(downloadLink)}`;
+        const response = await fetch(videoUrlProxy);
+        if (!response.ok) {
+          const errText = await response.text().catch(() => '');
+          throw new Error(errText || `Video proxy fetch failed (HTTP ${response.status}).`);
+        }
         setVideoUrl(URL.createObjectURL(await response.blob()));
       } else {
         throw new Error('Video generation returned no output.');

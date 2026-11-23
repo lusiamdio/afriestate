@@ -27,6 +27,64 @@ const readLocalJson = <T,>(key: string, fallback: T): T => {
     }
 };
 
+const safeJsonParse = <T,>(value: unknown, fallback: T): T => {
+    if (value === null || value === undefined) return fallback;
+    if (typeof value !== 'string') return value as T;
+    const trimmed = value.trim();
+    if (!trimmed) return fallback;
+    try {
+        return JSON.parse(trimmed) as T;
+    } catch {
+        return fallback;
+    }
+};
+
+const CITY_PROVINCE_MAP: Record<string, string> = {
+    'cape town': 'Western Cape',
+    'stellenbosch': 'Western Cape',
+    'johannesburg': 'Gauteng',
+    'sandton': 'Gauteng',
+    'pretoria': 'Gauteng',
+    'durban': 'KwaZulu-Natal',
+    'umhlanga': 'KwaZulu-Natal',
+    'nairobi': 'Nairobi County',
+    'mombasa': 'Mombasa County',
+    'lagos': 'Lagos State',
+    'abuja': 'FCT Abuja',
+    'accra': 'Greater Accra',
+    'marrakech': 'Marrakech-Safi',
+    'casablanca': 'Casablanca-Settat',
+    'kigali': 'Kigali City',
+    'cairo': 'Cairo Governorate',
+    'alexandria': 'Alexandria Governorate',
+    'luanda': 'Luanda Province',
+    'gaborone': 'South-East District',
+    'addis ababa': 'Addis Ababa Charter',
+    'dakar': 'Dakar Region',
+    'windhoek': 'Khomas Region',
+    'dar es salaam': 'Dar es Salaam Region',
+    'zanzibar': 'Zanzibar Urban/West',
+    'port louis': 'Port Louis District',
+    'victoria': 'Mahé District',
+    'harare': 'Harare Province',
+    'lusaka': 'Lusaka Province',
+    'kampala': 'Central Region',
+    'maputo': 'Maputo City',
+    'tunis': 'Tunis Governorate',
+};
+
+export const resolveProvinceForCity = (city: string, country: string, explicitRegion?: string): string => {
+    const cleanCity = sanitizeText(city || 'Cape Town', 80);
+    const cleanCountry = sanitizeText(country || 'South Africa', 80);
+    const mapped = CITY_PROVINCE_MAP[cleanCity.toLowerCase()];
+    if (mapped) return mapped;
+    const regionClean = explicitRegion ? sanitizeText(explicitRegion, 80) : '';
+    if (regionClean && regionClean.toLowerCase() !== cleanCity.toLowerCase()) {
+        return regionClean;
+    }
+    return `${cleanCountry} Region`;
+};
+
 const writeLocalJson = (key: string, value: unknown) => {
     try {
         localStorage.setItem(key, JSON.stringify(value));
@@ -215,7 +273,7 @@ export const getProperties = async (excludeMock = false): Promise<Property[]> =>
         const curatedMap = new Map(initialProperties.map(prop => [String(prop.id), prop]));
 
         const mappedData = data.map(p => {
-            const parsedImages = typeof p.images === 'string' ? JSON.parse(p.images) : p.images;
+            const parsedImages = safeJsonParse<string[] | undefined>(p.images, undefined);
             const curatedProp = curatedMap.get(String(p.id));
             const hasLocalImage = Array.isArray(parsedImages) && parsedImages.some((img: string) => typeof img === 'string' && img.startsWith('/images/'));
             return {
@@ -253,12 +311,12 @@ export const getProperties = async (excludeMock = false): Promise<Property[]> =>
                 localCurrency: p.localCurrency ?? p.local_currency,
                 foreignBuyerEligible: p.foreignBuyerEligible ?? p.foreign_buyer_eligible,
                 verificationDetails: p.verificationDetails ?? p.verification_details,
-                address: typeof p.address === 'string' ? JSON.parse(p.address) : p.address,
-                details: typeof p.details === 'string' ? JSON.parse(p.details) : p.details,
-                amenities: typeof p.amenities === 'string' ? JSON.parse(p.amenities) : p.amenities,
+                address: safeJsonParse(p.address, { street: '', city: '', state: '', zip: '' }),
+                details: safeJsonParse(p.details, { beds: 0, baths: 0, area: 0 }),
+                amenities: safeJsonParse(p.amenities, []),
                 images: curatedProp && !hasLocalImage ? curatedProp.images : (parsedImages || curatedProp?.images || []),
-                agent: typeof p.agent === 'string' ? JSON.parse(p.agent) : p.agent,
-                financials: typeof p.financials === 'string' ? JSON.parse(p.financials) : p.financials,
+                agent: safeJsonParse(p.agent, { name: 'AfriEstate Agent', phone: '', email: '', avatar: '' }),
+                financials: safeJsonParse(p.financials, undefined),
             };
         });
 
@@ -540,15 +598,18 @@ export const publishAccommodationService = async (
         // Proceed with unified store
     }
 
+    const cleanCity = sanitizeText(payload.city, 80);
+    const cleanCountry = sanitizeText(payload.country, 80);
+    const rawSuburb = sanitizeText(payload.address || '', 80);
     const stayProfile: StayPropertyProfile = {
         ...FLAGSHIP_AFRICAN_GRAND_HOTEL,
         id,
         name: sanitizeText(payload.business_name, 120),
         subtitle: sanitizeText(payload.accommodation_type, 50),
-        country: sanitizeText(payload.country, 80),
-        province: sanitizeText(payload.city, 80),
-        city: sanitizeText(payload.city, 80),
-        suburb: sanitizeText(payload.address || payload.city, 80),
+        country: cleanCountry,
+        province: resolveProvinceForCity(cleanCity, cleanCountry),
+        city: cleanCity,
+        suburb: rawSuburb && rawSuburb.toLowerCase() !== cleanCity.toLowerCase() ? rawSuburb : 'Central District',
         category: payload.accommodation_type === 'hotel' ? 'Hotels' : isLongTermApartment ? 'Serviced Apartments' : 'Resorts',
         propertyType: payload.accommodation_type === 'hotel' ? 'Hotel' : isLongTermApartment ? 'Serviced Apartment' : 'Villa',
         starRating: 5,
@@ -850,8 +911,8 @@ export const getSavedSearchesForUser = async (username: string): Promise<SearchF
             .select('filters')
             .eq('username', username);
         
-        if (error) return [];
-        return data.map(item => typeof item.filters === 'string' ? JSON.parse(item.filters) : item.filters);
+        if (error || !Array.isArray(data)) return [];
+        return data.map(item => safeJsonParse(item.filters, {} as SearchFilters));
     } catch (e) { return []; }
 };
 
@@ -1190,10 +1251,10 @@ export const deleteUserDocument = async (username: string, docId: string): Promi
 export const getPropertyAlerts = async (username: string): Promise<PropertyAlert[]> => {
     try {
         const { data } = await supabase.from('property_alerts').select('*').eq('username', username);
-        return data.map(a => ({
+        return (data || []).map(a => ({
             ...a,
-            criteria: typeof a.criteria === 'string' ? JSON.parse(a.criteria) : a.criteria
-        })) || [];
+            criteria: safeJsonParse(a.criteria, {})
+        }));
     } catch { return []; }
 };
 
@@ -1203,7 +1264,7 @@ export const addPropertyAlert = async (username: string, alertData: Omit<Propert
         const { data } = await supabase.from('property_alerts').insert(optimistic).select().single();
         return {
              ...data,
-             criteria: typeof data.criteria === 'string' ? JSON.parse(data.criteria) : data.criteria
+             criteria: safeJsonParse(data?.criteria, alertData.criteria)
         };
     } catch { return { ...optimistic, id: `alert_${Date.now()}` } as any; }
 };

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { GoogleGenAI, Type, Modality } from "../lib/ai";
+import { GoogleGenAI, Type, Modality, parseAiJson } from "../lib/ai";
 import type { Property } from '../types';
 import { CloseIcon } from './icons/NavIcons';
 import { CpuChipIcon, SparklesIcon, SpeakerWaveIcon, PauseIcon } from './icons/ActionIcons';
@@ -90,8 +90,7 @@ const AIImprovementModal: React.FC<AIImprovementModalProps> = ({ isOpen, onClose
                     }
                 });
                 
-                const jsonText = response.text.trim();
-                setSuggestions(JSON.parse(jsonText));
+                setSuggestions(parseAiJson(response.text));
 
             } catch (err) {
                 console.error("Error generating suggestions:", err);
