@@ -98,14 +98,12 @@ const BookAStayPage: React.FC<BookAStayPageProps> = ({
     { code: 'ar', name: 'العربية' },
   ]);
   const [selectedStayLanguage, setSelectedStayLanguage] = useState('en-gb');
-  const [stayLanguageProvider, setStayLanguageProvider] = useState<string | null>(null);
   const [isRotatingStayLang, setIsRotatingStayLang] = useState(false);
 
   const loadStayLanguages = async (vertical: 'stays' | 'rotate') => {
     setIsRotatingStayLang(true);
     try {
       const res = await fetchJsonStrict<{
-        providerUsed?: string;
         languages?: Array<{ code: string; name: string }>;
       }>(`/api/travel/languages?vertical=${vertical}`, {
         timeoutMs: 12000,
@@ -113,9 +111,6 @@ const BookAStayPage: React.FC<BookAStayPageProps> = ({
       });
       if (Array.isArray(res.languages) && res.languages.length > 0) {
         setStayLanguages(res.languages.slice(0, 60));
-        if (res.providerUsed) {
-          setStayLanguageProvider(res.providerUsed);
-        }
       }
     } catch {
       // Keep default fallback when RapidAPI is unconfigured
@@ -794,7 +789,7 @@ const BookAStayPage: React.FC<BookAStayPageProps> = ({
                   value={selectedStayLanguage}
                   onChange={(e) => setSelectedStayLanguage(e.target.value)}
                   className="bg-transparent text-xs font-semibold text-[#151515] dark:text-slate-200 focus:outline-none max-w-[125px]"
-                  title={stayLanguageProvider ? `Source: ${stayLanguageProvider}` : 'Hospitality Localization'}
+                  title="Hospitality Localization"
                 >
                   {stayLanguages.map((lang, idx) => (
                     <option key={`${lang.code}-${idx}`} value={lang.code}>
@@ -806,7 +801,7 @@ const BookAStayPage: React.FC<BookAStayPageProps> = ({
                   type="button"
                   onClick={() => loadStayLanguages('rotate')}
                   disabled={isRotatingStayLang}
-                  title={stayLanguageProvider ? `${stayLanguageProvider} — Rotate feed` : 'Rotate language feed'}
+                  title="Refresh localization"
                   className="p-0.5 text-[#6B6B6B] hover:text-[#123B2A] dark:hover:text-[#C99A3D] disabled:opacity-50"
                 >
                   <ArrowPathIcon className={`w-3.5 h-3.5 ${isRotatingStayLang ? 'animate-spin' : ''}`} />

@@ -126,17 +126,14 @@ const FlightResultsView: React.FC<FlightResultsViewProps> = ({
   const [liveVisaMap, setLiveVisaMap] = useState<Record<string, { regime: string; colorTier: string }>>({});
   const [visaMapStatus, setVisaMapStatus] = useState<{
     isLive: boolean;
-    providerUsed: string | null;
-    upstreamWarning?: string;
-  }>({ isLive: false, providerUsed: null });
+    hasSynced: boolean;
+  }>({ isLive: false, hasSynced: false });
 
   useEffect(() => {
     const controller = new AbortController();
     fetchJsonStrict<{
       regimeByIso2?: Record<string, { regime: string; colorTier: string }>;
       isLive?: boolean;
-      providerUsed?: string;
-      upstreamWarning?: string;
     }>('/api/visa/map', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -149,8 +146,7 @@ const FlightResultsView: React.FC<FlightResultsViewProps> = ({
         setLiveVisaMap(res?.regimeByIso2 || {});
         setVisaMapStatus({
           isLive: Boolean(res?.isLive),
-          providerUsed: res?.providerUsed || null,
-          upstreamWarning: res?.upstreamWarning,
+          hasSynced: true,
         });
       })
       .catch(() => {
@@ -1348,11 +1344,11 @@ const FlightResultsView: React.FC<FlightResultsViewProps> = ({
               <p className="text-xs font-semibold text-slate-900 dark:text-white">
                 {visaRule.requirement}
               </p>
-              {visaMapStatus.providerUsed && (
+              {visaMapStatus.hasSynced && (
                 <p className="text-[10px] text-slate-500 dark:text-slate-400">
                   {visaMapStatus.isLive
-                    ? `Live via ${visaMapStatus.providerUsed}`
-                    : 'Curated dossier (Visa Map API not verified live)'}
+                    ? 'Live border policy synced'
+                    : 'Curated dossier (Not verified live)'}
                 </p>
               )}
             </div>

@@ -117,7 +117,7 @@ const GroundingIntelligencePanel: React.FC<GroundingIntelligencePanelProps> = ({
         checkedAt: data.checkedAt || new Date().toISOString(),
       });
     } catch (err: any) {
-      setErrorMsg(err?.message || 'Unable to retrieve Google Search Grounding insights right now.');
+      setErrorMsg(err?.message || 'Unable to retrieve live neighborhood insights right now.');
     } finally {
       setIsLoading(false);
     }
@@ -289,7 +289,7 @@ const GroundingIntelligencePanel: React.FC<GroundingIntelligencePanelProps> = ({
           {searchResult.sources.length > 0 && (
             <div className="space-y-2">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                Search Grounding Sources ({searchResult.sources.length})
+                Verified Web Sources ({searchResult.sources.length})
               </p>
               <div className="flex flex-wrap gap-2">
                 {searchResult.sources.map((src, idx) => (

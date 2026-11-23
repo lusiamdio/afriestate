@@ -130,7 +130,6 @@ const FlightSearchWidget: React.FC<FlightSearchWidgetProps> = ({
   const [selectingField, setSelectingField] = useState<'depart' | 'return'>('depart');
   const [remoteAirports, setRemoteAirports] = useState<AirportHub[]>([]);
   const [airportSearchLoading, setAirportSearchLoading] = useState(false);
-  const [airportProviderLabel, setAirportProviderLabel] = useState<string | null>(null);
   const [externalHubCache, setExternalHubCache] = useState<Record<string, AirportHub>>({});
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -160,7 +159,6 @@ const FlightSearchWidget: React.FC<FlightSearchWidgetProps> = ({
       try {
         const res = await fetchJsonStrict<{
           airports?: Array<{ code: string; city: string; country: string; airport: string }>;
-          providerUsed?: string;
         }>(`/api/travel/airports/search?query=${encodeURIComponent(q)}`, {
           timeoutMs: 10000,
           retries: 0,
@@ -175,11 +173,10 @@ const FlightSearchWidget: React.FC<FlightSearchWidgetProps> = ({
           airport: a.airport,
           flag: '',
           popular: false,
-          terminalNote: res.providerUsed || 'Global International Terminal',
+          terminalNote: 'Global International Terminal',
           avgWeatherC: 21,
         }));
         setRemoteAirports(mapped);
-        setAirportProviderLabel(res.providerUsed || 'TripAdvisor Flights Search API');
       } catch {
         setRemoteAirports([]);
       } finally {
@@ -365,11 +362,9 @@ const FlightSearchWidget: React.FC<FlightSearchWidgetProps> = ({
                 <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                   Matching Airports ({filteredHubs.length})
                 </p>
-                {airportSearchLoading ? (
+                {airportSearchLoading && (
                   <span className="text-[10px] text-[#008F45] font-medium">Searching global airports...</span>
-                ) : remoteAirports.length > 0 && airportProviderLabel ? (
-                  <span className="text-[10px] text-slate-400 truncate max-w-[170px]">{airportProviderLabel}</span>
-                ) : null}
+                )}
               </div>
               {filteredHubs.length > 0 ? (
                 filteredHubs.map((hub) => (

@@ -194,9 +194,7 @@ async function callRapidApi<T = any>(
 
   const hostStatus = rapidHostHealth.get(host);
   if (hostStatus && hostStatus.state === 'cooldown' && hostStatus.cooldownUntil > Date.now()) {
-    throw new Error(
-      `RapidAPI (${host}) is in brief rate-limit cooldown (${hostStatus.lastError || 'HTTP 429'}).`
-    );
+    throw new Error('Live upstream data feed is in brief rate-limit cooldown.');
   }
 
   const controller = new AbortController();
@@ -232,44 +230,47 @@ async function callRapidApi<T = any>(
           // ignore
         }
       }
-      const msg = detail
+      const internalMsg = detail
         ? `RapidAPI (${host}) HTTP ${res.status}: ${detail}`
         : `RapidAPI (${host}) failed with HTTP ${res.status}`;
+      const clientSafeMsg = `Live upstream data feed returned HTTP ${res.status}.`;
+      console.warn(`[Upstream Telemetry] ${internalMsg}`);
 
       if (res.status === 429) {
         updateRapidHostHealth(host, {
           state: 'cooldown',
           lastStatus: 429,
-          lastError: msg,
+          lastError: internalMsg,
           cooldownUntil: Date.now() + 15000,
         });
       } else if (res.status === 403 && detail.toLowerCase().includes('not subscribed')) {
         updateRapidHostHealth(host, {
           state: 'unsubscribed',
           lastStatus: 403,
-          lastError: msg,
+          lastError: internalMsg,
           cooldownUntil: 0,
         });
       } else {
         updateRapidHostHealth(host, {
           state: 'error',
           lastStatus: res.status,
-          lastError: msg,
+          lastError: internalMsg,
           cooldownUntil: 0,
         });
       }
-      throw new Error(msg);
+      throw new Error(clientSafeMsg);
     }
 
     if (!isJson) {
-      const msg = `RapidAPI (${host}) returned non-JSON content-type (${contentType || 'unknown'}).`;
+      const internalMsg = `RapidAPI (${host}) returned non-JSON content-type (${contentType || 'unknown'}).`;
+      console.warn(`[Upstream Telemetry] ${internalMsg}`);
       updateRapidHostHealth(host, {
         state: 'error',
         lastStatus: res.status,
-        lastError: msg,
+        lastError: internalMsg,
         cooldownUntil: 0,
       });
-      throw new Error(msg);
+      throw new Error('Live upstream data feed returned an unexpected response format.');
     }
 
     const data = (await res.json()) as T;
@@ -696,7 +697,7 @@ app.post('/api/gemini/flight-tracker', async (req, res) => {
     const list = Array.isArray(raw) ? raw : Array.isArray(raw?.data) ? raw.data : raw ? [raw] : [];
     const entry = list[0];
     if (!entry || (!entry.departure && !entry.arrival && !entry.airline)) {
-      throw new Error(`AeroDataBox returned no active schedule records for flight ${cleanFlight}.`);
+      throw new Error(`No active schedule records returned for flight ${cleanFlight}.`);
     }
 
     const depAirport = entry?.departure?.airport?.iata || entry?.departure?.airport?.name || 'Origin';
@@ -722,13 +723,13 @@ app.post('/api/gemini/flight-tracker', async (req, res) => {
     const airlineName = entry?.airline?.name || entry?.airline?.iata || cleanFlight;
     const statusText = entry?.status || 'Scheduled';
     const aircraftModel = entry?.aircraft?.model || 'Commercial Jet';
-    const summaryText = `${airlineName} flight ${entry?.number || cleanFlight} from ${depAirport} to ${arrAirport} reports status "${statusText}" via AeroDataBox telemetry. Scheduled departure ${depScheduled} (estimated ${depRevised}), arrival ${arrScheduled}.`;
+    const summaryText = `${airlineName} flight ${entry?.number || cleanFlight} from ${depAirport} to ${arrAirport} reports status "${statusText}" via live aviation telemetry. Scheduled departure ${depScheduled} (estimated ${depRevised}), arrival ${arrScheduled}.`;
 
     return {
       flightNumber: cleanFlight,
       date: cleanDate,
       checkedAt: new Date().toISOString(),
-      providerUsed: 'AeroDataBox Telemetry API (Rotated)',
+      providerUsed: 'AfriEstate Live Flight Feed',
       reportText: summaryText,
       parsed: {
         airline: airlineName,
@@ -741,12 +742,7 @@ app.post('/api/gemini/flight-tracker', async (req, res) => {
         aircraft: aircraftModel,
         summary: summaryText,
       },
-      sources: [
-        {
-          title: `AeroDataBox Live Flight Feed (${entry?.number || compactFlight})`,
-          uri: `https://aerodatabox.p.rapidapi.com/flights/number/${encodeURIComponent(compactFlight)}`,
-        },
-      ],
+      sources: [],
     };
   };
 
@@ -801,7 +797,7 @@ SUMMARY: <2 factual sentences on current status, recent performance on this rout
       flightNumber: cleanFlight,
       date: cleanDate,
       checkedAt: new Date().toISOString(),
-      providerUsed: 'Gemini Google Search Grounding (Rotated)',
+      providerUsed: 'AfriEstate Live Flight Feed',
       reportText,
       parsed: {
         airline: extractField('AIRLINE') || cleanFlight,
@@ -835,20 +831,20 @@ SUMMARY: <2 factual sentences on current status, recent performance on this rout
         { name: 'AeroDataBox', fn: runAeroDataBox },
       ];
 
-  const errors: string[] = [];
+  const internalErrors: string[] = [];
   for (const step of order) {
     try {
       const payload = await step.fn();
       return res.json(payload);
     } catch (err: any) {
       const parsed = step.name === 'GeminiSearch' ? parseGeminiError(err) : null;
-      errors.push(`${step.name}: ${parsed ? parsed.message : err?.message || 'failed'}`);
+      internalErrors.push(`${step.name}: ${parsed ? parsed.message : err?.message || 'failed'}`);
     }
   }
 
-  console.warn(`[API /api/gemini/flight-tracker warning]: ${errors.join(' | ')}`);
+  console.warn(`[API /api/gemini/flight-tracker warning]: ${internalErrors.join(' | ')}`);
   return res.status(502).json({
-    error: errors.join(' | '),
+    error: `Live flight status lookup is currently unavailable for ${cleanFlight}. Please try again shortly.`,
     code: 'ALL_PROVIDERS_FAILED',
   });
 });
@@ -1121,7 +1117,7 @@ Return valid JSON matching the requested schema:
       destinationCountry: cleanDest,
       travelPurpose: cleanPurpose,
       checkedAt: new Date().toISOString(),
-      providerUsed: 'Gemini Google Search Grounding (Rotated)',
+      providerUsed: 'AfriEstate Consular Verification',
       reportText,
       parsed: {
         entryCategory: String(structured?.entryCategory || 'Verify via Official Portal'),
@@ -1174,13 +1170,6 @@ Return valid JSON matching the requested schema:
         ? 'Embassy / Consular Visa'
         : '';
 
-    const sourceList = [
-      {
-        title: `RapidAPI Visa Requirement Map (${passportIso2} -> ${destIso2})`,
-        url: 'https://visa-requirement.p.rapidapi.com/v2/visa/map',
-      },
-    ];
-
     const baselineEntry = inputItems.find((i) => i.id === 'entry_regime')?.currentValue || '';
     const entryMatches =
       mappedRegime &&
@@ -1197,10 +1186,10 @@ Return valid JSON matching the requested schema:
             | 'changed'
             | 'not found',
           summary: mappedRegime
-            ? `Visa Requirement Map API classifies ${passportIso2} -> ${destIso2} as "${mappedRegime}" (color tier: ${resolvedCategory}).`
+            ? `Live border classification for ${passportIso2} -> ${destIso2} is "${mappedRegime}" (tier: ${resolvedCategory}).`
             : `No direct entry code returned for ${destIso2} on passport ${passportIso2}.`,
           last_verified_date: todayIso,
-          sources: mappedRegime ? sourceList : [],
+          sources: [],
         };
       }
       return {
@@ -1208,7 +1197,7 @@ Return valid JSON matching the requested schema:
         label: baseline.label,
         status: 'not found' as const,
         summary:
-          'RapidAPI Visa Map provides entry-regime classification only; granular fee, stay window, and consular steps await official portal/Gemini confirmation.',
+          'Live border matrix provides entry-regime classification; granular fee, stay window, and consular steps await official portal confirmation.',
         last_verified_date: todayIso,
         sources: [],
       };
@@ -1219,9 +1208,9 @@ Return valid JSON matching the requested schema:
       destinationCountry: cleanDest,
       travelPurpose: cleanPurpose,
       checkedAt: new Date().toISOString(),
-      providerUsed: 'RapidAPI Visa Requirement Map (Rotated)',
+      providerUsed: 'AfriEstate Consular Verification',
       reportText: mappedRegime
-        ? `Live Visa Map classification for ${cleanPassport} (${passportIso2}) -> ${cleanDest} (${destIso2}): ${mappedRegime}.`
+        ? `Live border classification for ${cleanPassport} (${passportIso2}) -> ${cleanDest} (${destIso2}): ${mappedRegime}.`
         : '',
       parsed: {
         entryCategory: mappedRegime || 'Verify via Official Portal',
@@ -1230,14 +1219,14 @@ Return valid JSON matching the requested schema:
         processingTime: inputItems.find((i) => i.id === 'processing_window')?.currentValue || 'Check portal SLA',
         officialPortal: inputItems.find((i) => i.id === 'official_portal')?.currentValue || `${cleanDest} Immigration`,
         bureaucraticSummary: mappedRegime
-          ? `Cross-checked via Visa Requirement Map v2 API: ${cleanPassport} (${passportIso2}) passport entry status for ${cleanDest} (${destIso2}) is "${mappedRegime}".`
-          : `Visa map returned no explicit entry tag for ${destIso2}; check curated consular filing steps below.`,
+          ? `Cross-checked against live corridor policy: ${cleanPassport} (${passportIso2}) passport entry status for ${cleanDest} (${destIso2}) is "${mappedRegime}".`
+          : `No explicit entry tag returned for ${destIso2}; check curated consular filing steps below.`,
         propertyAdvisory:
           inputItems.find((i) => i.id === 'property_investor_advisory')?.currentValue ||
           'Verify non-resident deed & tax compliance locally.',
       },
       items: normalizedItems,
-      sources: sourceList.map((s) => ({ title: s.title, uri: s.url, url: s.url })),
+      sources: [],
     };
   };
 
@@ -1252,20 +1241,20 @@ Return valid JSON matching the requested schema:
         { name: 'VisaMapAPI', fn: runRapidVisaMapVerification },
       ];
 
-  const errors: string[] = [];
+  const internalErrors: string[] = [];
   for (const step of order) {
     try {
       const payload = await step.fn();
       return res.json(payload);
     } catch (err: any) {
       const parsed = step.name === 'GeminiSearch' ? parseGeminiError(err) : null;
-      errors.push(`${step.name}: ${parsed ? parsed.message : err?.message || 'failed'}`);
+      internalErrors.push(`${step.name}: ${parsed ? parsed.message : err?.message || 'failed'}`);
     }
   }
 
-  console.warn(`[API /api/gemini/visa-advisor warning]: ${errors.join(' | ')}`);
+  console.warn(`[API /api/gemini/visa-advisor warning]: ${internalErrors.join(' | ')}`);
   return res.status(502).json({
-    error: errors.join(' | '),
+    error: `Live immigration verification is temporarily unavailable for ${cleanPassport} to ${cleanDest}. Curated dossier remains active below.`,
     code: 'ALL_PROVIDERS_FAILED',
   });
 });
@@ -1309,16 +1298,17 @@ app.post('/api/visa/map', async (req, res) => {
       passportIso2: iso2,
       regimeByIso2,
       isLive: true,
-      providerUsed: 'RapidAPI Visa Requirement Map v2',
+      providerUsed: 'AfriEstate Border Matrix',
       checkedAt: new Date().toISOString(),
     });
   } catch (error: any) {
     const iso2 = resolveIso2Code(typeof req.body?.passport === 'string' && req.body.passport.trim() ? req.body.passport : 'ZA');
+    console.warn('[API /api/visa/map warning]:', error?.message || 'unavailable');
     res.json({
       passportIso2: iso2,
       regimeByIso2: {},
       isLive: false,
-      upstreamWarning: error?.message || 'RapidAPI Visa Map unavailable.',
+      upstreamWarning: 'Live border matrix sync temporarily unavailable.',
       providerUsed: 'Curated African Visa Matrix (Fallback)',
       checkedAt: new Date().toISOString(),
     });
@@ -1437,7 +1427,7 @@ app.post('/api/gemini/search-grounding', async (req, res) => {
     }
     if (!ai) {
       return res.status(503).json({
-        error: 'Live Google Search Grounding service is unavailable because server credentials are not configured.',
+        error: 'Live neighborhood intelligence service is unavailable because server credentials are not configured.',
       });
     }
 
@@ -1511,7 +1501,7 @@ const GLOBAL_GATEWAY_AIRPORTS = [
 app.get('/api/travel/airports/search', async (req, res) => {
   const query = typeof req.query.query === 'string' ? req.query.query.trim().slice(0, 60) : '';
   if (query.length < 2) {
-    return res.json({ airports: [], isLive: true, providerUsed: 'TripAdvisor Flights Search API' });
+    return res.json({ airports: [], isLive: true, providerUsed: 'AfriEstate Global Airport Directory' });
   }
   try {
     const raw = await callRapidApi<any>(
@@ -1554,12 +1544,10 @@ app.get('/api/travel/airports/search', async (req, res) => {
     res.json({
       airports: mergedAirports,
       isLive: true,
-      providerUsed:
-        mappedAirports.length > 0
-          ? 'TripAdvisor Flights Search Airport API'
-          : 'TripAdvisor Flights Search Airport API + Gateway Directory',
+      providerUsed: 'AfriEstate Global Airport Directory',
     });
   } catch (error: any) {
+    console.warn('[API /api/travel/airports/search warning]:', error?.message || 'unavailable');
     const qLower = query.toLowerCase();
     const fallbackMatches = GLOBAL_GATEWAY_AIRPORTS.filter(
       (a) =>
@@ -1571,7 +1559,7 @@ app.get('/api/travel/airports/search', async (req, res) => {
     res.json({
       airports: fallbackMatches,
       isLive: false,
-      upstreamWarning: error?.message || 'TripAdvisor airport lookup unavailable.',
+      upstreamWarning: 'Live airport directory lookup temporarily unavailable.',
       providerUsed: 'AfriEstate Gateway Airport Directory (Fallback)',
     });
   }
@@ -1610,8 +1598,8 @@ app.get('/api/travel/languages', async (req, res) => {
         countryFlag: l?.countryFlag || undefined,
       }))
       .filter((l: any) => l.code && l.name);
-    if (languages.length === 0) throw new Error('Booking.com returned empty language list');
-    return { isLive: true, providerUsed: 'Booking.com Meta Languages API (Rotated)', languages };
+    if (languages.length === 0) throw new Error('Primary localization feed returned empty language list');
+    return { isLive: true, providerUsed: 'AfriEstate Travel Localization', languages };
   };
 
   const fetchGoogleFlightsLanguages = async () => {
@@ -1627,8 +1615,8 @@ app.get('/api/travel/languages', async (req, res) => {
         name: String(l?.language_name || l?.name || l?.language || l?.code || '').trim(),
       }))
       .filter((l: any) => l.code && l.name);
-    if (languages.length === 0) throw new Error('Google Flights returned empty language list');
-    return { isLive: true, providerUsed: 'Google Flights Languages API (Rotated)', languages };
+    if (languages.length === 0) throw new Error('Secondary localization feed returned empty language list');
+    return { isLive: true, providerUsed: 'AfriEstate Travel Localization', languages };
   };
 
   const bookingFirst =
@@ -1642,19 +1630,20 @@ app.get('/api/travel/languages', async (req, res) => {
     ? [fetchBookingLanguages, fetchGoogleFlightsLanguages]
     : [fetchGoogleFlightsLanguages, fetchBookingLanguages];
 
-  const errors: string[] = [];
+  const internalErrors: string[] = [];
   for (const fn of order) {
     try {
       const payload = await fn();
       return res.json(payload);
     } catch (err: any) {
-      errors.push(err?.message || 'provider failed');
+      internalErrors.push(err?.message || 'provider failed');
     }
   }
+  console.warn(`[API /api/travel/languages warning]: ${internalErrors.join(' | ')}`);
 
   return res.json({
     isLive: false,
-    upstreamWarning: errors.join(' | '),
+    upstreamWarning: 'Live localization feed temporarily unavailable.',
     providerUsed: 'AfriEstate Multilingual Pack (Fallback)',
     languages: FALLBACK_TRAVEL_LANGUAGES,
   });
@@ -1744,40 +1733,40 @@ app.get('/api/neighborhood/safety-index', async (req, res) => {
         )
         .slice(0, 6),
       totalRankedCities: normalized.length,
-      providerUsed: 'Ranked Crime Cities RapidAPI',
+      providerUsed: 'AfriEstate City Safety Index',
       checkedAt: new Date().toISOString(),
     });
   } catch (error: any) {
+    console.warn('[API /api/neighborhood/safety-index warning]:', error?.message || 'unavailable');
     res.json({
       isLive: false,
-      upstreamWarning: error?.message || 'Ranked Crime Cities API is currently unavailable.',
+      upstreamWarning: 'Live city safety benchmark is currently unavailable.',
       matched: null,
       countryPeerCount: 0,
       sampleAfricanPeers: [],
       totalRankedCities: 0,
-      providerUsed: 'Ranked Crime Cities RapidAPI (Not verified live)',
+      providerUsed: 'AfriEstate City Safety Index (Not verified live)',
       checkedAt: new Date().toISOString(),
     });
   }
 });
 
-// 5b-8. RapidAPI Rotation Health & Telemetry Snapshot (no secrets exposed)
+// 5b-8. Internal Feed Rotation Health Snapshot (provider hostnames anonymized in JSON output)
 app.get('/api/travel/rotation-status', (_req, res) => {
   res.json({
-    rapidApiConfigured: getRapidApiKeys().length > 0,
-    rapidApiAppConfigured: Boolean(process.env.RAPIDAPI_APP_ID),
+    liveFeedsConfigured: getRapidApiKeys().length > 0,
+    feedAppConfigured: Boolean(process.env.RAPIDAPI_APP_ID),
     keyPoolSize: getRapidApiKeys().length,
-    geminiConfigured: Boolean(getActiveApiKey()),
+    aiConfigured: Boolean(getActiveApiKey()),
     rotationCounters: {
       flightTracker: flightTrackerRotationIdx,
       visaAdvisor: visaAdvisorRotationIdx,
       travelLanguages: travelLanguagesRotationIdx,
     },
-    hosts: Array.from(rapidHostHealth.values()).map((h) => ({
-      host: h.host,
+    channels: Array.from(rapidHostHealth.values()).map((h, idx) => ({
+      channel: `feed-${idx + 1}`,
       state: h.state,
       lastStatus: h.lastStatus,
-      lastError: h.lastError,
       lastCheckedAt: h.lastCheckedAt,
     })),
     checkedAt: new Date().toISOString(),

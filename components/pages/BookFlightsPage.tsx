@@ -113,14 +113,12 @@ const BookFlightsPage: React.FC<BookFlightsPageProps> = ({ currentUser, onBack, 
     { code: 'ar', name: 'العربية' },
   ]);
   const [selectedLanguageCode, setSelectedLanguageCode] = useState('en');
-  const [languageProviderUsed, setLanguageProviderUsed] = useState<string | null>(null);
   const [isRotatingLanguages, setIsRotatingLanguages] = useState(false);
 
   const loadTravelLanguages = async (vertical: 'flights' | 'rotate') => {
     setIsRotatingLanguages(true);
     try {
       const res = await fetchJsonStrict<{
-        providerUsed?: string;
         languages?: Array<{ code: string; name: string }>;
       }>(`/api/travel/languages?vertical=${vertical}`, {
         timeoutMs: 12000,
@@ -128,9 +126,6 @@ const BookFlightsPage: React.FC<BookFlightsPageProps> = ({ currentUser, onBack, 
       });
       if (Array.isArray(res.languages) && res.languages.length > 0) {
         setTravelLanguages(res.languages.slice(0, 60));
-        if (res.providerUsed) {
-          setLanguageProviderUsed(res.providerUsed);
-        }
       }
     } catch {
       // Keep default multilingual fallback if RapidAPI is unconfigured
@@ -265,7 +260,7 @@ const BookFlightsPage: React.FC<BookFlightsPageProps> = ({ currentUser, onBack, 
                       value={selectedLanguageCode}
                       onChange={(e) => setSelectedLanguageCode(e.target.value)}
                       className="bg-transparent text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none max-w-[115px]"
-                      title={languageProviderUsed ? `Source: ${languageProviderUsed}` : 'Flight Localization'}
+                      title="Flight Localization"
                     >
                       {travelLanguages.map((lang) => (
                         <option key={lang.code} value={lang.code}>
@@ -277,7 +272,7 @@ const BookFlightsPage: React.FC<BookFlightsPageProps> = ({ currentUser, onBack, 
                       type="button"
                       onClick={() => loadTravelLanguages('rotate')}
                       disabled={isRotatingLanguages}
-                      title={languageProviderUsed ? `Active: ${languageProviderUsed} — Click to rotate provider` : 'Rotate language feed'}
+                      title="Refresh localization"
                       className="p-0.5 rounded text-slate-500 hover:text-[#008F45] disabled:opacity-50"
                     >
                       <ArrowPathIcon className={`w-3.5 h-3.5 ${isRotatingLanguages ? 'animate-spin' : ''}`} />

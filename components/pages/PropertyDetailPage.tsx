@@ -1005,7 +1005,7 @@ Provide estimated_value, confidence, and concise rationale.`;
                       </h4>
                     </div>
                     <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
-                      {safetyIndexData?.providerUsed || 'Ranked Crime Cities RapidAPI'}
+                      AfriEstate City Safety Index
                     </span>
                   </div>
 

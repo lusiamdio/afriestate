@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import {
-  ArrowTopRightOnSquareIcon,
   BellAlertIcon,
   BuildingOfficeIcon,
   CalendarIcon,
@@ -363,7 +362,6 @@ export const FlightStatusPanel: React.FC<FlightStatusPanelProps> = ({
   const defaultDate = initialDate || new Date().toISOString().split('T')[0];
   const [flightNumber, setFlightNumber] = useState(initialQuery);
   const [flightDate, setFlightDate] = useState(defaultDate);
-  const [preferredProvider, setPreferredProvider] = useState<'auto' | 'aerodatabox' | 'gemini'>('auto');
   const [isTracking, setIsTracking] = useState(false);
   const [trackerError, setTrackerError] = useState<string | null>(null);
   const [liveResult, setLiveResult] = useState<FlightTrackerResult | null>(null);
@@ -390,14 +388,13 @@ export const FlightStatusPanel: React.FC<FlightStatusPanelProps> = ({
         body: JSON.stringify({
           flightNumber: cleanNum,
           date: targetDate,
-          preferredProvider,
         }),
         timeoutMs: 25000,
         retries: 1,
       });
       setLiveResult(data);
     } catch (err: any) {
-      setTrackerError(err?.message || 'Unable to retrieve live search-grounded flight status.');
+      setTrackerError(err?.message || 'Unable to retrieve live flight status.');
     } finally {
       setIsTracking(false);
     }
@@ -432,13 +429,13 @@ export const FlightStatusPanel: React.FC<FlightStatusPanelProps> = ({
         <div className="space-y-1">
           <p className="text-[11px] font-bold uppercase tracking-widest text-[#008F45] flex items-center gap-1.5">
             <GlobeAltIcon className="w-4 h-4" />
-            <span>Live Search Grounded</span>
+            <span>Real-Time Aviation Feed</span>
           </p>
           <h2 className="text-xl font-bold font-heading text-slate-900 dark:text-white">
             Real-Time Flight Tracker
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            Enter a flight number and date to query live global aviation status, gates, and arrival estimates via real-time web search.
+            Enter a flight number and date to query live global aviation status, gates, and arrival estimates.
           </p>
         </div>
 
@@ -473,34 +470,6 @@ export const FlightStatusPanel: React.FC<FlightStatusPanelProps> = ({
                 onChange={(e) => setFlightDate(e.target.value)}
                 className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-mono font-semibold focus:outline-none focus:border-[#008F45]"
               />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">
-              Data Feed Rotation
-            </label>
-            <div className="grid grid-cols-3 gap-1.5">
-              {(
-                [
-                  { id: 'auto', label: 'Auto-Rotate' },
-                  { id: 'aerodatabox', label: 'AeroDataBox' },
-                  { id: 'gemini', label: 'Gemini Search' },
-                ] as const
-              ).map((opt) => (
-                <button
-                  key={opt.id}
-                  type="button"
-                  onClick={() => setPreferredProvider(opt.id)}
-                  className={`py-2 px-2 rounded-lg text-[11px] font-semibold border transition-colors ${
-                    preferredProvider === opt.id
-                      ? 'bg-[#008F45] text-white border-[#008F45]'
-                      : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-[#008F45]'
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
             </div>
           </div>
 
@@ -544,7 +513,7 @@ export const FlightStatusPanel: React.FC<FlightStatusPanelProps> = ({
               Querying live schedules for {flightNumber} ({flightDate})...
             </p>
             <p className="text-xs text-slate-500">
-              Aggregating grounded web updates from airline &amp; airport feeds
+              Aggregating live operational schedules from global aviation feeds
             </p>
           </div>
         ) : trackerError ? (
@@ -583,11 +552,6 @@ export const FlightStatusPanel: React.FC<FlightStatusPanelProps> = ({
                 <span className={`px-3 py-1.5 rounded-xl text-xs font-bold ${statusBadgeColor(liveResult.parsed.status)}`}>
                   Status: {liveResult.parsed.status}
                 </span>
-                {liveResult.providerUsed && (
-                  <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                    Source: {liveResult.providerUsed}
-                  </span>
-                )}
               </div>
             </div>
 
@@ -631,27 +595,6 @@ export const FlightStatusPanel: React.FC<FlightStatusPanelProps> = ({
               </p>
             </div>
 
-            {liveResult.sources.length > 0 && (
-              <div className="space-y-2 pt-1">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                  Live Search Grounding Sources ({liveResult.sources.length})
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {liveResult.sources.map((src, idx) => (
-                    <a
-                      key={`${src.uri}-${idx}`}
-                      href={src.uri}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-[#E8F7EF] dark:hover:bg-emerald-950/60 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:text-[#006B35] transition-colors max-w-full"
-                    >
-                      <span className="truncate max-w-[220px]">{src.title}</span>
-                      <ArrowTopRightOnSquareIcon className="w-3.5 h-3.5 shrink-0" />
-                    </a>
-                  ))}
-                </div>
-              </div>
-            )}
           </>
         ) : (
           <div className="py-10 text-center space-y-3">
@@ -660,7 +603,7 @@ export const FlightStatusPanel: React.FC<FlightStatusPanelProps> = ({
               Ready to Track Your Flight Live
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
-              Enter your airline flight number and departure date on the left, or select a popular African route code to pull real-time search-grounded flight updates and citations.
+              Enter your airline flight number and departure date on the left, or select a popular African route code to pull real-time flight updates.
             </p>
           </div>
         )}

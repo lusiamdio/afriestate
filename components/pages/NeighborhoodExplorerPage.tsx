@@ -1398,7 +1398,7 @@ const NeighborhoodExplorerPage: React.FC<NeighborhoodExplorerPageProps> = ({
                         </p>
                       </div>
                       <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
-                        {safetyBenchmark?.providerUsed || 'Ranked Crime Cities RapidAPI'}
+                        AfriEstate City Safety Index
                       </span>
                     </div>
 

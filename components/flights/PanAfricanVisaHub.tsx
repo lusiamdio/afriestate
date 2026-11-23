@@ -41,7 +41,6 @@ interface LiveVisaAdvisorResponse {
   destinationCountry: string;
   travelPurpose: string;
   checkedAt: string;
-  providerUsed?: string;
   parsed: {
     entryCategory: string;
     stayLimit: string;
@@ -172,7 +171,6 @@ export const PanAfricanVisaHub: React.FC = () => {
   const [advisorError, setAdvisorError] = useState<string | null>(null);
   const [advisorResult, setAdvisorResult] = useState<LiveVisaAdvisorResponse | null>(null);
   const [liveVisaMap, setLiveVisaMap] = useState<Record<string, { regime: VisaRegime; colorTier: string }>>({});
-  const [visaMapProvider, setVisaMapProvider] = useState<string | null>(null);
   const [visaMapIsLive, setVisaMapIsLive] = useState(false);
   const [visaMapWarning, setVisaMapWarning] = useState<string | null>(null);
   const [visaMapNonce, setVisaMapNonce] = useState(0);
@@ -193,7 +191,6 @@ export const PanAfricanVisaHub: React.FC = () => {
       regimeByIso2?: Record<string, { regime: VisaRegime; colorTier: string }>;
       isLive?: boolean;
       upstreamWarning?: string;
-      providerUsed?: string;
     }>('/api/visa/map', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -204,7 +201,6 @@ export const PanAfricanVisaHub: React.FC = () => {
     })
       .then((data) => {
         setLiveVisaMap(data?.regimeByIso2 || {});
-        setVisaMapProvider(data?.providerUsed || null);
         setVisaMapIsLive(Boolean(data?.isLive));
         setVisaMapWarning(data?.upstreamWarning || null);
       })
@@ -212,8 +208,7 @@ export const PanAfricanVisaHub: React.FC = () => {
         if (!String(err?.message || '').includes('was cancelled')) {
           setLiveVisaMap({});
           setVisaMapIsLive(false);
-          setVisaMapProvider(null);
-          setVisaMapWarning(err?.message || 'Visa Requirement Map API unavailable.');
+          setVisaMapWarning(err?.message || 'Live border matrix unavailable.');
         }
       })
       .finally(() => {
@@ -636,7 +631,7 @@ export const PanAfricanVisaHub: React.FC = () => {
           <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 flex items-center gap-3 text-xs text-slate-700 dark:text-slate-200">
             <div className="w-4 h-4 border-2 border-emerald-600/30 border-t-emerald-600 rounded-full animate-spin shrink-0" />
             <span>
-              Querying Gemini Google Search grounding across official immigration portals for{' '}
+              Verifying official immigration portals for{' '}
               <strong>{passportCountry}</strong> &rarr; <strong>{selectedCountry.name}</strong> (28s timeout, auto-retry on transient errors)...
             </span>
           </div>
@@ -676,18 +671,13 @@ export const PanAfricanVisaHub: React.FC = () => {
               <div className="flex items-center gap-2">
                 <GlobeAltIcon className="w-5 h-5 text-[#008F45]" />
                 <h4 className="text-sm font-bold text-slate-900 dark:text-white">
-                  Live Search-Grounded Policy Update ({advisorResult.destinationCountry})
+                  Live Official Policy Update ({advisorResult.destinationCountry})
                 </h4>
               </div>
               <div className="text-right">
                 <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400 tabular-nums block">
                   Verified {new Date(advisorResult.checkedAt).toLocaleString()}
                 </span>
-                {advisorResult.providerUsed && (
-                  <span className="text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
-                    {advisorResult.providerUsed}
-                  </span>
-                )}
               </div>
             </div>
 
@@ -841,11 +831,11 @@ export const PanAfricanVisaHub: React.FC = () => {
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
               Select any nation to inspect full consular workflows tailored to your {passportCountry} passport.
               {isSyncingVisaMap
-                ? ' Syncing global visa map...'
-                : visaMapIsLive && visaMapProvider
-                ? ` Live map synced via ${visaMapProvider}.`
+                ? ' Syncing global visa matrix...'
+                : visaMapIsLive
+                ? ' Live border matrix synced.'
                 : visaMapWarning
-                ? ` Not verified live via Visa Map API (${visaMapWarning}).`
+                ? ` Border matrix not verified live (${visaMapWarning}).`
                 : ''}
             </p>
           </div>
