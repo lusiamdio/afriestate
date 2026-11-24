@@ -5,6 +5,7 @@ import { LanguageProvider } from './contexts/LanguageContext';
 import { CurrencyProvider } from './contexts/CurrencyContext';
 import { ToastProvider } from './contexts/ToastContext';
 import { AdminStateProvider } from './contexts/AdminStateContext';
+import { PlatformStateProvider } from './contexts/PlatformStateContext';
 
 // Google Maps Platform Tier 1 global auth & quota error defense (Case A)
 if (typeof window !== 'undefined') {
@@ -33,7 +34,9 @@ root.render(
       <CurrencyProvider>
         <ToastProvider>
           <AdminStateProvider>
-            <App />
+            <PlatformStateProvider>
+              <App />
+            </PlatformStateProvider>
           </AdminStateProvider>
         </ToastProvider>
       </CurrencyProvider>

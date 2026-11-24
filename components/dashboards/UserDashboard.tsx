@@ -41,6 +41,7 @@ import {
 } from '../../lib/data';
 import { useCurrency } from '../../contexts/CurrencyContext';
 import { useToast } from '../../contexts/ToastContext';
+import { usePlatformState, type PlatformVerticalTarget } from '../../contexts/PlatformStateContext';
 
 export type SeekerView =
   | 'overview'
@@ -73,6 +74,7 @@ interface UserDashboardProps {
   onUpgradeAccountRequest?: () => void;
   onListPropertyClick?: () => void;
   onSendMessage?: (property: Property, text: string) => Promise<void> | void;
+  onNavigatePlatformPage?: (target: PlatformVerticalTarget) => void;
 }
 
 const viewMeta: Record<SeekerView, { label: string; group: string }> = {
@@ -118,7 +120,9 @@ const UserDashboard: React.FC<UserDashboardProps> = (props) => {
     onUpgradeAccountRequest,
     onListPropertyClick,
     onSendMessage,
+    onNavigatePlatformPage,
   } = props;
+  const { unifiedBookings, sharedJourney } = usePlatformState();
 
   const [activeView, setActiveView] = useState<SeekerView>('overview');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -216,6 +220,10 @@ const UserDashboard: React.FC<UserDashboardProps> = (props) => {
             onBrowseMarketplace={onBrowseMarketplace}
             onOpenDetailModal={onOpenDetailModal}
             onUpgradeAccountRequest={onUpgradeAccountRequest}
+            unifiedBookingsCount={unifiedBookings.length}
+            recentUnifiedBookings={unifiedBookings}
+            sharedCity={sharedJourney.destinationCity}
+            onNavigatePlatformPage={onNavigatePlatformPage}
           />
         );
       case 'saved':
@@ -259,7 +267,7 @@ const UserDashboard: React.FC<UserDashboardProps> = (props) => {
       case 'documents':
         return <DocumentVaultView user={user} addToast={addToast} />;
       case 'payments':
-        return <PaymentsView addToast={addToast} />;
+        return <PaymentsView addToast={addToast} unifiedBookings={unifiedBookings} onNavigatePlatformPage={onNavigatePlatformPage} />;
       default:
         return null;
     }
@@ -397,6 +405,10 @@ const SeekerOverview: React.FC<{
   onBrowseMarketplace?: () => void;
   onOpenDetailModal?: (property: Property) => void;
   onUpgradeAccountRequest?: () => void;
+  unifiedBookingsCount: number;
+  recentUnifiedBookings: ReturnType<typeof usePlatformState>['unifiedBookings'];
+  sharedCity: string;
+  onNavigatePlatformPage?: (target: PlatformVerticalTarget) => void;
 }> = ({
   user,
   savedProperties,
@@ -408,12 +420,16 @@ const SeekerOverview: React.FC<{
   onBrowseMarketplace,
   onOpenDetailModal,
   onUpgradeAccountRequest,
+  unifiedBookingsCount,
+  recentUnifiedBookings,
+  sharedCity,
+  onNavigatePlatformPage,
 }) => {
   const kpis = [
     { label: 'Saved Homes', value: String(savedProperties.length), sub: 'Shortlisted residences', icon: HeartIcon, view: 'saved' as SeekerView },
     { label: 'Scheduled Tours', value: String(tourRequests.length), sub: 'Upcoming viewings', icon: CalendarIcon, view: 'tours' as SeekerView },
     { label: 'Saved Searches', value: String(savedSearches.length), sub: 'Tracked market filters', icon: BookmarkIcon, view: 'searches' as SeekerView },
-    { label: 'Agent Threads', value: String(messageThreadCount), sub: 'Direct enquiries', icon: ChatBubbleLeftRightIcon, view: 'messages' as SeekerView },
+    { label: 'Platform Bookings', value: String(unifiedBookingsCount || messageThreadCount), sub: unifiedBookingsCount > 0 ? 'Flights, stays, transport & spa' : 'Direct enquiries', icon: BanknotesIcon, view: (unifiedBookingsCount > 0 ? 'payments' : 'messages') as SeekerView },
   ];
 
   return (
@@ -605,6 +621,93 @@ const SeekerOverview: React.FC<{
             </button>
           </div>
         </div>
+      </div>
+
+      {/* Unified Cross-Platform Travel & Vertical Bookings */}
+      <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5 sm:p-6 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="text-base font-semibold text-slate-900 dark:text-white">
+              Cross-Platform Travel &amp; Reservations
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              Active itinerary hub: <span className="font-semibold text-slate-800 dark:text-slate-200">{sharedCity || 'Cape Town'}</span> · Shared across Flights, Short Stays, Transport &amp; Wellness
+            </p>
+          </div>
+          {onNavigatePlatformPage && (
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => onNavigatePlatformPage('book-flights')}
+                className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-semibold text-slate-800 dark:text-slate-200"
+              >
+                Flights
+              </button>
+              <button
+                type="button"
+                onClick={() => onNavigatePlatformPage('book-a-stay')}
+                className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-semibold text-slate-800 dark:text-slate-200"
+              >
+                Short Stays
+              </button>
+              <button
+                type="button"
+                onClick={() => onNavigatePlatformPage('rent-a-car')}
+                className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-semibold text-slate-800 dark:text-slate-200"
+              >
+                Transport
+              </button>
+              <button
+                type="button"
+                onClick={() => onNavigatePlatformPage('find-wellness')}
+                className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-semibold text-slate-800 dark:text-slate-200"
+              >
+                Wellness
+              </button>
+            </div>
+          )}
+        </div>
+
+        {recentUnifiedBookings.length > 0 ? (
+          <div className="divide-y divide-slate-100 dark:divide-slate-800">
+            {recentUnifiedBookings.slice(0, 5).map((item) => (
+              <div key={item.id} className="py-3.5 flex flex-wrap items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">
+                    {item.title}
+                  </p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate">
+                    {item.subtitle} · <span className="font-mono tabular-nums">{item.startDate}</span> · Ref{' '}
+                    <span className="font-mono">{item.reference}</span>
+                  </p>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+                    {item.status}
+                  </span>
+                  {item.amountZar > 0 && (
+                    <span className="font-mono text-sm font-bold text-slate-900 dark:text-white tabular-nums">
+                      R {item.amountZar.toLocaleString()}
+                    </span>
+                  )}
+                  {onNavigatePlatformPage && (
+                    <button
+                      type="button"
+                      onClick={() => onNavigatePlatformPage(item.targetPage)}
+                      className="text-xs font-semibold text-[#0F2D25] dark:text-[#C9A35D] hover:underline"
+                    >
+                      Open &rarr;
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Any flight, short-term stay, executive vehicle rental, or wellness appointment you book will appear here automatically.
+          </p>
+        )}
       </div>
     </div>
   );
@@ -1177,7 +1280,9 @@ const DocumentVaultView: React.FC<{
 
 const PaymentsView: React.FC<{
   addToast: (msg: string, type?: 'success' | 'info' | 'error') => void;
-}> = ({ addToast }) => {
+  unifiedBookings: ReturnType<typeof usePlatformState>['unifiedBookings'];
+  onNavigatePlatformPage?: (target: PlatformVerticalTarget) => void;
+}> = ({ addToast, unifiedBookings, onNavigatePlatformPage }) => {
   const [savedCards, setSavedCards] = useState<{ id: string; brand: string; last4: string; expiry: string }[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
   const [cardLabel, setCardLabel] = useState('Visa Corporate');
@@ -1285,13 +1390,51 @@ const PaymentsView: React.FC<{
         )}
 
         <hr className="border-slate-200 dark:border-slate-800" />
-        <div>
-          <h3 className="text-base font-semibold text-slate-900 dark:text-white mb-1">
-            Transaction &amp; Escrow History
-          </h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            Completed booking settlements and refundable deposit records will appear here.
-          </p>
+        <div className="space-y-3">
+          <div>
+            <h3 className="text-base font-semibold text-slate-900 dark:text-white mb-1">
+              Transaction &amp; Booking Settlement History
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Synchronized short-stay, aviation, vehicle hire, and wellness settlements across AfriEstate.
+            </p>
+          </div>
+          {unifiedBookings.length > 0 ? (
+            <div className="divide-y divide-slate-100 dark:divide-slate-800">
+              {unifiedBookings.map((booking) => (
+                <div key={booking.id} className="py-3 flex flex-wrap items-center justify-between gap-3 text-sm">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-slate-900 dark:text-white truncate">{booking.title}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Ref <span className="font-mono">{booking.reference}</span> · {booking.city} ·{' '}
+                      <span className="font-mono tabular-nums">{booking.startDate}</span>
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+                      {booking.status}
+                    </span>
+                    <span className="font-mono font-bold text-slate-900 dark:text-white tabular-nums">
+                      {booking.amountZar > 0 ? `R ${booking.amountZar.toLocaleString()}` : 'Off-Platform'}
+                    </span>
+                    {onNavigatePlatformPage && (
+                      <button
+                        type="button"
+                        onClick={() => onNavigatePlatformPage(booking.targetPage)}
+                        className="text-xs font-semibold text-[#0F2D25] dark:text-[#C9A35D] hover:underline"
+                      >
+                        View
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Completed booking settlements and refundable deposit records will appear here.
+            </p>
+          )}
         </div>
       </div>
     </div>

@@ -1,8 +1,9 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import type { Property } from '../../types';
 import { GoogleGenAI } from '../../lib/ai';
 import { useToast } from '../../contexts/ToastContext';
+import { usePlatformState } from '../../contexts/PlatformStateContext';
 import {
   MapPinIcon,
   CalendarIcon,
@@ -146,11 +147,16 @@ interface RentACarPageProps {
 
 const RentACarPage: React.FC<RentACarPageProps> = ({ properties = [], onListFleet, onNavigate }) => {
   const { addToast } = useToast();
+  const { currentUser, sharedJourney, updateSharedJourney, addPlatformBooking } = usePlatformState();
   const [activeCategory, setActiveCategory] = useState<'All' | 'Luxury' | 'SUV' | 'Executive'>('All');
-  const [pickupLocation, setPickupLocation] = useState('Cape Town Airport');
-  const [returnLocation, setReturnLocation] = useState('Cape Town CBD');
-  const [pickupDate, setPickupDate] = useState('2026-06-15');
-  const [returnDate, setReturnDate] = useState('2026-06-20');
+  const [pickupLocation, setPickupLocation] = useState(() =>
+    sharedJourney.destinationCity ? `${sharedJourney.destinationCity} Airport` : 'Cape Town Airport'
+  );
+  const [returnLocation, setReturnLocation] = useState(() =>
+    sharedJourney.destinationCity ? `${sharedJourney.destinationCity} CBD` : 'Cape Town CBD'
+  );
+  const [pickupDate, setPickupDate] = useState(() => sharedJourney.checkInDate || '2026-06-15');
+  const [returnDate, setReturnDate] = useState(() => sharedJourney.returnDate || '2026-06-20');
   const [driverAge, setDriverAge] = useState('30+');
   const [activeHub, setActiveHub] = useState<'All' | 'Cape Town' | 'Johannesburg' | 'Luanda'>('All');
 
@@ -158,6 +164,21 @@ const RentACarPage: React.FC<RentACarPageProps> = ({ properties = [], onListFlee
   const [driverName, setDriverName] = useState('');
   const [driverEmail, setDriverEmail] = useState('');
   const [driverPhone, setDriverPhone] = useState('');
+
+  useEffect(() => {
+    if (currentUser) {
+      setDriverName((prev) => prev || currentUser.fullName || currentUser.username || '');
+      setDriverEmail((prev) => prev || currentUser.email || '');
+      setDriverPhone((prev) => prev || currentUser.phone || '');
+    }
+  }, [currentUser]);
+
+  useEffect(() => {
+    updateSharedJourney({
+      checkInDate: pickupDate,
+      returnDate: returnDate,
+    });
+  }, [pickupDate, returnDate, updateSharedJourney]);
   const [bookingStep, setBookingStep] = useState<'details' | 'settlement'>('details');
   const [settledReceipt, setSettledReceipt] = useState<SettlementReceipt | null>(null);
 
@@ -285,17 +306,30 @@ const RentACarPage: React.FC<RentACarPageProps> = ({ properties = [], onListFlee
 
   const handleCarHireSettled = async (receipt: SettlementReceipt) => {
     if (!selectedVehicle) return;
-    const cleanEmail = sanitizeText(driverEmail, 120);
+    const cleanName = sanitizeText(driverName, 80);
+    const cleanEmail = sanitizeText(driverEmail, 120).toLowerCase();
     const title = `${selectedVehicle.make} ${selectedVehicle.model}`;
     setSettledReceipt(receipt);
+
+    addPlatformBooking({
+      category: 'car-hire',
+      reference: receipt.transactionRef,
+      title,
+      subtitle: `${pickupLocation} → ${returnLocation} · ${selectedVehicle.businessName}`,
+      city: selectedVehicle.city || pickupLocation,
+      startDate: pickupDate,
+      endDate: returnDate,
+      amountZar: receipt.amount,
+      status: 'Confirmed',
+      customerName: cleanName || currentUser?.fullName || 'Guest Driver',
+      customerEmail: cleanEmail || currentUser?.email || '',
+      targetPage: 'rent-a-car',
+    });
 
     const throttle = checkSubmissionThrottle(`car_book_${selectedVehicle.id}`, 8000);
     if (throttle.allowed) {
       try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-        const username = user?.email || cleanEmail;
+        const username = currentUser?.username || currentUser?.email || cleanEmail;
         await supabase.from('tour_requests').insert({
           property_id: selectedVehicle.id,
           property_title: `${title} (${pickupLocation} · ${pickupDate} to ${returnDate} · Ref ${receipt.transactionRef})`,

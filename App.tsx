@@ -105,8 +105,14 @@ import ServiceListingPage from './components/pages/ServiceListingPage';
 import DashboardPortalPage from './components/pages/DashboardPortalPage';
 import BookFlightsPage from './components/pages/BookFlightsPage';
 import ComparePropertiesPage from './components/pages/ComparePropertiesPage';
+import {
+  PrivacyPolicyPage,
+  DataProtectionPage,
+  PopiaCompliancePage,
+} from './components/pages/LegalCompliancePages';
+import { usePlatformState } from './contexts/PlatformStateContext';
 
-type Page = 'home' | 'about' | 'services' | 'contact' | 'pricing' | 'rent-a-car' | 'find-wellness' | 'book-a-stay' | 'long-term-stays' | 'book-flights' | 'auth' | 'property-detail' | 'neighborhood-explorer' | 'find-professional' | 'hotel-registration' | 'list-service' | 'list-transport' | 'list-wellness' | 'dashboard' | 'seeker-dashboard' | 'agent-platform' | 'investor-platform' | 'compare';
+type Page = 'home' | 'about' | 'services' | 'contact' | 'pricing' | 'rent-a-car' | 'find-wellness' | 'book-a-stay' | 'long-term-stays' | 'book-flights' | 'auth' | 'property-detail' | 'neighborhood-explorer' | 'find-professional' | 'hotel-registration' | 'list-service' | 'list-transport' | 'list-wellness' | 'dashboard' | 'seeker-dashboard' | 'agent-platform' | 'investor-platform' | 'compare' | 'privacy-policy' | 'data-protection' | 'popia';
 
 const initialFilters: SearchFilters = {
     location: '',
@@ -166,6 +172,7 @@ const blogSchema = {
 
 const App: React.FC = () => {
   const { settings, roleControls, userOverrides, applyListingOverrides, lastAction } = useAdminState();
+  const { setSessionUser, setAuthLoading, updateSharedJourney } = usePlatformState();
   const [page, setPage] = useState<Page>('home');
   const [filters, setFilters] = useState<SearchFilters>(initialFilters);
   
@@ -209,6 +216,8 @@ const App: React.FC = () => {
   
   // Auth State
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
+  const [pendingAuthRedirect, setPendingAuthRedirect] = useState<Page | null>(null);
 
   // Saved Properties State
   const [savedPropertyIds, setSavedPropertyIds] = useState<Set<string>>(new Set());
@@ -281,7 +290,11 @@ const App: React.FC = () => {
   const [isTourModalOpen, setIsTourModalOpen] = useState(false);
   const [isCompareModalOpen, setIsCompareModalOpen] = useState(false);
   const [authPageView, setAuthPageView] = useState<AuthView>('login');
-  const openAuthPage = (view: AuthView = 'login') => {
+  const openAuthPage = (view: AuthView = 'login', returnToPage?: Page) => {
+    const redirectTarget = returnToPage || (page !== 'auth' && page !== 'home' ? page : null);
+    if (redirectTarget) {
+      setPendingAuthRedirect(redirectTarget);
+    }
     setAuthPageView(view);
     setPage('auth');
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -375,6 +388,7 @@ const App: React.FC = () => {
       if (!active) return;
       if (!session?.user) {
         setCurrentUser(null);
+        setSessionUser(null);
         setIsSuperAdminLoggedIn(false);
         return;
       }
@@ -399,6 +413,7 @@ const App: React.FC = () => {
       if (profile?.status === 'Suspended') {
         await supabase.auth.signOut().catch(() => undefined);
         setCurrentUser(null);
+        setSessionUser(null);
         setIsSuperAdminLoggedIn(false);
         return;
       }
@@ -410,7 +425,7 @@ const App: React.FC = () => {
         setIsSuperAdminLoggedIn(true);
       }
 
-      setCurrentUser({
+      const hydratedUser: User = {
         id: authUser.id,
         username: profile?.username || authUser.email || authUser.id,
         fullName: profile?.full_name || authUser.user_metadata?.full_name || 'AfriEstate Member',
@@ -425,12 +440,20 @@ const App: React.FC = () => {
         isWalletFrozen: Boolean(profile?.is_wallet_frozen),
         agencyName: profile?.agency_name || undefined,
         companyName: profile?.company_name || undefined,
-      });
+      };
+      setCurrentUser(hydratedUser);
+      setSessionUser(hydratedUser);
     };
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      hydrateAuthenticatedUser(session);
-    });
+    supabase.auth
+      .getSession()
+      .then(({ data: { session } }) => hydrateAuthenticatedUser(session))
+      .finally(() => {
+        if (active) {
+          setIsAuthLoading(false);
+          setAuthLoading(false);
+        }
+      });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       hydrateAuthenticatedUser(session);
@@ -900,11 +923,17 @@ const App: React.FC = () => {
       listingType: listingType || prev.listingType,
       mode: listingType === ListingType.FOR_INVESTMENT ? 'invest' : prev.mode,
     }));
+    if (city) {
+      updateSharedJourney({ destinationCity: city });
+    }
     scrollToSection('home', 'all-listings');
   };
 
   const handleFilterChange = (key: keyof SearchFilters, value: any) => {
     setFilters(prev => ({ ...prev, [key]: value }));
+    if (key === 'location' && typeof value === 'string' && value.trim()) {
+      updateSharedJourney({ destinationCity: value.trim() });
+    }
   };
 
   const fallbackParseQuery = (q: string): Partial<SearchFilters> => {
@@ -1119,7 +1148,9 @@ const App: React.FC = () => {
   };
   
   const handleLogin = () => {
-      setPage('home');
+      const target = pendingAuthRedirect || 'home';
+      setPendingAuthRedirect(null);
+      setPage(target);
       window.scrollTo({ top: 0, behavior: 'smooth' });
   };
   
@@ -1130,8 +1161,18 @@ const App: React.FC = () => {
         // Proceed clearing client session state
     }
     setCurrentUser(null);
+    setSessionUser(null);
+    setPendingAuthRedirect(null);
     setIsSuperAdminLoggedIn(false);
-    if (['dashboard', 'seeker-dashboard', 'agent-platform', 'investor-platform'].includes(page)) {
+    setSavedPropertyIds(new Set());
+    setTourRequests([]);
+    setSavedSearches([]);
+    setMessages([]);
+    setCalendarEvents([]);
+    setLeads([]);
+    setInvestmentRequests([]);
+    setNotifications([]);
+    if (['dashboard', 'seeker-dashboard', 'agent-platform', 'investor-platform', 'list-service', 'list-transport', 'list-wellness'].includes(page)) {
       setPage('home');
     }
     setIsSessionWarningOpen(false);
@@ -1570,7 +1611,10 @@ const App: React.FC = () => {
           return (
             <AuthPage
               initialView={authPageView}
-              onBack={() => scrollToSection('home')}
+              onBack={() => {
+                setPendingAuthRedirect(null);
+                scrollToSection('home');
+              }}
               onLogin={handleLogin}
               onSwitchToPricing={() => scrollToSection('pricing')}
               onSelectHotelManager={() => {
@@ -1579,8 +1623,39 @@ const App: React.FC = () => {
               }}
               onSuperAdminLogin={() => {
                 setIsSuperAdminLoggedIn(true);
+                setPendingAuthRedirect(null);
                 setPage('home');
               }}
+              onOpenPrivacyPolicy={() => scrollToSection('privacy-policy')}
+              onOpenDataProtection={() => scrollToSection('data-protection')}
+              onOpenPopia={() => scrollToSection('popia')}
+            />
+          );
+      case 'privacy-policy':
+          return (
+            <PrivacyPolicyPage
+              onNavigateCompliance={(slug) => scrollToSection(slug)}
+              onBackHome={() => scrollToSection('home')}
+              onOpenContact={() => scrollToSection('contact', 'contact')}
+              onOpenDashboard={() => openDashboardPage('dashboard')}
+            />
+          );
+      case 'data-protection':
+          return (
+            <DataProtectionPage
+              onNavigateCompliance={(slug) => scrollToSection(slug)}
+              onBackHome={() => scrollToSection('home')}
+              onOpenContact={() => scrollToSection('contact', 'contact')}
+              onOpenDashboard={() => openDashboardPage('dashboard')}
+            />
+          );
+      case 'popia':
+          return (
+            <PopiaCompliancePage
+              onNavigateCompliance={(slug) => scrollToSection(slug)}
+              onBackHome={() => scrollToSection('home')}
+              onOpenContact={() => scrollToSection('contact', 'contact')}
+              onOpenDashboard={() => openDashboardPage('dashboard')}
             />
           );
       case 'property-detail':
@@ -1764,6 +1839,7 @@ const App: React.FC = () => {
                   : 'auto'
               }
               user={currentUser}
+              isAuthLoading={isAuthLoading}
               allProperties={governedProperties}
               investmentProperties={investmentProperties}
               tourRequests={tourRequests}
@@ -1783,7 +1859,7 @@ const App: React.FC = () => {
               currency={currency}
               theme={theme}
               onBackToMarketplace={() => scrollToSection('home')}
-              onOpenAuth={() => openAuthPage('login')}
+              onOpenAuth={() => openAuthPage('login', page)}
               onLogout={handleLogout}
               onEditProperty={handleEditProperty}
               onDeleteProperty={handleDeleteProperty}
@@ -1815,6 +1891,7 @@ const App: React.FC = () => {
               onToggleCompare={handleToggleCompare}
               onOpenVRTour={handleOpenVRTour}
               onSendMessage={(prop, text) => handleSendMessage(text, prop)}
+              onNavigatePlatformPage={(target) => scrollToSection(target)}
               onNotificationsDispatched={(dispatched) => {
                 setNotifications(prev => {
                   const seen = new Set(prev.map(n => n.id));
@@ -2425,7 +2502,9 @@ const App: React.FC = () => {
               onAboutClick={() => scrollToSection('about', 'about')}
               onContactClick={() => scrollToSection('contact', 'contact')}
               onBlogClick={() => scrollToSection('home', 'blog')}
-              onPrivacyPolicyClick={() => setIsPrivacyPolicyModalOpen(true)}
+              onPrivacyPolicyClick={() => scrollToSection('privacy-policy')}
+              onDataProtectionClick={() => scrollToSection('data-protection')}
+              onPopiaClick={() => scrollToSection('popia')}
               onTermsOfServiceClick={() => setIsTermsOfServiceModalOpen(true)}
               onCareersClick={() => setIsCareersModalOpen(true)}
               onFindAProClick={() => handleOpenProviderServices('All')}

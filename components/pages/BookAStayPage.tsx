@@ -34,6 +34,7 @@ import { ListingType, PropertyType, type Property } from '../../types';
 import { GoogleGenAI } from '../../lib/ai';
 import { resolveProvinceForCity } from '../../lib/data';
 import { useToast } from '../../contexts/ToastContext';
+import { usePlatformState } from '../../contexts/PlatformStateContext';
 import { SharePropertyModal } from '../stay/StayModals';
 import { getPublishedStayProfiles } from '../../lib/data';
 import { generateListingSignature, sanitizeSafeUrl, sanitizeText } from '../../lib/security';
@@ -76,21 +77,36 @@ const BookAStayPage: React.FC<BookAStayPageProps> = ({
   onListLongTermProperty,
 }) => {
   const { addToast } = useToast();
+  const {
+    sharedJourney,
+    updateSharedJourney,
+    savedStayIds: savedIds,
+    toggleSavedStay,
+    compareStayIds: compareIds,
+    toggleCompareStay,
+  } = usePlatformState();
   const [selectedStay, setSelectedStay] = useState<StayPropertyProfile | null>(null);
   const [termMode, setTermMode] = useState<StayTermMode>(initialTermMode);
   const [userIntent, setUserIntent] = useState<UserIntentType>('Traveler');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
-  const [searchCity, setSearchCity] = useState<string>('');
-  const [checkIn, setCheckIn] = useState<string>('2026-12-12');
-  const [checkOut, setCheckOut] = useState<string>('2026-12-15');
+  const [searchCity, setSearchCity] = useState<string>(sharedJourney.destinationCity || '');
+  const [checkIn, setCheckIn] = useState<string>(sharedJourney.checkInDate || '2026-12-12');
+  const [checkOut, setCheckOut] = useState<string>(sharedJourney.returnDate || '2026-12-15');
   const [leaseMonths, setLeaseMonths] = useState<number>(3);
-  const [guestsCount, setGuestsCount] = useState<string>('2 guests · 1 room');
+  const [guestsCount, setGuestsCount] = useState<string>(sharedJourney.guestsLabel || '2 guests · 1 room');
   const [savedOnly, setSavedOnly] = useState<boolean>(false);
 
-  const [savedIds, setSavedIds] = useState<string[]>(['african-grand-hotel']);
-  const [compareIds, setCompareIds] = useState<string[]>([]);
   const [isCompareOpen, setIsCompareOpen] = useState<boolean>(false);
   const [shareTarget, setShareTarget] = useState<StayPropertyProfile | null>(null);
+
+  useEffect(() => {
+    updateSharedJourney({
+      ...(searchCity.trim() ? { destinationCity: searchCity.trim() } : {}),
+      checkInDate: checkIn,
+      returnDate: checkOut,
+      guestsLabel: guestsCount,
+    });
+  }, [searchCity, checkIn, checkOut, guestsCount, updateSharedJourney]);
   const [stayLanguages, setStayLanguages] = useState<Array<{ code: string; name: string }>>([
     { code: 'en-gb', name: 'English (UK)' },
     { code: 'fr', name: 'Français' },
@@ -259,22 +275,16 @@ const BookAStayPage: React.FC<BookAStayPageProps> = ({
   );
 
   const toggleSave = (id: string, name: string) => {
-    setSavedIds((prev) => {
-      const exists = prev.includes(id);
-      addToast(exists ? `Removed ${name} from Saved Stays.` : `Saved ${name} to your stay collection.`, 'success');
-      return exists ? prev.filter((x) => x !== id) : [...prev, id];
-    });
+    const added = toggleSavedStay(id);
+    addToast(added ? `Saved ${name} to your stay collection.` : `Removed ${name} from Saved Stays.`, 'success');
   };
 
   const toggleCompare = (id: string) => {
-    setCompareIds((prev) => {
-      if (prev.includes(id)) return prev.filter((x) => x !== id);
-      if (prev.length >= 3) {
-        addToast('You can compare up to 3 stays side by side.', 'info');
-        return prev;
-      }
-      return [...prev, id];
-    });
+    if (!compareIds.includes(id) && compareIds.length >= 3) {
+      addToast('You can compare up to 3 stays side by side.', 'info');
+      return;
+    }
+    toggleCompareStay(id);
   };
 
   const handleAskAi = async (e: React.FormEvent) => {

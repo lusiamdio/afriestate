@@ -29,6 +29,7 @@ import {
 } from '../flights/FlightOperationsPanels';
 import PanAfricanVisaHub from '../flights/PanAfricanVisaHub';
 import { useCurrency } from '../../contexts/CurrencyContext';
+import { usePlatformState, resolveCityFromAirport } from '../../contexts/PlatformStateContext';
 import { fetchJsonStrict } from '../../lib/http';
 
 interface BookFlightsPageProps {
@@ -68,10 +69,21 @@ const QUICK_EXPLORE_DESTINATIONS = [
 
 const BookFlightsPage: React.FC<BookFlightsPageProps> = ({ currentUser, onBack, onNavigate }) => {
   const { currency, formatCurrency } = useCurrency();
+  const { sharedJourney, updateSharedJourney, addPlatformBooking } = usePlatformState();
   const formatZar = (zar: number) => formatCurrency(zarToUsd(zar));
 
+  const userScopeSuffix = currentUser?.id || currentUser?.username || 'guest';
+  const scopedTripsKey = `${TRIPS_STORAGE_KEY}_${userScopeSuffix}`;
+  const scopedAlertsKey = `${ALERTS_STORAGE_KEY}_${userScopeSuffix}`;
+
   const [section, setSection] = useState<FlightHubSection>('flights');
-  const [search, setSearch] = useState<FlightSearchParams>(DEFAULT_SEARCH);
+  const [search, setSearch] = useState<FlightSearchParams>(() => ({
+    ...DEFAULT_SEARCH,
+    origin: sharedJourney.originAirport || DEFAULT_SEARCH.origin,
+    destination: sharedJourney.destinationAirport || DEFAULT_SEARCH.destination,
+    departDate: sharedJourney.checkInDate || DEFAULT_SEARCH.departDate,
+    returnDate: sharedJourney.returnDate || DEFAULT_SEARCH.returnDate,
+  }));
   const [isSearching, setIsSearching] = useState<boolean>(false);
 
   const [selectedBookingFlight, setSelectedBookingFlight] = useState<{
@@ -81,7 +93,9 @@ const BookFlightsPage: React.FC<BookFlightsPageProps> = ({ currentUser, onBack, 
 
   const [trips, setTrips] = useState<BookedTripRecord[]>(() => {
     try {
-      const raw = localStorage.getItem(TRIPS_STORAGE_KEY);
+      const scoped = localStorage.getItem(scopedTripsKey);
+      const legacy = localStorage.getItem(TRIPS_STORAGE_KEY);
+      const raw = scoped || legacy;
       const parsed = raw ? JSON.parse(raw) : [];
       return Array.isArray(parsed) ? parsed : [];
     } catch {
@@ -91,13 +105,45 @@ const BookFlightsPage: React.FC<BookFlightsPageProps> = ({ currentUser, onBack, 
 
   const [alerts, setAlerts] = useState<PriceAlertRecord[]>(() => {
     try {
-      const raw = localStorage.getItem(ALERTS_STORAGE_KEY);
+      const scoped = localStorage.getItem(scopedAlertsKey);
+      const legacy = localStorage.getItem(ALERTS_STORAGE_KEY);
+      const raw = scoped || legacy;
       const parsed = raw ? JSON.parse(raw) : [];
       return Array.isArray(parsed) ? parsed : [];
     } catch {
       return [];
     }
   });
+
+  useEffect(() => {
+    try {
+      const scoped = localStorage.getItem(scopedTripsKey);
+      const parsed = scoped ? JSON.parse(scoped) : [];
+      if (Array.isArray(parsed)) setTrips(parsed);
+    } catch {
+      // ignore
+    }
+    try {
+      const scopedA = localStorage.getItem(scopedAlertsKey);
+      const parsedA = scopedA ? JSON.parse(scopedA) : [];
+      if (Array.isArray(parsedA)) setAlerts(parsedA);
+    } catch {
+      // ignore
+    }
+  }, [scopedTripsKey, scopedAlertsKey]);
+
+  useEffect(() => {
+    const destCity = resolveCityFromAirport(search.destination);
+    updateSharedJourney({
+      originAirport: search.origin,
+      ...(search.destination && !search.destination.startsWith('ANYWHERE')
+        ? { destinationAirport: search.destination }
+        : {}),
+      ...(destCity ? { destinationCity: destCity } : {}),
+      checkInDate: search.departDate,
+      returnDate: search.returnDate,
+    });
+  }, [search.origin, search.destination, search.departDate, search.returnDate, updateSharedJourney]);
 
   const [priceAlertModal, setPriceAlertModal] = useState<{ open: boolean; zar: number }>({
     open: false,
@@ -141,6 +187,7 @@ const BookFlightsPage: React.FC<BookFlightsPageProps> = ({ currentUser, onBack, 
   const persistTrips = (next: BookedTripRecord[]) => {
     setTrips(next);
     try {
+      localStorage.setItem(scopedTripsKey, JSON.stringify(next));
       localStorage.setItem(TRIPS_STORAGE_KEY, JSON.stringify(next));
     } catch {
       // ignore quota
@@ -150,6 +197,7 @@ const BookFlightsPage: React.FC<BookFlightsPageProps> = ({ currentUser, onBack, 
   const persistAlerts = (next: PriceAlertRecord[]) => {
     setAlerts(next);
     try {
+      localStorage.setItem(scopedAlertsKey, JSON.stringify(next));
       localStorage.setItem(ALERTS_STORAGE_KEY, JSON.stringify(next));
     } catch {
       // ignore quota
@@ -462,7 +510,30 @@ const BookFlightsPage: React.FC<BookFlightsPageProps> = ({ currentUser, onBack, 
             currentUser={currentUser}
             onCancelFlow={() => setSelectedBookingFlight(null)}
             onExploreHotels={() => onNavigate?.('book-a-stay')}
-            onBookingCompleted={(trip) => persistTrips([trip, ...trips])}
+            onBookingCompleted={(trip) => {
+              persistTrips([trip, ...trips]);
+              const destCity =
+                trip.destinationCity ||
+                resolveCityFromAirport(trip.destination) ||
+                trip.destination;
+              addPlatformBooking({
+                category: 'flight',
+                reference: trip.reference,
+                title: `${trip.airline} · ${trip.origin} → ${trip.destination}`,
+                subtitle: `${trip.cabin} · ${trip.travellersCount} passenger(s)`,
+                city: destCity,
+                startDate: trip.departureDate,
+                endDate: trip.returnDate,
+                amountZar: trip.totalZar,
+                status: trip.status === 'Cancelled' ? 'Cancelled' : 'Confirmed',
+                customerName:
+                  trip.leadTravellerName ||
+                  currentUser?.fullName ||
+                  'Traveler',
+                customerEmail: trip.contactEmail || currentUser?.email || '',
+                targetPage: 'book-flights',
+              });
+            }}
             onViewMyTrips={() => {
               setSelectedBookingFlight(null);
               setSection('trips');

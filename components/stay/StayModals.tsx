@@ -30,6 +30,7 @@ import { GoogleGenAI } from '../../lib/ai';
 import { createStayBooking } from '../../lib/data';
 import { generateSecureBookingRef, isValidEmail, sanitizeText } from '../../lib/security';
 import { useToast } from '../../contexts/ToastContext';
+import { usePlatformState } from '../../contexts/PlatformStateContext';
 import PaymentSettlementPanel, { type SettlementReceipt } from '../payments/PaymentSettlementPanel';
 
 interface VerificationModalProps {
@@ -852,6 +853,7 @@ export const TransparentBookingModal: React.FC<{
   guestsLabel,
 }) => {
   const { addToast } = useToast();
+  const { currentUser, addPlatformBooking } = usePlatformState();
   const [guestName, setGuestName] = useState('');
   const [guestEmail, setGuestEmail] = useState('');
   const [leaseNote, setLeaseNote] = useState('');
@@ -862,13 +864,17 @@ export const TransparentBookingModal: React.FC<{
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
+    if (isOpen && currentUser) {
+      setGuestName((prev) => prev || currentUser.fullName || currentUser.username || '');
+      setGuestEmail((prev) => prev || currentUser.email || '');
+    }
     if (!isOpen) {
       setConfirmed(false);
       setBookingRef('');
       setSettledReceipt(null);
       setIsSubmitting(false);
     }
-  }, [isOpen]);
+  }, [isOpen, currentUser]);
 
   if (!isOpen || !room || !ratePlan) return null;
 
@@ -909,6 +915,20 @@ export const TransparentBookingModal: React.FC<{
       payToday,
       payAtProperty,
       bookingRef: receipt.transactionRef,
+    });
+    addPlatformBooking({
+      category: 'short-stay',
+      reference: receipt.transactionRef,
+      title: `${property.name} · ${room.name}`,
+      subtitle: `${ratePlan.name} · ${nights} night(s) (${guestsLabel})`,
+      city: property.city || property.locationLabel || 'Cape Town',
+      startDate: checkIn,
+      endDate: checkOut,
+      amountZar: payToday,
+      status: 'Confirmed',
+      customerName: cleanedName,
+      customerEmail: cleanedEmail,
+      targetPage: 'book-a-stay',
     });
     setSettledReceipt(receipt);
     setBookingRef(receipt.transactionRef);
@@ -954,6 +974,20 @@ export const TransparentBookingModal: React.FC<{
         payToday: 0,
         payAtProperty: grandTotal,
         bookingRef: ref,
+      });
+      addPlatformBooking({
+        category: 'lease-inquiry',
+        reference: ref,
+        title: `${property.name} · ${months}-Month Lease Inquiry`,
+        subtitle: `${room.name} · Direct Landlord Execution`,
+        city: property.city || property.locationLabel || 'Cape Town',
+        startDate: checkIn,
+        endDate: checkOut,
+        amountZar: 0,
+        status: 'Pending',
+        customerName: cleanedName,
+        customerEmail: cleanedEmail,
+        targetPage: 'long-term-stays',
       });
       setBookingRef(ref);
       setConfirmed(true);

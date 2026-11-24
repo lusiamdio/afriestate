@@ -83,6 +83,8 @@ interface DashboardPortalPageProps {
   onToggleCompare: (property: Property) => void;
   onSendMessage?: (property: Property, text: string) => Promise<void> | void;
   onNotificationsDispatched?: (notifications: Notification[]) => void;
+  isAuthLoading?: boolean;
+  onNavigatePlatformPage?: (target: 'book-flights' | 'book-a-stay' | 'long-term-stays' | 'rent-a-car' | 'find-wellness') => void;
 }
 
 const roleMeta: Record<string, { title: string; badge: string }> = {
@@ -98,6 +100,7 @@ const DashboardPortalPage: React.FC<DashboardPortalPageProps> = (props) => {
   const {
     portalMode = 'auto',
     user,
+    isAuthLoading = false,
     theme,
     onThemeToggle,
     currency,
@@ -107,6 +110,22 @@ const DashboardPortalPage: React.FC<DashboardPortalPageProps> = (props) => {
     onOpenAuth,
   } = props;
   const { settings, roleControls, userOverrides } = useAdminState();
+
+  if (isAuthLoading && !user) {
+    return (
+      <div className="min-h-[70vh] bg-[#FAF8F5] dark:bg-slate-950 flex items-center justify-center px-6 py-16">
+        <div className="max-w-md w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 text-center space-y-3">
+          <div className="w-8 h-8 rounded-full border-2 border-[#0F2D25] dark:border-[#C9A35D] border-t-transparent animate-spin mx-auto" />
+          <p className="text-xs font-semibold uppercase tracking-widest text-[#C9A35D]">
+            AfriEstate Workspace
+          </p>
+          <h1 className="font-heading text-xl font-bold text-slate-900 dark:text-white">
+            Verifying your session…
+          </h1>
+        </div>
+      </div>
+    );
+  }
 
   if (!user) {
     return (
@@ -219,6 +238,7 @@ const DashboardPortalPage: React.FC<DashboardPortalPageProps> = (props) => {
         onUpgradeAccountRequest={props.onUpgradeAccountRequest}
         onListPropertyClick={props.onListPropertyClick}
         onSendMessage={props.onSendMessage}
+        onNavigatePlatformPage={props.onNavigatePlatformPage}
       />
     );
   };

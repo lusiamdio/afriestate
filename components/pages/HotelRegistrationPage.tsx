@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { GoogleGenAI } from '../../lib/ai';
 import { useToast } from '../../contexts/ToastContext';
+import { usePlatformState } from '../../contexts/PlatformStateContext';
 import {
   ArrowLeftIcon,
   ArrowRightIcon,
@@ -238,6 +239,7 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({
   onViewLiveStays,
 }) => {
   const { addToast } = useToast();
+  const { currentUser } = usePlatformState();
 
   // Check if a draft already exists for Save & Resume banner
   const savedDraftRaw = typeof window !== 'undefined' ? localStorage.getItem(DRAFT_STORAGE_KEY) : null;
@@ -263,6 +265,16 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({
   const [phoneNumber, setPhoneNumber] = useState<string>(savedDraft?.phoneNumber || '');
   const [password, setPassword] = useState<string>('');
   const [confirmPassword, setConfirmPassword] = useState<string>('');
+
+  useEffect(() => {
+    if (currentUser) {
+      const nameParts = (currentUser.fullName || '').trim().split(/\s+/);
+      setFirstName((prev) => prev || nameParts[0] || '');
+      setLastName((prev) => prev || nameParts.slice(1).join(' ') || '');
+      setBusinessEmail((prev) => prev || currentUser.email || '');
+      setPhoneNumber((prev) => prev || currentUser.phone || '');
+    }
+  }, [currentUser]);
   const [consentTerms, setConsentTerms] = useState<boolean>(Boolean(savedDraft?.consentTerms));
   const [consentPrivacy, setConsentPrivacy] = useState<boolean>(Boolean(savedDraft?.consentPrivacy));
   const [consentUpdates, setConsentUpdates] = useState<boolean>(Boolean(savedDraft?.consentUpdates));
@@ -1310,10 +1322,16 @@ const HotelRegistrationPage: React.FC<HotelRegistrationPageProps> = ({
                 </button>
                 <button
                   type="button"
-                  onClick={onSignInClick}
+                  onClick={() => {
+                    if (currentUser) {
+                      setMode('command-center');
+                    } else {
+                      onSignInClick();
+                    }
+                  }}
                   className="inline-flex items-center gap-2 px-5 py-4 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 text-white text-sm font-semibold transition-colors whitespace-nowrap"
                 >
-                  Already registered? Sign In
+                  {currentUser ? 'Open Partner Command Center' : 'Already registered? Sign In'}
                 </button>
               </div>
 

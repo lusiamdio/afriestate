@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { sanitizeText } from '../../lib/security';
+import { isValidEmail, sanitizeText } from '../../lib/security';
 import { createKycVerification } from '../../lib/kyc';
+import { usePlatformState } from '../../contexts/PlatformStateContext';
 import { GmailIcon, OutlookIcon } from '../icons/SocialIcons';
 import {
   EyeIcon,
@@ -36,6 +37,9 @@ interface AuthPageProps {
   onSwitchToPricing?: () => void;
   onSuperAdminLogin?: () => void;
   onSelectHotelManager?: () => void;
+  onOpenPrivacyPolicy?: () => void;
+  onOpenDataProtection?: () => void;
+  onOpenPopia?: () => void;
 }
 
 interface PasswordCriteria {
@@ -365,7 +369,11 @@ const AuthPage: React.FC<AuthPageProps> = ({
   onSwitchToPricing,
   onSuperAdminLogin,
   onSelectHotelManager,
+  onOpenPrivacyPolicy,
+  onOpenDataProtection,
+  onOpenPopia,
 }) => {
+  const { currentUser } = usePlatformState();
   const [view, setView] = useState<AuthView>(initialView);
   const [error, setError] = useState('');
 
@@ -430,10 +438,15 @@ const AuthPage: React.FC<AuthPageProps> = ({
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    const cleanedEmail = loginEmail.trim().toLowerCase();
+    if (!isValidEmail(cleanedEmail)) {
+      setError('Please enter a valid email address.');
+      return;
+    }
     setSubmitting(true);
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
-        email: loginEmail.trim().toLowerCase(),
+        email: cleanedEmail,
         password: loginPassword,
       });
       if (error) throw error;
@@ -475,23 +488,33 @@ const AuthPage: React.FC<AuthPageProps> = ({
   const handleUserSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    const cleanedEmail = userForm.email.trim().toLowerCase();
+    const cleanedName = sanitizeText(userForm.fullName, 120);
+    if (!cleanedName || cleanedName.length < 2) {
+      setError('Please enter your full name.');
+      return;
+    }
+    if (!isValidEmail(cleanedEmail)) {
+      setError('Please enter a valid email address.');
+      return;
+    }
     if (!isPasswordStrong(userForm.password).all) {
       setError('Password does not meet security requirements.');
       return;
     }
     if (!userForm.agreeToTerms) {
-      setError('You must agree to the Terms & Conditions.');
+      setError('You must agree to the Terms of Service & Privacy Policy.');
       return;
     }
 
     setSubmitting(true);
     try {
       const { data, error } = await supabase.auth.signUp({
-        email: userForm.email,
+        email: cleanedEmail,
         password: userForm.password,
         options: {
           data: {
-            full_name: userForm.fullName,
+            full_name: cleanedName,
             role: 'user',
           },
         },
@@ -642,9 +665,14 @@ const AuthPage: React.FC<AuthPageProps> = ({
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    const cleanedResetEmail = resetEmail.trim().toLowerCase();
+    if (!isValidEmail(cleanedResetEmail)) {
+      setError('Please enter a valid registered email address.');
+      return;
+    }
     setSubmitting(true);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+      const { error } = await supabase.auth.resetPasswordForEmail(cleanedResetEmail, {
         redirectTo: `${window.location.origin}?reset=true`,
       });
       if (error) throw error;
@@ -811,6 +839,39 @@ const AuthPage: React.FC<AuthPageProps> = ({
               {activeHeading.subtitle}
             </p>
           </div>
+
+          {/* Active Session Notice */}
+          {currentUser && (
+            <div className="mb-6 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 px-4 py-3.5 text-xs flex flex-wrap items-center justify-between gap-3">
+              <div className="text-emerald-900 dark:text-emerald-200">
+                <p className="font-semibold">
+                  Signed in as {currentUser.fullName || currentUser.username} ({currentUser.email || currentUser.username})
+                </p>
+                <p className="text-emerald-700 dark:text-emerald-400 mt-0.5">
+                  Your session is active across all AfriEstate verticals.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={onLogin}
+                  className="px-3 py-1.5 rounded-lg bg-[#0F2D25] text-white font-semibold hover:bg-emerald-900 transition-colors"
+                >
+                  Continue
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await supabase.auth.signOut().catch(() => undefined);
+                    setError('');
+                  }}
+                  className="px-3 py-1.5 rounded-lg border border-emerald-300 dark:border-emerald-700 text-emerald-900 dark:text-emerald-200 font-semibold hover:bg-emerald-100/60 dark:hover:bg-emerald-900/40 transition-colors"
+                >
+                  Switch Account
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Error Banner (No thick left accent stripe) */}
           {error && (
@@ -1047,14 +1108,32 @@ const AuthPage: React.FC<AuthPageProps> = ({
                 />
                 <PasswordStrengthMeter criteria={isPasswordStrong(userForm.password)} />
 
-                <label className="flex items-center gap-3 text-xs text-slate-600 dark:text-slate-300 cursor-pointer pt-1">
+                <label className="flex items-start gap-3 text-xs text-slate-600 dark:text-slate-300 cursor-pointer pt-1">
                   <input
                     type="checkbox"
                     checked={userForm.agreeToTerms}
                     onChange={(e) => setUserForm((p) => ({ ...p, agreeToTerms: e.target.checked }))}
-                    className="h-4 w-4 rounded text-emerald-700 focus:ring-emerald-700"
+                    className="h-4 w-4 rounded text-emerald-700 focus:ring-emerald-700 mt-0.5"
                   />
-                  <span>I agree to the AfriEstate Terms of Service and Privacy Policy.</span>
+                  <span>
+                    I agree to the AfriEstate{' '}
+                    <button
+                      type="button"
+                      onClick={onOpenPrivacyPolicy}
+                      className="font-semibold text-emerald-800 dark:text-amber-300 hover:underline"
+                    >
+                      Privacy Policy
+                    </button>
+                    {' & '}
+                    <button
+                      type="button"
+                      onClick={onOpenPopia}
+                      className="font-semibold text-emerald-800 dark:text-amber-300 hover:underline"
+                    >
+                      POPIA Notice
+                    </button>
+                    .
+                  </span>
                 </label>
 
                 <button
@@ -1384,12 +1463,28 @@ const AuthPage: React.FC<AuthPageProps> = ({
           )}
 
           {/* Security Footer Line */}
-          <div className="mt-10 pt-6 flex items-center justify-between text-xs text-slate-400">
+          <div className="mt-10 pt-6 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500 dark:text-slate-400">
             <span className="inline-flex items-center gap-1.5">
               <ShieldCheckIcon className="w-4 h-4 text-emerald-600" />
-              Encrypted Supabase & OAuth 2.0 Authentication
+              Encrypted OAuth 2.0 &amp; Token Auth
             </span>
-            <span>Gmail · Outlook · Email</span>
+            <div className="flex items-center gap-3">
+              {onOpenPrivacyPolicy && (
+                <button type="button" onClick={onOpenPrivacyPolicy} className="hover:text-emerald-800 dark:hover:text-amber-300 transition-colors">
+                  Privacy
+                </button>
+              )}
+              {onOpenDataProtection && (
+                <button type="button" onClick={onOpenDataProtection} className="hover:text-emerald-800 dark:hover:text-amber-300 transition-colors">
+                  Data Protection
+                </button>
+              )}
+              {onOpenPopia && (
+                <button type="button" onClick={onOpenPopia} className="hover:text-emerald-800 dark:hover:text-amber-300 transition-colors">
+                  POPIA
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>

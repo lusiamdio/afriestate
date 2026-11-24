@@ -62,6 +62,7 @@ import {
 } from '../stay/StayModals';
 import { GoogleGenAI } from '../../lib/ai';
 import { useToast } from '../../contexts/ToastContext';
+import { usePlatformState } from '../../contexts/PlatformStateContext';
 
 interface StayDetailsPageProps {
   property: any;
@@ -130,16 +131,26 @@ const StayDetailsPage: React.FC<StayDetailsPageProps> = ({
   initialIntent = 'Traveler',
 }) => {
   const { addToast } = useToast();
+  const { sharedJourney, updateSharedJourney } = usePlatformState();
   const profile = useMemo(() => resolveStayProfile(property), [property]);
 
   const [userIntent, setUserIntent] = useState<UserIntentType>(initialIntent);
   const [termMode, setTermMode] = useState<StayTermMode>(initialTermMode);
   const [searchDest, setSearchDest] = useState(profile.city);
-  const [checkIn, setCheckIn] = useState(initialDates?.checkIn || '2026-12-12');
-  const [checkOut, setCheckOut] = useState(initialDates?.checkOut || '2026-12-15');
+  const [checkIn, setCheckIn] = useState(initialDates?.checkIn || sharedJourney.checkInDate || '2026-12-12');
+  const [checkOut, setCheckOut] = useState(initialDates?.checkOut || sharedJourney.returnDate || '2026-12-15');
   const [leaseMonths, setLeaseMonths] = useState<number>(3);
-  const [guestsLabel, setGuestsLabel] = useState('2 guests · 1 room');
+  const [guestsLabel, setGuestsLabel] = useState(sharedJourney.guestsLabel || '2 guests · 1 room');
   const [showStickyBar, setShowStickyBar] = useState(false);
+
+  useEffect(() => {
+    updateSharedJourney({
+      ...(searchDest ? { destinationCity: searchDest } : {}),
+      checkInDate: checkIn,
+      returnDate: checkOut,
+      guestsLabel,
+    });
+  }, [searchDest, checkIn, checkOut, guestsLabel, updateSharedJourney]);
 
   // Interactive Content States
   const [galleryCategory, setGalleryCategory] = useState<string>('All');

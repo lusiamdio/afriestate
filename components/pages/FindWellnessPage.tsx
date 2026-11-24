@@ -19,6 +19,7 @@ import type { Property } from '../../types';
 import { supabase } from '../../lib/supabase';
 import { GoogleGenAI } from '../../lib/ai';
 import { useToast } from '../../contexts/ToastContext';
+import { usePlatformState } from '../../contexts/PlatformStateContext';
 import {
   checkSubmissionThrottle,
   generateListingSignature,
@@ -106,6 +107,7 @@ interface FindWellnessPageProps {
 
 const FindWellnessPage: React.FC<FindWellnessPageProps> = ({ properties = [], onListSanctuary, onNavigate }) => {
   const { addToast } = useToast();
+  const { currentUser, sharedJourney, addPlatformBooking } = usePlatformState();
   const [visibleCount, setVisibleCount] = useState(8);
   const [searchKeyword, setSearchKeyword] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
@@ -122,8 +124,17 @@ const FindWellnessPage: React.FC<FindWellnessPageProps> = ({ properties = [], on
   const [guestFirstName, setGuestFirstName] = useState('');
   const [guestLastName, setGuestLastName] = useState('');
   const [guestEmail, setGuestEmail] = useState('');
-  const [preferredDate, setPreferredDate] = useState('2026-06-15');
+  const [preferredDate, setPreferredDate] = useState(() => sharedJourney.checkInDate || '2026-06-15');
   const [enquiryNotes, setEnquiryNotes] = useState('');
+
+  React.useEffect(() => {
+    if (currentUser && modalMode) {
+      const parts = (currentUser.fullName || '').trim().split(/\s+/);
+      setGuestFirstName((prev) => prev || parts[0] || '');
+      setGuestLastName((prev) => prev || parts.slice(1).join(' ') || '');
+      setGuestEmail((prev) => prev || currentUser.email || '');
+    }
+  }, [currentUser, modalMode]);
 
   const allCompanies = useMemo(() => {
     const publishedProviders = properties.map((p, idx) => {
@@ -221,18 +232,30 @@ const FindWellnessPage: React.FC<FindWellnessPageProps> = ({ properties = [], on
       return;
     }
 
+    const bookingRef = `AFR-WELL-${Date.now().toString(36).toUpperCase().slice(-6)}`;
+    addPlatformBooking({
+      category: 'wellness',
+      reference: bookingRef,
+      title: selectedCompany.name,
+      subtitle: `${modalMode === 'book' ? 'Verified Appointment' : 'Sanctuary Enquiry'} · ${selectedCompany.category}`,
+      city: selectedCompany.location || 'South Africa',
+      startDate: preferredDate || new Date().toISOString().split('T')[0],
+      amountZar: typeof selectedCompany.price === 'number' ? selectedCompany.price : 650,
+      status: modalMode === 'book' ? 'Confirmed' : 'Pending',
+      customerName: `${cleanFirst} ${cleanLast}`.trim(),
+      customerEmail: cleanEmail.toLowerCase(),
+      targetPage: 'find-wellness',
+    });
+
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      const username = user?.email || cleanEmail;
+      const username = currentUser?.username || currentUser?.email || cleanEmail.toLowerCase();
       await supabase.from('tour_requests').insert({
         property_id: selectedCompany.id || 'wellness_' + Date.now().toString(36),
         property_title: `${selectedCompany.name} (${cleanFirst} ${cleanLast}: ${cleanNotes || 'Consultation'})`,
         username,
         date: preferredDate || new Date().toISOString().split('T')[0],
         time: '12:00',
-        status: 'Pending',
+        status: modalMode === 'book' ? 'Confirmed' : 'Pending',
         timestamp: Date.now(),
       });
     } catch {

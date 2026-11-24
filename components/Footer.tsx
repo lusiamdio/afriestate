@@ -19,6 +19,8 @@ interface FooterProps {
   onContactClick: () => void;
   onBlogClick: () => void;
   onPrivacyPolicyClick: () => void;
+  onDataProtectionClick: () => void;
+  onPopiaClick: () => void;
   onTermsOfServiceClick: () => void;
   onCareersClick: () => void;
   onFindAProClick: () => void;
@@ -45,6 +47,8 @@ const Footer: React.FC<FooterProps> = ({
   onContactClick,
   onBlogClick,
   onPrivacyPolicyClick,
+  onDataProtectionClick,
+  onPopiaClick,
   onTermsOfServiceClick,
   onCareersClick,
   onFindAProClick,
@@ -429,14 +433,40 @@ const Footer: React.FC<FooterProps> = ({
               </h3>
               <ul className="space-y-2 text-sm">
                 <li>
-                  <a href="#privacy" onClick={(e) => handleLinkClick(e, onPrivacyPolicyClick)} className="text-slate-400 hover:text-white transition-colors">
+                  <button
+                    type="button"
+                    onClick={onPrivacyPolicyClick}
+                    className="text-slate-300 hover:text-amber-300 transition-colors font-normal"
+                  >
                     {t.footer.privacyPolicy}
-                  </a>
+                  </button>
                 </li>
                 <li>
-                  <a href="#terms" onClick={(e) => handleLinkClick(e, onTermsOfServiceClick)} className="text-slate-400 hover:text-white transition-colors">
+                  <button
+                    type="button"
+                    onClick={onDataProtectionClick}
+                    className="text-slate-300 hover:text-amber-300 transition-colors font-normal"
+                  >
+                    Data Protection
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    onClick={onPopiaClick}
+                    className="text-slate-300 hover:text-amber-300 transition-colors font-normal"
+                  >
+                    POPIA Compliance
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    onClick={onTermsOfServiceClick}
+                    className="text-slate-300 hover:text-amber-300 transition-colors font-normal"
+                  >
                     {t.footer.termsOfService}
-                  </a>
+                  </button>
                 </li>
               </ul>
             </div>
