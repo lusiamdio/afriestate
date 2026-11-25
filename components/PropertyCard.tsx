@@ -22,7 +22,7 @@ import {
   GatedSecurityIcon,
   YieldTrendingIcon 
 } from './icons/AfricanInfrastructureIcons';
-import { FacebookIcon, TwitterIcon, WhatsAppIcon } from './icons/SocialIcons';
+import { WhatsAppIcon } from './icons/SocialIcons';
 import { useCurrency } from '../contexts/CurrencyContext';
 import { useToast } from '../contexts/ToastContext';
 import { ChevronLeftIcon, ChevronRightIcon, FireIcon } from '@heroicons/react/20/solid';
@@ -38,8 +38,6 @@ const ShareMenu: React.FC<ShareMenuProps> = ({ propertyTitle, propertyUrl, onCop
   const shareText = `Check out this property on AfriEstate: ${propertyTitle}`;
   
   const socialLinks = {
-    facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(propertyUrl)}&quote=${encodeURIComponent(shareText)}`,
-    twitter: `https://twitter.com/intent/tweet?url=${encodeURIComponent(propertyUrl)}&text=${encodeURIComponent(shareText)}`,
     whatsapp: `https://api.whatsapp.com/send?text=${encodeURIComponent(`${shareText} ${propertyUrl}`)}`,
     email: `mailto:?subject=${encodeURIComponent(propertyTitle)}&body=${encodeURIComponent(`${shareText}\n\n${propertyUrl}`)}`
   };
@@ -70,12 +68,6 @@ const ShareMenu: React.FC<ShareMenuProps> = ({ propertyTitle, propertyUrl, onCop
       </a>
       <a href={socialLinks.email} onClick={(e) => e.stopPropagation()} className="w-full text-left px-4 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-3">
         <EnvelopeIcon className="w-4 h-4 text-amber-500" /><span>Email</span>
-      </a>
-      <a href={socialLinks.facebook} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="w-full text-left px-4 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-3">
-        <FacebookIcon className="w-4 h-4 text-blue-600" /><span>Facebook</span>
-      </a>
-      <a href={socialLinks.twitter} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="w-full text-left px-4 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-3">
-        <TwitterIcon className="w-4 h-4 text-slate-700 dark:text-slate-300" /><span>X (Twitter)</span>
       </a>
       <div className="h-px bg-slate-100 dark:bg-slate-800 my-1"></div>
       <button onClick={handleCopy} className="w-full text-left px-4 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-3">

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { CheckBadgeIcon, CpuChipIcon } from '../../icons/ActionIcons';
 import { useToast } from '../../../contexts/ToastContext';
+import { WidgetTabGroup } from '../../widgets/EmbeddedWidgetToolkit';
 
 const plans = [
   {
@@ -146,6 +147,12 @@ const AgentBilling: React.FC = () => {
           })}
         </div>
       </div>
+
+      <WidgetTabGroup
+        title="Brokerage Card, VAT & Billing Verification"
+        subtitle="Pre-validate corporate payment cards, card issuer types, EU/international VAT registration numbers, and billing contact emails."
+        toolIds={['validate-cc', 'cc-type', 'validate-vat', 'validate-email']}
+      />
     </div>
   );
 };

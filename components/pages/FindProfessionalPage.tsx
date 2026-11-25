@@ -21,7 +21,7 @@ import {
   ScaleIcon,
 } from '@heroicons/react/24/outline';
 import { StarIcon, CheckBadgeIcon } from '@heroicons/react/24/solid';
-import { FacebookIcon, TwitterIcon, WhatsAppIcon } from '../icons/SocialIcons';
+import { WhatsAppIcon } from '../icons/SocialIcons';
 
 interface FindProfessionalPageProps {
   initialServiceFilter?: string;
@@ -346,24 +346,6 @@ const ShareProviderMenu: React.FC<{ provider: EnrichedProvider }> = ({ provider 
       >
         <EnvelopeIcon className="w-4 h-4 text-amber-600 shrink-0" />
         <span>Email Contact</span>
-      </a>
-      <a
-        href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="w-full px-3.5 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-2.5"
-      >
-        <TwitterIcon className="w-4 h-4 text-slate-800 dark:text-white shrink-0" />
-        <span>Share on X</span>
-      </a>
-      <a
-        href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="w-full px-3.5 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-2.5"
-      >
-        <FacebookIcon className="w-4 h-4 text-blue-600 shrink-0" />
-        <span>Facebook</span>
       </a>
       <div className="h-px bg-slate-100 dark:bg-slate-800 my-1" />
       <button

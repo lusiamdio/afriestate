@@ -250,6 +250,9 @@ const FindWellnessPage: React.FC<FindWellnessPageProps> = ({ properties = [], on
     try {
       const username = currentUser?.username || currentUser?.email || cleanEmail.toLowerCase();
       await supabase.from('tour_requests').insert({
+        requester_user_id: currentUser?.id || null,
+        request_type: 'wellness',
+        booking_ref: bookingRef,
         property_id: selectedCompany.id || 'wellness_' + Date.now().toString(36),
         property_title: `${selectedCompany.name} (${cleanFirst} ${cleanLast}: ${cleanNotes || 'Consultation'})`,
         username,

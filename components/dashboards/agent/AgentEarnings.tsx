@@ -3,6 +3,7 @@ import type { Property, User } from '../../../types';
 import { PropertyStatus } from '../../../types';
 import { BanknotesIcon, ClockIcon } from '../../icons/ActionIcons';
 import { useCurrency } from '../../../contexts/CurrencyContext';
+import { WidgetTabGroup } from '../../widgets/EmbeddedWidgetToolkit';
 
 interface AgentEarningsProps {
   user: User;
@@ -124,6 +125,12 @@ const AgentEarnings: React.FC<AgentEarningsProps> = ({ user, allProperties }) =>
           </p>
         )}
       </div>
+
+      <WidgetTabGroup
+        title="Commission Payout Banking & Tax Verification"
+        subtitle="Validate cross-border IBAN payout accounts, brokerage VAT registration numbers, and card settlement credentials prior to disbursement."
+        toolIds={['validate-iban', 'validate-vat', 'cc-type', 'validate-cc']}
+      />
     </div>
   );
 };

@@ -167,14 +167,21 @@ export const getAgentProfile = async (username: string): Promise<AgentProfile> =
 
 export const updateAgentProfile = async (username: string, updatedProfile: AgentProfile): Promise<AgentProfile> => {
     try {
+        const cleanUsername = sanitizeText(username, 120);
         const { error } = await supabase
             .from('agent_profiles')
-            .upsert({ 
-                ...updatedProfile, 
-                username,
-                profile_picture: updatedProfile.profilePicture 
-            })
-            .eq('username', username);
+            .upsert(
+                {
+                    username: cleanUsername,
+                    bio: sanitizeText(updatedProfile.bio, 1500),
+                    email: sanitizeText(updatedProfile.email, 160),
+                    phone: sanitizeText(updatedProfile.phone, 40),
+                    profile_picture: sanitizeSafeUrl(updatedProfile.profilePicture, '/images/tersia-kroonstad.webp'),
+                    socials: updatedProfile.socials || { twitter: '', linkedin: '', facebook: '' },
+                    updated_at: new Date().toISOString(),
+                },
+                { onConflict: 'username' }
+            );
         
         if (error) throw error;
         return updatedProfile;
@@ -363,6 +370,7 @@ export const removePublishedProperty = async (propertyId: string): Promise<void>
 
 export const publishCarRental = async (
     payload: {
+        listing_mode?: 'hire' | 'sale';
         business_name: string;
         trading_name?: string | null;
         registration_number?: string | null;
@@ -382,6 +390,10 @@ export const publishCarRental = async (
         vehicle_make_model: string;
         vehicle_year: number;
         transmission: string;
+        fuel_type?: string | null;
+        mileage_km?: number | null;
+        vehicle_condition?: string | null;
+        financing_available?: boolean;
         daily_rate: number;
         currency: string;
         description: string;
@@ -390,6 +402,7 @@ export const publishCarRental = async (
     },
     currentUser: User
 ): Promise<Property> => {
+    const isForSale = payload.listing_mode === 'sale';
     const id = `car_${Date.now().toString(36)}`;
     const sig = generateListingSignature(id, currentUser.username, payload.daily_rate);
     const catLower = (payload.vehicle_category || '').toLowerCase();
@@ -404,21 +417,45 @@ export const publishCarRental = async (
     const resolvedImages = cleanGallery.length > 0 ? cleanGallery : [imgUrl];
 
     try {
-        await supabase.from('car_rentals').insert([{
+        const { error } = await supabase.from('car_rentals').insert([{
             owner_id: currentUser.id || null,
             user_id: currentUser.username || currentUser.id,
-            ...payload,
+            business_name: payload.business_name,
+            trading_name: payload.trading_name || null,
+            registration_number: payload.registration_number || null,
+            vat_number: payload.vat_number || null,
+            business_type: payload.business_type,
+            contact_person: payload.contact_person,
+            mobile_number: payload.mobile_number,
+            whatsapp_number: payload.whatsapp_number,
+            email_address: payload.email_address,
+            website: payload.website || null,
+            country: payload.country,
+            province: payload.province,
+            city: payload.city,
+            pickup_address: payload.pickup_address,
+            vehicle_title: payload.vehicle_title,
+            vehicle_category: payload.vehicle_category,
+            vehicle_make_model: payload.vehicle_make_model,
+            vehicle_year: payload.vehicle_year,
+            transmission: payload.transmission,
+            daily_rate: payload.daily_rate,
+            currency: payload.currency,
+            description: payload.description,
             images: resolvedImages,
             status: 'active',
         }]);
-    } catch {
-        // Proceed with unified synced store
+        if (error) {
+            handleError(error, 'persisting vehicle listing');
+        }
+    } catch (e) {
+        handleError(e, 'persisting vehicle listing');
     }
 
     const newProperty: Property = {
         id,
         title: sanitizeText(payload.vehicle_title || payload.vehicle_make_model, 120),
-        listingType: ListingType.RENT,
+        listingType: isForSale ? ListingType.SALE : ListingType.RENT,
         propertyType: PropertyType.TRANSPORT,
         address: {
             street: sanitizeText(payload.pickup_address, 140),
@@ -427,20 +464,28 @@ export const publishCarRental = async (
         },
         country: sanitizeText(payload.country, 80),
         coordinates: { lat: -26.2041, lng: 28.0473 },
-        price: Math.max(100, Number(payload.daily_rate) || 950),
-        perNightPrice: true,
+        price: isForSale ? Math.max(5000, Number(payload.daily_rate) || 450000) : Math.max(100, Number(payload.daily_rate) || 950),
+        perNightPrice: !isForSale,
         localCurrency: sanitizeText(payload.currency, 8) || 'ZAR',
         vehicleType,
         details: { beds: 0, baths: 0, area: 0 },
         description: sanitizeText(payload.description, 1500),
-        neighborhoodInfo: `${sanitizeText(payload.business_name, 80)} (${sanitizeText(payload.business_type, 60)}) · Pickup at ${sanitizeText(payload.pickup_address, 120)}, ${sanitizeText(payload.city, 60)}`,
+        neighborhoodInfo: isForSale
+            ? `${sanitizeText(payload.business_name, 80)} (${sanitizeText(payload.business_type, 60)}) · Viewing at ${sanitizeText(payload.pickup_address, 120)}, ${sanitizeText(payload.city, 60)}`
+            : `${sanitizeText(payload.business_name, 80)} (${sanitizeText(payload.business_type, 60)}) · Pickup at ${sanitizeText(payload.pickup_address, 120)}, ${sanitizeText(payload.city, 60)}`,
         amenities: [
+            isForSale ? 'For Sale' : 'For Hire',
             payload.transmission === 'auto' ? 'Automatic Transmission' : 'Manual Transmission',
             `${payload.vehicle_year || 2025} Model`,
             sanitizeText(payload.vehicle_make_model, 60),
+            payload.fuel_type ? sanitizeText(payload.fuel_type, 30) : '',
+            isForSale && payload.mileage_km != null && Number.isFinite(payload.mileage_km)
+                ? `${Number(payload.mileage_km).toLocaleString()} km`
+                : '',
+            isForSale && payload.vehicle_condition ? sanitizeText(payload.vehicle_condition, 40) : '',
+            isForSale && payload.financing_available ? 'Finance & Trade-In Eligible' : '',
+            !isForSale ? 'Unlimited Mileage Option' : '',
             sanitizeText(payload.business_type, 50),
-            'Unlimited Mileage Option',
-            'Verified Mobility Partner',
         ].filter(Boolean),
         images: resolvedImages,
         agent: {
@@ -460,7 +505,9 @@ export const publishCarRental = async (
             verifiedDate: new Date().toISOString().split('T')[0],
             titleDeedNumber: sig,
             inspectionDate: new Date().toISOString().split('T')[0],
-            registryStatus: `Fleet License Verified · ${sanitizeText(payload.email_address, 80)}`,
+            registryStatus: isForSale
+                ? `Ownership & Roadworthy Verified · ${sanitizeText(payload.email_address, 80)}`
+                : `Fleet License Verified · ${sanitizeText(payload.email_address, 80)}`,
             surveyVerified: true,
         },
     };
@@ -990,13 +1037,16 @@ export const addTourRequest = async (username: string, propertyId: string, prope
 // --- Messages ---
 export const getMessagesForUser = async (username: string): Promise<Message[]> => {
     try {
+        const cleanUser = sanitizeText(username, 120).replace(/["\\,()]/g, '');
+        if (!cleanUser) return [];
+        const quoted = `"${cleanUser}"`;
         const { data, error } = await supabase
             .from('messages')
             .select('*')
-            .or(`sender_username.eq.${username},receiver_username.eq.${username}`)
+            .or(`sender_username.eq.${quoted},receiver_username.eq.${quoted}`)
             .order('timestamp', { ascending: true });
         
-        if (error) return [];
+        if (error || !data) return [];
         return data.map(m => ({
             ...m,
             propertyId: m.property_id || m.propertyId,

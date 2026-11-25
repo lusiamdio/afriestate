@@ -42,6 +42,7 @@ import {
 import { useCurrency } from '../../contexts/CurrencyContext';
 import { useToast } from '../../contexts/ToastContext';
 import { usePlatformState, type PlatformVerticalTarget } from '../../contexts/PlatformStateContext';
+import { WidgetTabGroup } from '../widgets/EmbeddedWidgetToolkit';
 
 export type SeekerView =
   | 'overview'
@@ -50,8 +51,10 @@ export type SeekerView =
   | 'searches'
   | 'messages'
   | 'alerts'
+  | 'calculators'
   | 'documents'
-  | 'payments';
+  | 'payments'
+  | 'security';
 
 interface UserDashboardProps {
   user: User;
@@ -84,8 +87,10 @@ const viewMeta: Record<SeekerView, { label: string; group: string }> = {
   searches: { label: 'Saved Searches', group: 'Search & Comms' },
   messages: { label: 'Agent Conversations', group: 'Search & Comms' },
   alerts: { label: 'Property Alerts', group: 'Search & Comms' },
+  calculators: { label: 'Financial & Utility Tools', group: 'Readiness' },
   documents: { label: 'Document & KYC Vault', group: 'Readiness' },
   payments: { label: 'Payments & Pre-Approval', group: 'Readiness' },
+  security: { label: 'Account Security', group: 'Readiness' },
 };
 
 const formatSearchFilters = (filters: SearchFilters) => {
@@ -152,8 +157,10 @@ const UserDashboard: React.FC<UserDashboardProps> = (props) => {
   ];
 
   const readinessItems: { id: SeekerView; label: string; icon: React.ElementType }[] = [
+    { id: 'calculators', label: 'Decision & Cost Tools', icon: CalculatorIcon },
     { id: 'documents', label: 'Document Vault', icon: DocumentDuplicateIcon },
     { id: 'payments', label: 'Payments & Escrow', icon: BanknotesIcon },
+    { id: 'security', label: 'Account Security', icon: ShieldCheckIcon },
   ];
 
   const currentMeta = viewMeta[activeView];
@@ -264,10 +271,14 @@ const UserDashboard: React.FC<UserDashboardProps> = (props) => {
         );
       case 'alerts':
         return <PropertyAlertsView user={user} addToast={addToast} />;
+      case 'calculators':
+        return <SeekerCalculatorsView />;
       case 'documents':
         return <DocumentVaultView user={user} addToast={addToast} />;
       case 'payments':
         return <PaymentsView addToast={addToast} unifiedBookings={unifiedBookings} onNavigatePlatformPage={onNavigatePlatformPage} />;
+      case 'security':
+        return <SeekerSecurityView />;
       default:
         return null;
     }
@@ -1274,9 +1285,59 @@ const DocumentVaultView: React.FC<{
           message="Upload proof of income, ID verification, or bank pre-approval documents when ready."
         />
       )}
+
+      <WidgetTabGroup
+        title="Lease Signing, Digital Signature & Integrity Desk"
+        subtitle="Sign lease agreements or offers to purchase, verify agent signatures, and confirm unmodified document hashes."
+        toolIds={['sign-pdf', 'signature', 'hash-compare']}
+      />
     </div>
   );
 };
+
+const SeekerCalculatorsView: React.FC = () => (
+  <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-[1400px] mx-auto">
+    <div>
+      <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white tracking-tight">
+        Financial &amp; Household Decision Tools
+      </h2>
+      <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+        Evaluate mortgages, compare buying vs renting, split shared rent, and project household insurance, power, and water bills.
+      </p>
+    </div>
+
+    <WidgetTabGroup
+      title="Buying, Leasing & Shortlist Decision Suite"
+      subtitle="Compare homes side-by-side, score your shortlist, calculate monthly mortgage repayments, and test rent-vs-buy timelines."
+      toolIds={['mortgage', 'rent-vs-buy', 'property-decider', 'property-comparison']}
+    />
+
+    <WidgetTabGroup
+      title="Living Costs, Utilities & Shared Rent Estimators"
+      subtitle="Split shared leases fairly and forecast monthly energy, water, and homeowner or contents insurance."
+      toolIds={['rent-splitter', 'energy-cost', 'water-usage', 'home-insurance']}
+    />
+  </div>
+);
+
+const SeekerSecurityView: React.FC = () => (
+  <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-[1400px] mx-auto">
+    <div>
+      <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white tracking-tight">
+        Account Credential &amp; Breach Security
+      </h2>
+      <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+        Audit password resilience and check if your personal email has appeared in any known external data breaches.
+      </p>
+    </div>
+
+    <WidgetTabGroup
+      title="Seeker Security Check Workbench"
+      subtitle="Test new passwords locally and verify breach exposure before storing identity or KYC files."
+      toolIds={['password-strength', 'breach-checker']}
+    />
+  </div>
+);
 
 const PaymentsView: React.FC<{
   addToast: (msg: string, type?: 'success' | 'info' | 'error') => void;
@@ -1437,6 +1498,12 @@ const PaymentsView: React.FC<{
           )}
         </div>
       </div>
+
+      <WidgetTabGroup
+        title="Card, Banking & Contact Validation Tools"
+        subtitle="Verify payment card numbers, card networks, IBAN payout details, and contact credentials before settling bookings or holding deposits."
+        toolIds={['validate-cc', 'cc-type', 'validate-iban', 'validate-email', 'validate-phone']}
+      />
     </div>
   );
 };

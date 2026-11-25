@@ -11,12 +11,12 @@ import {
   ClipboardDocumentCheckIcon,
   ClipboardIcon,
   EnvelopeIcon,
-  ChatBubbleLeftRightIcon,
   BuildingOffice2Icon,
   CheckBadgeIcon,
   CurrencyDollarIcon,
   PaperAirplaneIcon,
 } from '@heroicons/react/24/outline';
+import { WhatsAppIcon } from '../icons/SocialIcons';
 import { HeartIcon as HeartSolidIcon } from '@heroicons/react/24/solid';
 import {
   ALL_64_AMENITIES,
@@ -465,6 +465,9 @@ export const SharePropertyModal: React.FC<{
   if (!isOpen) return null;
 
   const shareUrl = typeof window !== 'undefined' ? window.location.href : 'https://afriestate.africa/stays/african-grand';
+  const shareText = `Check out ${propertyName} (${locationLabel}) on AfriEstate: ${shareUrl}`;
+  const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`;
+  const emailUrl = `mailto:?subject=${encodeURIComponent(`AfriEstate Stay: ${propertyName}`)}&body=${encodeURIComponent(`Check out ${propertyName} in ${locationLabel} on AfriEstate:\n\n${shareUrl}`)}`;
 
   const handleCopy = () => {
     navigator.clipboard?.writeText(shareUrl);
@@ -511,25 +514,28 @@ export const SharePropertyModal: React.FC<{
         </div>
 
         <div className="grid grid-cols-3 gap-2 text-xs font-semibold">
-          {['WhatsApp', 'Facebook', 'LinkedIn', 'X', 'Email'].map((channel) => (
-            <button
-              key={channel}
-              type="button"
-              onClick={() => addToast(`Opened ${channel} share composer for ${propertyName}.`, 'success')}
-              className="py-2.5 px-3 rounded-xl border border-[#E4E1D9] dark:border-slate-700 hover:bg-[#F8F7F3] dark:hover:bg-slate-800 flex items-center justify-center gap-1.5"
-            >
-              {channel === 'Email' ? (
-                <EnvelopeIcon className="w-3.5 h-3.5 text-[#123B2A] dark:text-[#C99A3D]" />
-              ) : (
-                <ChatBubbleLeftRightIcon className="w-3.5 h-3.5 text-[#123B2A] dark:text-[#C99A3D]" />
-              )}
-              <span>{channel}</span>
-            </button>
-          ))}
+          <a
+            href={whatsappUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => addToast(`Opening WhatsApp to share ${propertyName}.`, 'success')}
+            className="py-2.5 px-3 rounded-xl border border-[#E4E1D9] dark:border-slate-700 hover:bg-[#F8F7F3] dark:hover:bg-slate-800 flex items-center justify-center gap-1.5 text-[#151515] dark:text-white transition-colors"
+          >
+            <WhatsAppIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+            <span>WhatsApp</span>
+          </a>
+          <a
+            href={emailUrl}
+            onClick={() => addToast(`Opening email composer for ${propertyName}.`, 'success')}
+            className="py-2.5 px-3 rounded-xl border border-[#E4E1D9] dark:border-slate-700 hover:bg-[#F8F7F3] dark:hover:bg-slate-800 flex items-center justify-center gap-1.5 text-[#151515] dark:text-white transition-colors"
+          >
+            <EnvelopeIcon className="w-4 h-4 text-[#C99A3D] shrink-0" />
+            <span>Email</span>
+          </a>
           <button
             type="button"
             onClick={handleCopy}
-            className="py-2.5 px-3 rounded-xl bg-[#123B2A] text-white flex items-center justify-center gap-1.5"
+            className="py-2.5 px-3 rounded-xl bg-[#123B2A] text-white flex items-center justify-center gap-1.5 hover:bg-[#0d2b1f] transition-colors"
           >
             {copied ? <ClipboardDocumentCheckIcon className="w-3.5 h-3.5" /> : <ClipboardIcon className="w-3.5 h-3.5" />}
             <span>{copied ? 'Copied' : 'Copy link'}</span>

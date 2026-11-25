@@ -3,6 +3,7 @@ import type { Lead, ActivityType } from '../../../types';
 import { ActivityType as ActivityTypeEnum } from '../../../types';
 import { ChatBubbleLeftRightIcon, CalendarIcon, EnvelopeIcon, PhoneIcon } from '../../icons/ActionIcons';
 import { useToast } from '../../../contexts/ToastContext';
+import { WidgetTabGroup } from '../../widgets/EmbeddedWidgetToolkit';
 
 const activityIcons: Record<ActivityType, React.ElementType> = {
   [ActivityTypeEnum.MESSAGE_SENT]: ChatBubbleLeftRightIcon,
@@ -99,6 +100,13 @@ const LeadDetailView: React.FC<{ lead: Lead }> = ({ lead }) => {
           </ul>
         </div>
       </div>
+
+      <WidgetTabGroup
+        className="mt-6"
+        title="Lead Contact & Profile Validation"
+        subtitle="Verify buyer or tenant email syntax, international phone numbers, and shared portfolio or company URLs before follow-up."
+        toolIds={['validate-email', 'validate-phone', 'validate-url']}
+      />
     </div>
   );
 };

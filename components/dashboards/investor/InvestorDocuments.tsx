@@ -4,6 +4,7 @@ import { getInvestorDocuments } from '../../../lib/data';
 import { DocumentTextIcon } from '../../icons/ActionIcons';
 import { DownloadIcon } from '../../icons/AgentDashboardIcons';
 import { useToast } from '../../../contexts/ToastContext';
+import { WidgetTabGroup } from '../../widgets/EmbeddedWidgetToolkit';
 
 interface InvestorDocumentsProps {
   user: User;
@@ -103,6 +104,12 @@ const InvestorDocuments: React.FC<InvestorDocumentsProps> = () => {
           </p>
         )}
       </div>
+
+      <WidgetTabGroup
+        title="Contract Execution, Signature & Integrity Desk"
+        subtitle="Sign subscription agreements, validate digital counterparty signatures, and verify unaltered deed checksums."
+        toolIds={['sign-pdf', 'signature', 'hash-compare']}
+      />
     </div>
   );
 };

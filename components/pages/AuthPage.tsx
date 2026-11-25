@@ -17,6 +17,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { BuildingStorefrontIcon, BuildingOffice2Icon, UserIcon } from '@heroicons/react/24/solid';
 import { BanknotesIcon } from '../icons/ActionIcons';
+import { WidgetTabGroup } from '../widgets/EmbeddedWidgetToolkit';
 
 export type AuthView =
   | 'login'
@@ -422,6 +423,7 @@ const AuthPage: React.FC<AuthPageProps> = ({
 
   // Forgot password state
   const [resetEmail, setResetEmail] = useState('');
+  const [showSecurityAuditModal, setShowSecurityAuditModal] = useState(false);
 
   useEffect(() => {
     setView(initialView);
@@ -1107,6 +1109,14 @@ const AuthPage: React.FC<AuthPageProps> = ({
                   onIconClick={() => setShowUserPassword((prev) => !prev)}
                 />
                 <PasswordStrengthMeter criteria={isPasswordStrong(userForm.password)} />
+                <button
+                  type="button"
+                  onClick={() => setShowSecurityAuditModal(true)}
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-800 dark:text-amber-300 hover:underline"
+                >
+                  <ShieldCheckIcon className="w-4 h-4 shrink-0" />
+                  <span>Check password strength &amp; email breach status</span>
+                </button>
 
                 <label className="flex items-start gap-3 text-xs text-slate-600 dark:text-slate-300 cursor-pointer pt-1">
                   <input
@@ -1192,6 +1202,14 @@ const AuthPage: React.FC<AuthPageProps> = ({
                   onIconClick={() => setShowAgentPassword((prev) => !prev)}
                 />
                 <PasswordStrengthMeter criteria={isPasswordStrong(agentForm.password)} />
+                <button
+                  type="button"
+                  onClick={() => setShowSecurityAuditModal(true)}
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-800 dark:text-amber-300 hover:underline"
+                >
+                  <ShieldCheckIcon className="w-4 h-4 shrink-0" />
+                  <span>Check password strength &amp; email breach status</span>
+                </button>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <AuthInput
@@ -1304,6 +1322,14 @@ const AuthPage: React.FC<AuthPageProps> = ({
                       onIconClick={() => setShowInvestorPassword((prev) => !prev)}
                     />
                     <PasswordStrengthMeter criteria={isPasswordStrong(investorForm.password)} />
+                    <button
+                      type="button"
+                      onClick={() => setShowSecurityAuditModal(true)}
+                      className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-800 dark:text-amber-300 hover:underline"
+                    >
+                      <ShieldCheckIcon className="w-4 h-4 shrink-0" />
+                      <span>Check password strength &amp; email breach status</span>
+                    </button>
                     <div className="flex justify-end pt-2">
                       <button
                         type="button"
@@ -1488,6 +1514,39 @@ const AuthPage: React.FC<AuthPageProps> = ({
           </div>
         </div>
       </div>
+
+      {showSecurityAuditModal && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Account Security Audit Tools"
+          onClick={() => setShowSecurityAuditModal(false)}
+        >
+          <div
+            className="w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white dark:bg-[#0B1F1A] border border-slate-200 dark:border-slate-800 p-4 sm:p-6 shadow-2xl space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-4">
+              <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                Pre-Registration Credential &amp; Breach Audit
+              </p>
+              <button
+                type="button"
+                onClick={() => setShowSecurityAuditModal(false)}
+                className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-xs font-semibold text-slate-800 dark:text-slate-100"
+              >
+                Close
+              </button>
+            </div>
+            <WidgetTabGroup
+              title="Credential Strength, Email &amp; Phone Verification"
+              subtitle="Test password resilience, validate email and international phone formatting, and check historical breach exposure."
+              toolIds={['password-strength', 'breach-checker', 'validate-email', 'validate-phone']}
+            />
+          </div>
+        </div>
+      )}
     </section>
   );
 };

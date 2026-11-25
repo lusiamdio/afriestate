@@ -14,6 +14,7 @@ import {
   SparklesIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline';
+import { supabase } from '../../lib/supabase';
 import {
   DESTINATION_PHOTOS,
   FARE_TIER_CONFIG,
@@ -28,7 +29,7 @@ import type { FlightSearchParams } from './FlightSearchWidget';
 import type { User } from '../../types';
 import { useCurrency } from '../../contexts/CurrencyContext';
 import { useToast } from '../../contexts/ToastContext';
-import { isValidEmail, isValidPhone, sanitizeText } from '../../lib/security';
+import { generateSecureBookingRef, isValidEmail, isValidPhone, sanitizeText } from '../../lib/security';
 import { fetchJsonStrict } from '../../lib/http';
 import AirlineLogo from './AirlineLogo';
 
@@ -214,12 +215,24 @@ const FlightBookingFlow: React.FC<FlightBookingFlowProps> = ({
       return;
     }
 
+    let cardBrand: string | undefined;
+    let cardLast4: string | undefined;
     if (paymentMethod === 'Card') {
       const digits = cardNumber.replace(/\D/g, '');
-      if (digits.length < 12 || !cardExpiry.trim() || cardCvv.trim().length < 3) {
-        setPaymentError('Card details could not be verified. Your flight has not been charged.');
+      const cleanExpiry = cardExpiry.trim();
+      const cleanCvv = cardCvv.replace(/\D/g, '');
+      if (digits.length < 13 || digits.length > 19 || !/^(0[1-9]|1[0-2])\/\d{2,4}$/.test(cleanExpiry) || cleanCvv.length < 3) {
+        setPaymentError('Card details could not be verified. Enter valid card number (13-19 digits), MM/YY expiry, and CVV.');
         return;
       }
+      cardLast4 = digits.slice(-4);
+      cardBrand = digits.startsWith('4')
+        ? 'Visa'
+        : /^5[1-5]/.test(digits)
+        ? 'Mastercard'
+        : /^3[47]/.test(digits)
+        ? 'Amex'
+        : 'Card';
     }
     if (paymentMethod.includes('Mobile Money') && mobileMoneyPhone.replace(/\D/g, '').length < 8) {
       setPaymentError('Mobile Money MSISDN appears incomplete. Please verify your number.');
@@ -245,9 +258,9 @@ const FlightBookingFlow: React.FC<FlightBookingFlowProps> = ({
           customerName: leadName,
           customerEmail: cleanEmail,
           paymentDetails: {
-            cardNumber: paymentMethod === 'Card' ? cardNumber.replace(/\D/g, '').slice(-4).padStart(16, '4') : undefined,
+            cardLast4,
+            cardBrand,
             cardExpiry: paymentMethod === 'Card' ? cardExpiry.trim() : undefined,
-            cardCvv: paymentMethod === 'Card' ? cardCvv.trim() : undefined,
             mobileMoneyPhone: paymentMethod.includes('Mobile Money') ? mobileMoneyPhone.trim() : undefined,
           },
           metadata: {
@@ -259,7 +272,7 @@ const FlightBookingFlow: React.FC<FlightBookingFlowProps> = ({
         }),
       });
 
-      const ref = data.transactionRef || `AFR${Math.floor(100000 + Math.random() * 899999)}`;
+      const ref = data.transactionRef || generateSecureBookingRef('AFR');
       const record: BookedTripRecord = {
         id: `trip-${Date.now()}`,
         reference: ref,
@@ -296,6 +309,35 @@ const FlightBookingFlow: React.FC<FlightBookingFlowProps> = ({
       };
       setConfirmedTrip(record);
       setStage('confirmed');
+      try {
+        const { data: authData } = await supabase.auth.getUser().catch(() => ({ data: { user: null } }));
+        if (authData?.user?.id && data.settlementId) {
+          await supabase.from('payment_settlements').insert({
+            settlement_id: data.settlementId,
+            transaction_ref: ref,
+            authorization_code: data.authorizationCode || null,
+            user_id: authData.user.id,
+            booking_category: 'flight',
+            item_id: flight.id,
+            item_title: `${flight.airline} ${flight.flightNumber} (${flight.origin} -> ${flight.destination})`,
+            amount: grandTotalZar,
+            currency,
+            payment_method: paymentMethod,
+            customer_name: leadName,
+            customer_email: cleanEmail.toLowerCase(),
+            status: 'Settled',
+            metadata: {
+              flightNumber: flight.flightNumber,
+              departureDate: search.departDate,
+              cabin: search.cabin,
+              fareTier: selectedTier,
+            },
+            settled_at: data.settledAt || new Date().toISOString(),
+          });
+        }
+      } catch {
+        // Non-blocking settlement audit persistence
+      }
       onBookingCompleted(record);
       addToast(`Real-time settlement ${ref} confirmed!`, 'success');
     } catch (err: any) {

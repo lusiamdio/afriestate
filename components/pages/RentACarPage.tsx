@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../lib/supabase';
-import type { Property } from '../../types';
+import { ListingType, type Property } from '../../types';
 import { GoogleGenAI } from '../../lib/ai';
 import { useToast } from '../../contexts/ToastContext';
 import { usePlatformState } from '../../contexts/PlatformStateContext';
@@ -22,13 +22,18 @@ import { StarIcon as StarSolidIcon, CheckBadgeIcon } from '@heroicons/react/24/s
 import {
   checkSubmissionThrottle,
   generateListingSignature,
+  generateSecureBookingRef,
   isValidEmail,
   isValidPhone,
   sanitizeSafeUrl,
   sanitizeText,
 } from '../../lib/security';
 import type { SettlementReceipt } from '../payments/PaymentSettlementPanel';
-import TransportBookingFlowPage, { type FleetVehicleCard } from '../transport/TransportBookingFlowPage';
+import TransportBookingFlowPage, {
+  type FleetVehicleCard,
+  type VehicleSaleInquiryPayload,
+} from '../transport/TransportBookingFlowPage';
+import { WidgetTabGroup } from '../widgets/EmbeddedWidgetToolkit';
 
 const carRentals = [
   {
@@ -139,15 +144,93 @@ const featuredFleet = [
   },
 ];
 
+const featuredVehiclesForSale = [
+  {
+    make: 'Land Rover',
+    model: 'Range Rover Sport P400 Dynamic SE',
+    image: '/images/luxury_suv_fleet.jpg',
+    rating: '5.0',
+    reviews: '38',
+    specs: ['2024 Model', '18,400 km', 'Hybrid Petrol', 'Certified Pre-Owned', 'Full Service History'],
+    price: 'R 1,985,000',
+    numericPrice: 1985000,
+    mileage: '18,400 km',
+    condition: 'Certified Pre-Owned',
+    fuelType: 'Hybrid Petrol',
+    year: '2024',
+    city: 'Cape Town',
+    address: 'V&A Waterfront Luxury Auto Gallery, Cape Town',
+    businessName: 'Atlantic Sovereign Motors',
+    category: 'SUV',
+  },
+  {
+    make: 'Mercedes-Benz',
+    model: 'E300 AMG Line Executive',
+    image: '/images/executive_sedan_fleet.jpg',
+    rating: '4.9',
+    reviews: '24',
+    specs: ['2025 Model', '6,200 km', 'Petrol', 'Demo Model', 'Motorplan Active'],
+    price: 'R 1,340,000',
+    numericPrice: 1340000,
+    mileage: '6,200 km',
+    condition: 'Demo Model',
+    fuelType: 'Petrol',
+    year: '2025',
+    city: 'Johannesburg',
+    address: 'Rivonia Boulevard Showroom, Sandton',
+    businessName: 'Sandton Prestige Auto',
+    category: 'Executive',
+  },
+  {
+    make: 'BMW',
+    model: 'X5 xDrive30d M Sport',
+    image: '/images/2a47542b078d54560485a1e72a5373aa9c3a4a48-800x535.avif',
+    rating: '4.9',
+    reviews: '41',
+    specs: ['2023 Model', '32,500 km', 'Diesel', 'Certified Pre-Owned', 'Finance Ready'],
+    price: 'R 1,495,000',
+    numericPrice: 1495000,
+    mileage: '32,500 km',
+    condition: 'Certified Pre-Owned',
+    fuelType: 'Diesel',
+    year: '2023',
+    city: 'Johannesburg',
+    address: 'Melrose Arch Flagship Showroom, Johannesburg',
+    businessName: 'Gauteng Executive Fleet Sales',
+    category: 'SUV',
+  },
+  {
+    make: 'Audi',
+    model: 'A5 Sportback 40 TFSI S Line',
+    image: '/images/executive_sedan_fleet.jpg',
+    rating: '4.8',
+    reviews: '19',
+    specs: ['2024 Model', '14,800 km', 'Petrol', 'Certified Pre-Owned', 'Roadworthy Included'],
+    price: 'R 895,000',
+    numericPrice: 895000,
+    mileage: '14,800 km',
+    condition: 'Certified Pre-Owned',
+    fuelType: 'Petrol',
+    year: '2024',
+    city: 'Cape Town',
+    address: 'Century City Mobility Boulevard, Cape Town',
+    businessName: 'Cape Peninsula Auto Exchange',
+    category: 'Luxury',
+  },
+];
+
 interface RentACarPageProps {
   properties?: Property[];
-  onListFleet?: () => void;
+  onListFleet?: (mode?: 'hire' | 'sale') => void;
   onNavigate?: (page: string) => void;
 }
 
 const RentACarPage: React.FC<RentACarPageProps> = ({ properties = [], onListFleet, onNavigate }) => {
   const { addToast } = useToast();
   const { currentUser, sharedJourney, updateSharedJourney, addPlatformBooking } = usePlatformState();
+  const [heroMode, setHeroMode] = useState<'hire' | 'sale'>('hire');
+  const [listingFilter, setListingFilter] = useState<'all' | 'hire' | 'sale'>('all');
+  const [saleBudgetMax, setSaleBudgetMax] = useState<'all' | '1000000' | '1600000' | '2500000'>('all');
   const [activeCategory, setActiveCategory] = useState<'All' | 'Luxury' | 'SUV' | 'Executive'>('All');
   const [pickupLocation, setPickupLocation] = useState(() =>
     sharedJourney.destinationCity ? `${sharedJourney.destinationCity} Airport` : 'Cape Town Airport'
@@ -207,6 +290,16 @@ const RentACarPage: React.FC<RentACarPageProps> = ({ properties = [], onListFlee
   const baseVehicles = useMemo<FleetVehicleCard[]>(() => {
     const publishedCars: FleetVehicleCard[] = properties.map((p, idx) => {
       const parts = sanitizeText(p.title, 120).split(' ');
+      const isSale = p.listingType === ListingType.SALE;
+      const numericPrice = Number(p.price) || (isSale ? 850000 : 950);
+      const amenitiesList = (p.amenities || []).map((a) => sanitizeText(a, 50));
+      const mileageSpec = amenitiesList.find((a) => /\b[\d,]+\s*km\b/i.test(a));
+      const conditionSpec = amenitiesList.find((a) =>
+        ['Brand New', 'Demo Model', 'Certified Pre-Owned', 'Used'].some((c) => a.toLowerCase().includes(c.toLowerCase()))
+      );
+      const fuelSpec = amenitiesList.find((a) =>
+        ['Petrol', 'Diesel', 'Hybrid', 'Electric'].some((f) => a.toLowerCase().includes(f.toLowerCase()))
+      );
       const sig =
         p.verificationDetails?.titleDeedNumber ||
         generateListingSignature(p.id, p.agent?.name || 'afriestate', p.price);
@@ -218,22 +311,40 @@ const RentACarPage: React.FC<RentACarPageProps> = ({ properties = [], onListFlee
         rating: String(p.agent?.rating || 4.9),
         reviews: String(p.agent?.reviewCount || 12),
         specs:
-          p.amenities && p.amenities.length > 0
-            ? p.amenities.map((a) => sanitizeText(a, 50))
-            : ['Automatic', 'Unlimited Mileage', 'Verified Partner'],
-        price: `${p.localCurrency ? `${p.localCurrency} ` : 'R '}${(Number(p.price) || 950).toLocaleString()}`,
+          amenitiesList.length > 0
+            ? amenitiesList
+            : isSale
+              ? ['Automatic', 'Full Service History', 'Roadworthy Verified']
+              : ['Automatic', 'Unlimited Mileage', 'Verified Partner'],
+        price: `${p.localCurrency ? `${p.localCurrency} ` : 'R '}${numericPrice.toLocaleString()}`,
+        numericPrice,
+        listingMode: isSale ? 'sale' : 'hire',
+        mileage: mileageSpec || (isSale ? 'Verified Mileage' : undefined),
+        condition: conditionSpec || (isSale ? 'Inspected Pre-Owned' : undefined),
+        fuelType: fuelSpec,
+        financingAvailable: amenitiesList.some((a) => a.toLowerCase().includes('finance')),
         category: p.vehicleType || 'SUV',
         city: sanitizeText(p.address?.city || 'Cape Town', 60),
-        pickupAddress: sanitizeText(p.address?.street || p.address?.city || 'International Arrivals Desk', 120),
-        businessName: sanitizeText(p.agent?.name || 'Verified Mobility Partner', 80),
+        pickupAddress: sanitizeText(
+          p.address?.street || p.address?.city || (isSale ? 'Verified Dealership Showroom' : 'International Arrivals Desk'),
+          120
+        ),
+        businessName: sanitizeText(p.agent?.name || (isSale ? 'Verified Vehicle Seller' : 'Verified Mobility Partner'), 80),
         phone: sanitizeText(p.agent?.phone || '+27 21 555 0140', 30),
-        description: sanitizeText(p.description || p.neighborhoodInfo || 'Vetted African fleet with comprehensive insurance and roadside cover.', 280),
+        description: sanitizeText(
+          p.description ||
+            p.neighborhoodInfo ||
+            (isSale
+              ? 'Verified vehicle listed for outright sale with ownership and roadworthy inspection support.'
+              : 'Vetted African fleet with comprehensive insurance and roadside cover.'),
+          280
+        ),
         verificationHash: sig,
         isUserPublished: true,
       };
     });
 
-    const curatedMapped: FleetVehicleCard[] = featuredFleet.map((f, idx) => ({
+    const curatedHire: FleetVehicleCard[] = featuredFleet.map((f, idx) => ({
       id: `curated_car_${idx}`,
       make: f.make,
       model: f.model,
@@ -242,6 +353,8 @@ const RentACarPage: React.FC<RentACarPageProps> = ({ properties = [], onListFlee
       reviews: f.reviews,
       specs: f.specs,
       price: f.price,
+      numericPrice: parseDailyRateZar(f.price),
+      listingMode: 'hire',
       category: f.category,
       city: idx % 2 === 0 ? 'Cape Town' : 'Johannesburg',
       pickupAddress: idx % 2 === 0 ? 'Cape Town International Terminal Desk' : 'Sandton & OR Tambo VIP Terminal',
@@ -252,25 +365,50 @@ const RentACarPage: React.FC<RentACarPageProps> = ({ properties = [], onListFlee
       isUserPublished: false,
     }));
 
-    return [...publishedCars, ...curatedMapped];
+    const curatedSale: FleetVehicleCard[] = featuredVehiclesForSale.map((f, idx) => ({
+      id: `curated_sale_car_${idx}`,
+      make: f.make,
+      model: f.model,
+      image: f.image,
+      rating: f.rating,
+      reviews: f.reviews,
+      specs: f.specs,
+      price: f.price,
+      numericPrice: f.numericPrice,
+      listingMode: 'sale',
+      mileage: f.mileage,
+      condition: f.condition,
+      fuelType: f.fuelType,
+      year: f.year,
+      financingAvailable: true,
+      category: f.category,
+      city: f.city,
+      pickupAddress: f.address,
+      businessName: f.businessName,
+      phone: '+27 21 555 0195',
+      description: `${f.year} ${f.make} ${f.model} (${f.mileage}) available for scheduled showroom inspection, bank finance, or cash settlement.`,
+      verificationHash: generateListingSignature(`curated_sale_car_${idx}`, f.make, f.numericPrice),
+      isUserPublished: false,
+    }));
+
+    return [...publishedCars, ...curatedHire, ...curatedSale];
   }, [properties]);
 
   const displayedVehicles = useMemo(() => {
-    const locQuery = pickupLocation.trim().toLowerCase();
+    const maxBudget = saleBudgetMax !== 'all' ? Number(saleBudgetMax) : null;
     return baseVehicles.filter((v) => {
+      if (listingFilter !== 'all' && (v.listingMode || 'hire') !== listingFilter) {
+        return false;
+      }
       if (activeCategory !== 'All' && !v.category.toLowerCase().includes(activeCategory.toLowerCase())) {
         return false;
       }
-      if (locQuery && locQuery !== 'cape town airport' && locQuery !== '') {
-        const hay = `${v.city} ${v.pickupAddress} ${v.businessName} ${v.make} ${v.model}`.toLowerCase();
-        // Keep matches flexible so curated vehicles aren't hidden unless user explicitly types a specific mismatch
-        if (locQuery.length > 3 && !hay.includes(locQuery.split(' ')[0])) {
-          return true;
-        }
+      if (maxBudget && v.listingMode === 'sale' && (v.numericPrice || 0) > maxBudget) {
+        return false;
       }
       return true;
     });
-  }, [baseVehicles, activeCategory, pickupLocation]);
+  }, [baseVehicles, listingFilter, activeCategory, saleBudgetMax]);
 
   const filteredPartners = useMemo(() => {
     if (activeHub === 'All') return carRentals;
@@ -331,6 +469,9 @@ const RentACarPage: React.FC<RentACarPageProps> = ({ properties = [], onListFlee
       try {
         const username = currentUser?.username || currentUser?.email || cleanEmail;
         await supabase.from('tour_requests').insert({
+          requester_user_id: currentUser?.id || null,
+          request_type: 'car_hire',
+          booking_ref: receipt.transactionRef,
           property_id: selectedVehicle.id,
           property_title: `${title} (${pickupLocation} · ${pickupDate} to ${returnDate} · Ref ${receipt.transactionRef})`,
           username,
@@ -345,6 +486,58 @@ const RentACarPage: React.FC<RentACarPageProps> = ({ properties = [], onListFlee
     }
 
     addToast(`Car hire settled & confirmed for ${title} (${receipt.transactionRef}).`, 'success');
+  };
+
+  const handleCarSaleInquirySubmitted = async (payload: VehicleSaleInquiryPayload): Promise<string | null> => {
+    const cleanName = sanitizeText(payload.buyerName, 80);
+    const cleanEmail = sanitizeText(payload.buyerEmail, 120).toLowerCase();
+    const cleanPhone = sanitizeText(payload.buyerPhone, 30);
+
+    if (!cleanName || !isValidEmail(cleanEmail) || !isValidPhone(cleanPhone)) {
+      addToast('Please provide a valid buyer name, email address, and mobile number.', 'error');
+      return null;
+    }
+
+    const ref = generateSecureBookingRef('AFR-VEH');
+
+    addPlatformBooking({
+      category: 'car-hire',
+      reference: ref,
+      title: payload.vehicleTitle,
+      subtitle: `Car Sale Inquiry · R ${payload.offerAmountZar.toLocaleString()} offer · Inspection ${payload.inspectionDate}`,
+      city: selectedVehicle?.city || pickupLocation,
+      startDate: payload.inspectionDate,
+      endDate: payload.inspectionDate,
+      amountZar: 0,
+      status: 'Pending',
+      customerName: cleanName,
+      customerEmail: cleanEmail,
+      targetPage: 'rent-a-car',
+    });
+
+    const throttle = checkSubmissionThrottle(`car_sale_${payload.vehicleId}`, 6000);
+    if (throttle.allowed) {
+      try {
+        const username = currentUser?.username || currentUser?.email || cleanEmail;
+        await supabase.from('tour_requests').insert({
+          requester_user_id: currentUser?.id || null,
+          request_type: 'car_sale_inquiry',
+          booking_ref: ref,
+          property_id: payload.vehicleId,
+          property_title: `${payload.vehicleTitle} (Sale Offer R ${payload.offerAmountZar.toLocaleString()} · ${payload.financeRequested ? 'Finance/Trade-In' : 'Cash'} · ${payload.inspectionDate})`,
+          username,
+          date: payload.inspectionDate,
+          time: '10:00',
+          status: 'Pending',
+          timestamp: Date.now(),
+        });
+      } catch {
+        // continue cleanly in local fallback mode
+      }
+    }
+
+    addToast(`Inspection & purchase offer logged for ${payload.vehicleTitle} (${ref}).`, 'success');
+    return ref;
   };
 
   const openVehicleBookingPage = (vehicle: FleetVehicleCard) => {
@@ -431,6 +624,7 @@ const RentACarPage: React.FC<RentACarPageProps> = ({ properties = [], onListFlee
         settledReceipt={settledReceipt}
         onProceedToSettlement={handleProceedToSettlement}
         onCarHireSettled={handleCarHireSettled}
+        onCarSaleInquirySubmitted={handleCarSaleInquirySubmitted}
         onNavigate={onNavigate}
       />
     );
@@ -452,106 +646,233 @@ const RentACarPage: React.FC<RentACarPageProps> = ({ properties = [], onListFlee
 
         <div className="relative z-10 max-w-6xl mx-auto text-center">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#C9A35D] mb-4">
-            AfriEstate Transport &amp; Mobility
+            AfriEstate Transport · Car Hire &amp; Vehicle Sales
           </p>
           <h1 className="font-heading text-4xl sm:text-5xl lg:text-6xl font-semibold leading-[1.08] max-w-4xl mx-auto">
-            Executive Fleet &amp; Seamless Transfers Across Africa
+            Hire Executive Fleet or Buy &amp; Sell Verified Vehicles
           </h1>
           <p className="text-base sm:text-lg font-light text-slate-300 max-w-2xl mx-auto mt-5 mb-10">
-            Reserve vetted SUVs, executive sedans, and corporate transport from leading airport and city hubs with transparent daily rates.
+            Reserve vetted executive cars for daily airport and city travel, browse inspected vehicles for outright purchase, or list your own car for sale or hire.
           </p>
 
-          {/* Compact Booking Widget */}
+          {/* Compact Search & Mode Switcher Widget */}
           <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 text-slate-900 dark:text-white mx-auto w-full text-left">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 items-end">
-              <div className="bg-[#FAF8F5] dark:bg-slate-800/80 rounded-xl px-3.5 py-2.5 border border-slate-200/70 dark:border-slate-700">
-                <label className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
-                  Pickup Hub
-                </label>
-                <div className="flex items-center gap-2">
-                  <MapPinIcon className="w-4 h-4 text-[#0F2D25] dark:text-[#C9A35D] shrink-0" />
-                  <input
-                    type="text"
-                    value={pickupLocation}
-                    onChange={(e) => setPickupLocation(e.target.value)}
-                    className="w-full bg-transparent outline-none text-sm font-medium"
-                  />
-                </div>
-              </div>
-
-              <div className="bg-[#FAF8F5] dark:bg-slate-800/80 rounded-xl px-3.5 py-2.5 border border-slate-200/70 dark:border-slate-700">
-                <label className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
-                  Drop-Off Hub
-                </label>
-                <div className="flex items-center gap-2">
-                  <MapPinIcon className="w-4 h-4 text-[#0F2D25] dark:text-[#C9A35D] shrink-0" />
-                  <input
-                    type="text"
-                    value={returnLocation}
-                    onChange={(e) => setReturnLocation(e.target.value)}
-                    className="w-full bg-transparent outline-none text-sm font-medium"
-                  />
-                </div>
-              </div>
-
-              <div className="bg-[#FAF8F5] dark:bg-slate-800/80 rounded-xl px-3.5 py-2.5 border border-slate-200/70 dark:border-slate-700">
-                <label className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
-                  Pickup Date
-                </label>
-                <div className="flex items-center gap-2">
-                  <CalendarIcon className="w-4 h-4 text-[#0F2D25] dark:text-[#C9A35D] shrink-0" />
-                  <input
-                    type="date"
-                    value={pickupDate}
-                    onChange={(e) => setPickupDate(e.target.value)}
-                    className="w-full bg-transparent outline-none text-sm font-medium"
-                  />
-                </div>
-              </div>
-
-              <div className="bg-[#FAF8F5] dark:bg-slate-800/80 rounded-xl px-3.5 py-2.5 border border-slate-200/70 dark:border-slate-700">
-                <label className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
-                  Return Date
-                </label>
-                <div className="flex items-center gap-2">
-                  <CalendarIcon className="w-4 h-4 text-[#0F2D25] dark:text-[#C9A35D] shrink-0" />
-                  <input
-                    type="date"
-                    value={returnDate}
-                    onChange={(e) => setReturnDate(e.target.value)}
-                    className="w-full bg-transparent outline-none text-sm font-medium"
-                  />
-                </div>
-              </div>
-
-              <div className="bg-[#FAF8F5] dark:bg-slate-800/80 rounded-xl px-3.5 py-2.5 border border-slate-200/70 dark:border-slate-700">
-                <label className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
-                  Driver Age
-                </label>
-                <div className="flex items-center gap-2">
-                  <UserIcon className="w-4 h-4 text-[#0F2D25] dark:text-[#C9A35D] shrink-0" />
-                  <select
-                    value={driverAge}
-                    onChange={(e) => setDriverAge(e.target.value)}
-                    className="w-full bg-transparent outline-none text-sm font-medium cursor-pointer"
-                  >
-                    <option>30+</option>
-                    <option>25–29</option>
-                    <option>21–24</option>
-                  </select>
-                </div>
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div className="inline-flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setHeroMode('hire');
+                    setListingFilter('hire');
+                  }}
+                  className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap shrink-0 ${
+                    heroMode === 'hire'
+                      ? 'bg-[#0F2D25] text-white'
+                      : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  Cars for Hire
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setHeroMode('sale');
+                    setListingFilter('sale');
+                  }}
+                  className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap shrink-0 ${
+                    heroMode === 'sale'
+                      ? 'bg-[#0F2D25] text-white'
+                      : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  Cars for Sale
+                </button>
               </div>
 
               <button
+                type="button"
                 onClick={() => {
-                  document.getElementById('fleet-catalog')?.scrollIntoView({ behavior: 'smooth' });
-                  addToast(`Fleet availability updated for ${pickupLocation}`, 'info');
+                  if (onListFleet) {
+                    onListFleet('sale');
+                  } else {
+                    addToast('Sign in to sell or list your car on AfriEstate.', 'info');
+                  }
                 }}
-                className="h-[58px] bg-[#0F2D25] text-white font-semibold px-5 rounded-xl hover:bg-[#173f34] transition-colors flex items-center justify-center gap-2 text-sm whitespace-nowrap"
+                className="px-4 py-2 rounded-xl bg-[#C9A35D] text-[#0B1F1A] hover:bg-[#d8b471] text-xs font-bold transition-colors whitespace-nowrap shrink-0"
               >
-                <MagnifyingGlassIcon className="w-4 h-4 text-[#C9A35D]" /> Search Fleet
+                Sell / List Your Car
               </button>
             </div>
+
+            {heroMode === 'hire' ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 items-end">
+                <div className="bg-[#FAF8F5] dark:bg-slate-800/80 rounded-xl px-3.5 py-2.5 border border-slate-200/70 dark:border-slate-700">
+                  <label className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
+                    Pickup Hub
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <MapPinIcon className="w-4 h-4 text-[#0F2D25] dark:text-[#C9A35D] shrink-0" />
+                    <input
+                      type="text"
+                      value={pickupLocation}
+                      onChange={(e) => setPickupLocation(e.target.value)}
+                      className="w-full bg-transparent outline-none text-sm font-medium"
+                    />
+                  </div>
+                </div>
+
+                <div className="bg-[#FAF8F5] dark:bg-slate-800/80 rounded-xl px-3.5 py-2.5 border border-slate-200/70 dark:border-slate-700">
+                  <label className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
+                    Drop-Off Hub
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <MapPinIcon className="w-4 h-4 text-[#0F2D25] dark:text-[#C9A35D] shrink-0" />
+                    <input
+                      type="text"
+                      value={returnLocation}
+                      onChange={(e) => setReturnLocation(e.target.value)}
+                      className="w-full bg-transparent outline-none text-sm font-medium"
+                    />
+                  </div>
+                </div>
+
+                <div className="bg-[#FAF8F5] dark:bg-slate-800/80 rounded-xl px-3.5 py-2.5 border border-slate-200/70 dark:border-slate-700">
+                  <label className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
+                    Pickup Date
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <CalendarIcon className="w-4 h-4 text-[#0F2D25] dark:text-[#C9A35D] shrink-0" />
+                    <input
+                      type="date"
+                      value={pickupDate}
+                      onChange={(e) => setPickupDate(e.target.value)}
+                      className="w-full bg-transparent outline-none text-sm font-medium"
+                    />
+                  </div>
+                </div>
+
+                <div className="bg-[#FAF8F5] dark:bg-slate-800/80 rounded-xl px-3.5 py-2.5 border border-slate-200/70 dark:border-slate-700">
+                  <label className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
+                    Return Date
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <CalendarIcon className="w-4 h-4 text-[#0F2D25] dark:text-[#C9A35D] shrink-0" />
+                    <input
+                      type="date"
+                      value={returnDate}
+                      onChange={(e) => setReturnDate(e.target.value)}
+                      className="w-full bg-transparent outline-none text-sm font-medium"
+                    />
+                  </div>
+                </div>
+
+                <div className="bg-[#FAF8F5] dark:bg-slate-800/80 rounded-xl px-3.5 py-2.5 border border-slate-200/70 dark:border-slate-700">
+                  <label className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
+                    Driver Age
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <UserIcon className="w-4 h-4 text-[#0F2D25] dark:text-[#C9A35D] shrink-0" />
+                    <select
+                      value={driverAge}
+                      onChange={(e) => setDriverAge(e.target.value)}
+                      className="w-full bg-transparent outline-none text-sm font-medium cursor-pointer"
+                    >
+                      <option>30+</option>
+                      <option>25–29</option>
+                      <option>21–24</option>
+                    </select>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setListingFilter('hire');
+                    document.getElementById('fleet-catalog')?.scrollIntoView({ behavior: 'smooth' });
+                    addToast(`Fleet availability updated for ${pickupLocation}`, 'info');
+                  }}
+                  className="h-[58px] bg-[#0F2D25] text-white font-semibold px-5 rounded-xl hover:bg-[#173f34] transition-colors flex items-center justify-center gap-2 text-sm whitespace-nowrap"
+                >
+                  <MagnifyingGlassIcon className="w-4 h-4 text-[#C9A35D]" /> Search Fleet
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
+                <div className="bg-[#FAF8F5] dark:bg-slate-800/80 rounded-xl px-3.5 py-2.5 border border-slate-200/70 dark:border-slate-700">
+                  <label className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
+                    City / Showroom Hub
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <MapPinIcon className="w-4 h-4 text-[#0F2D25] dark:text-[#C9A35D] shrink-0" />
+                    <input
+                      type="text"
+                      value={pickupLocation}
+                      onChange={(e) => setPickupLocation(e.target.value)}
+                      className="w-full bg-transparent outline-none text-sm font-medium"
+                    />
+                  </div>
+                </div>
+
+                <div className="bg-[#FAF8F5] dark:bg-slate-800/80 rounded-xl px-3.5 py-2.5 border border-slate-200/70 dark:border-slate-700">
+                  <label className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
+                    Vehicle Class
+                  </label>
+                  <select
+                    value={activeCategory}
+                    onChange={(e) => setActiveCategory(e.target.value as 'All' | 'Luxury' | 'SUV' | 'Executive')}
+                    className="w-full bg-transparent outline-none text-sm font-medium cursor-pointer"
+                  >
+                    <option value="All">All Vehicle Classes</option>
+                    <option value="SUV">SUV &amp; 4x4</option>
+                    <option value="Luxury">Luxury Sedan</option>
+                    <option value="Executive">Executive Touring</option>
+                  </select>
+                </div>
+
+                <div className="bg-[#FAF8F5] dark:bg-slate-800/80 rounded-xl px-3.5 py-2.5 border border-slate-200/70 dark:border-slate-700">
+                  <label className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
+                    Max Budget (ZAR)
+                  </label>
+                  <select
+                    value={saleBudgetMax}
+                    onChange={(e) => setSaleBudgetMax(e.target.value as 'all' | '1000000' | '1600000' | '2500000')}
+                    className="w-full bg-transparent outline-none text-sm font-medium cursor-pointer font-mono"
+                  >
+                    <option value="all">Any Budget</option>
+                    <option value="1000000">Up to R 1,000,000</option>
+                    <option value="1600000">Up to R 1,600,000</option>
+                    <option value="2500000">Up to R 2,500,000</option>
+                  </select>
+                </div>
+
+                <div className="bg-[#FAF8F5] dark:bg-slate-800/80 rounded-xl px-3.5 py-2.5 border border-slate-200/70 dark:border-slate-700">
+                  <label className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
+                    Inspection Date
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <CalendarIcon className="w-4 h-4 text-[#0F2D25] dark:text-[#C9A35D] shrink-0" />
+                    <input
+                      type="date"
+                      value={pickupDate}
+                      onChange={(e) => setPickupDate(e.target.value)}
+                      className="w-full bg-transparent outline-none text-sm font-medium"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setListingFilter('sale');
+                    document.getElementById('fleet-catalog')?.scrollIntoView({ behavior: 'smooth' });
+                    addToast(`Showing verified cars for sale`, 'info');
+                  }}
+                  className="h-[58px] bg-[#0F2D25] text-white font-semibold px-5 rounded-xl hover:bg-[#173f34] transition-colors flex items-center justify-center gap-2 text-sm whitespace-nowrap"
+                >
+                  <MagnifyingGlassIcon className="w-4 h-4 text-[#C9A35D]" /> Search Cars for Sale
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Trust Row */}
@@ -560,126 +881,185 @@ const RentACarPage: React.FC<RentACarPageProps> = ({ properties = [], onListFlee
               <StarSolidIcon className="w-4 h-4 text-[#C9A35D]" /> 4.9/5 Verified Fleet Rating
             </span>
             <span className="inline-flex items-center gap-1.5">
-              <CheckCircleIcon className="w-4 h-4 text-emerald-400" /> Comprehensive Insurance
+              <CheckCircleIcon className="w-4 h-4 text-emerald-400" /> Inspected Cars for Sale &amp; Hire
             </span>
             <span className="inline-flex items-center gap-1.5">
               <CheckCircleIcon className="w-4 h-4 text-emerald-400" /> 24/7 Roadside Dispatch
             </span>
             <span className="inline-flex items-center gap-1.5">
-              <CheckCircleIcon className="w-4 h-4 text-emerald-400" /> Transparent Daily Rates
+              <CheckCircleIcon className="w-4 h-4 text-emerald-400" /> Verified Seller &amp; Title Checks
             </span>
           </div>
         </div>
       </section>
 
-      {/* Featured Fleet Collections */}
+      {/* Featured Fleet & Car Sales Catalog */}
       <section id="fleet-catalog" className="py-16 px-6 sm:px-10 lg:px-16">
         <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-10">
+          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 mb-10">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#C9A35D]">Curated Mobility</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#C9A35D]">
+                Curated Mobility &amp; Vehicle Sales
+              </p>
               <h2 className="font-heading text-3xl sm:text-4xl font-semibold text-slate-900 dark:text-white mt-1">
-                Featured Vehicle Collections
+                {listingFilter === 'sale'
+                  ? 'Verified Cars for Sale'
+                  : listingFilter === 'hire'
+                    ? 'Executive Cars for Hire'
+                    : 'Cars for Hire & Sale'}
               </h2>
             </div>
 
-            <div className="inline-flex items-center gap-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-1 rounded-xl self-start md:self-auto">
-              {(['All', 'Luxury', 'SUV', 'Executive'] as const).map((cat) => (
-                <button
-                  key={cat}
-                  onClick={() => setActiveCategory(cat)}
-                  className={`px-4 py-2 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap ${
-                    activeCategory === cat
-                      ? 'bg-[#0F2D25] text-white'
-                      : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
-                  }`}
-                >
-                  {cat}
-                </button>
-              ))}
+            <div className="flex flex-wrap items-center gap-3 self-start lg:self-auto">
+              <div className="inline-flex items-center gap-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-1 rounded-xl">
+                {(
+                  [
+                    { id: 'all', label: 'All Vehicles' },
+                    { id: 'hire', label: 'Cars for Hire' },
+                    { id: 'sale', label: 'Cars for Sale' },
+                  ] as const
+                ).map((modeTab) => (
+                  <button
+                    key={modeTab.id}
+                    type="button"
+                    onClick={() => setListingFilter(modeTab.id)}
+                    className={`px-3.5 py-2 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap shrink-0 ${
+                      listingFilter === modeTab.id
+                        ? 'bg-[#0F2D25] text-white'
+                        : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    {modeTab.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="inline-flex items-center gap-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-1 rounded-xl">
+                {(['All', 'Luxury', 'SUV', 'Executive'] as const).map((cat) => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setActiveCategory(cat)}
+                    className={`px-3.5 py-2 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap shrink-0 ${
+                      activeCategory === cat
+                        ? 'bg-[#0F2D25] text-white'
+                        : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => onListFleet?.('sale')}
+                className="px-4 py-2.5 rounded-xl bg-[#0F2D25] hover:bg-[#173f34] text-white text-xs font-semibold transition-colors whitespace-nowrap shrink-0"
+              >
+                Sell / List Your Car
+              </button>
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {displayedVehicles.map((vehicle) => (
-              <div
-                key={vehicle.id}
-                className="bg-white dark:bg-slate-900 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 transition-colors group flex flex-col"
-              >
-                <div className="h-36 overflow-hidden relative bg-slate-100 dark:bg-slate-800">
-                  <img
-                    src={vehicle.image}
-                    alt={`${vehicle.make} ${vehicle.model}`}
-                    onError={(e) => {
-                      if (!e.currentTarget.dataset.fb) {
-                        e.currentTarget.dataset.fb = '1';
-                        e.currentTarget.src = '/images/luxury_suv_fleet.jpg';
-                      }
-                    }}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    referrerPolicy="no-referrer"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-transparent" />
-                  <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between gap-2">
-                    <span className="px-2 py-0.5 rounded-md bg-[#0B1F1A]/90 text-[#C9A35D] text-[10px] font-bold uppercase tracking-wider inline-flex items-center gap-1">
-                      <CheckBadgeIcon className="w-3 h-3" />
-                      {vehicle.isUserPublished ? 'Live Partner' : 'Verified'}
-                    </span>
-                    <span className="px-2 py-0.5 rounded-md bg-white/90 text-slate-900 font-mono text-[10px] font-bold">
-                      {vehicle.city}
-                    </span>
-                  </div>
-                  <span className="absolute bottom-2 left-3 text-[10px] font-semibold uppercase tracking-wider text-white truncate max-w-[90%]">
-                    {vehicle.category} · {vehicle.businessName}
-                  </span>
-                </div>
-
-                <div className="p-3.5 flex-1 flex flex-col">
-                  <div className="flex justify-between items-start gap-2">
-                    <div className="min-w-0">
-                      <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-widest font-semibold truncate">
-                        {vehicle.make}
-                      </p>
-                      <h3 className="font-heading text-base font-semibold text-slate-900 dark:text-white mt-0.5 line-clamp-1">
-                        {vehicle.model}
-                      </h3>
+            {displayedVehicles.map((vehicle) => {
+              const isForSale = vehicle.listingMode === 'sale';
+              return (
+                <div
+                  key={vehicle.id}
+                  className="bg-white dark:bg-slate-900 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 transition-colors group flex flex-col"
+                >
+                  <div className="h-36 overflow-hidden relative bg-slate-100 dark:bg-slate-800">
+                    <img
+                      src={vehicle.image}
+                      alt={`${vehicle.make} ${vehicle.model}`}
+                      onError={(e) => {
+                        if (!e.currentTarget.dataset.fb) {
+                          e.currentTarget.dataset.fb = '1';
+                          e.currentTarget.src = '/images/luxury_suv_fleet.jpg';
+                        }
+                      }}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      referrerPolicy="no-referrer"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                    <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between gap-2">
+                      <span
+                        className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider inline-flex items-center gap-1 ${
+                          isForSale
+                            ? 'bg-[#C9A35D] text-[#0B1F1A]'
+                            : 'bg-[#0B1F1A]/90 text-[#C9A35D]'
+                        }`}
+                      >
+                        <CheckBadgeIcon className="w-3 h-3" />
+                        {isForSale ? 'For Sale' : 'For Hire'}
+                        {vehicle.isUserPublished ? ' · Live' : ''}
+                      </span>
+                      <span className="px-2 py-0.5 rounded-md bg-white/90 text-slate-900 font-mono text-[10px] font-bold">
+                        {vehicle.city}
+                      </span>
                     </div>
-                    <div className="text-right shrink-0">
-                      <p className="text-base font-bold font-mono tabular-nums text-[#0F2D25] dark:text-emerald-400">
-                        {vehicle.price}
-                      </p>
-                      <p className="text-[10px] text-slate-500">/ day</p>
+                    <span className="absolute bottom-2 left-3 text-[10px] font-semibold uppercase tracking-wider text-white truncate max-w-[90%]">
+                      {vehicle.category} · {vehicle.businessName}
+                    </span>
+                  </div>
+
+                  <div className="p-3.5 flex-1 flex flex-col">
+                    <div className="flex justify-between items-start gap-2">
+                      <div className="min-w-0">
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-widest font-semibold truncate">
+                          {vehicle.make}
+                        </p>
+                        <h3 className="font-heading text-base font-semibold text-slate-900 dark:text-white mt-0.5 line-clamp-1">
+                          {vehicle.model}
+                        </h3>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-base font-bold font-mono tabular-nums text-[#0F2D25] dark:text-emerald-400">
+                          {vehicle.price}
+                        </p>
+                        <p className="text-[10px] text-slate-500">{isForSale ? 'Asking Price' : '/ day'}</p>
+                      </div>
                     </div>
+
+                    <div className="flex items-center justify-between gap-2 mt-1.5 mb-2 text-[11px] text-slate-600 dark:text-slate-300 font-mono tabular-nums">
+                      <span className="inline-flex items-center gap-1 truncate">
+                        {isForSale ? (
+                          <span className="font-semibold text-slate-700 dark:text-slate-200 truncate">
+                            {vehicle.mileage || 'Verified'} · {vehicle.condition || 'Inspected'}
+                          </span>
+                        ) : (
+                          <>
+                            <StarSolidIcon className="w-3 h-3 text-[#C9A35D]" />
+                            <span className="font-semibold text-slate-900 dark:text-white">{vehicle.rating}</span>
+                            <span className="text-slate-400">({vehicle.reviews})</span>
+                          </>
+                        )}
+                      </span>
+                      <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-semibold truncate">
+                        {vehicle.verificationHash}
+                      </span>
+                    </div>
+
+                    <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed mb-2 line-clamp-2">
+                      {vehicle.description}
+                    </p>
+
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 mb-3 line-clamp-1">
+                      {vehicle.specs.slice(0, 3).join(' · ')}
+                    </p>
+
+                    <button
+                      type="button"
+                      onClick={() => openVehicleBookingPage(vehicle)}
+                      className="mt-auto w-full bg-[#0F2D25] text-white font-semibold py-2 rounded-xl hover:bg-[#173f34] transition-colors text-xs"
+                    >
+                      {isForSale ? 'Inspect & Make Offer' : 'Book & Settle Online'}
+                    </button>
                   </div>
-
-                  <div className="flex items-center justify-between gap-2 mt-1.5 mb-2 text-[11px] text-slate-600 dark:text-slate-300 font-mono tabular-nums">
-                    <span className="inline-flex items-center gap-1">
-                      <StarSolidIcon className="w-3 h-3 text-[#C9A35D]" />
-                      <span className="font-semibold text-slate-900 dark:text-white">{vehicle.rating}</span>
-                      <span className="text-slate-400">({vehicle.reviews})</span>
-                    </span>
-                    <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-semibold truncate">
-                      {vehicle.verificationHash}
-                    </span>
-                  </div>
-
-                  <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed mb-2 line-clamp-2">
-                    {vehicle.description}
-                  </p>
-
-                  <p className="text-[10px] text-slate-500 dark:text-slate-400 mb-3 line-clamp-1">
-                    {vehicle.specs.slice(0, 3).join(' · ')}
-                  </p>
-
-                  <button
-                    onClick={() => openVehicleBookingPage(vehicle)}
-                    className="mt-auto w-full bg-[#0F2D25] text-white font-semibold py-2 rounded-xl hover:bg-[#173f34] transition-colors text-xs"
-                  >
-                    Book &amp; Settle Online
-                  </button>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </section>
@@ -773,6 +1153,17 @@ const RentACarPage: React.FC<RentACarPageProps> = ({ properties = [], onListFlee
               </div>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* Interactive Fleet Comparison, Fuel Cost & Depreciation Suite */}
+      <section className="py-14 px-6 sm:px-10 lg:px-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
+        <div className="max-w-7xl mx-auto">
+          <WidgetTabGroup
+            title="Fleet Comparison, Fuel Cost & Depreciation Suite"
+            subtitle="Compare vehicle models side by side, project trip fuel spend, and model resale depreciation before hiring or buying."
+            toolIds={['car-comparison', 'fuel-cost', 'car-depreciation']}
+          />
         </div>
       </section>
 
@@ -884,16 +1275,17 @@ const RentACarPage: React.FC<RentACarPageProps> = ({ properties = [], onListFlee
               Request Corporate Pricing
             </button>
             <button
+              type="button"
               onClick={() => {
                 if (onListFleet) {
-                  onListFleet();
+                  onListFleet('sale');
                 } else {
-                  addToast('Sign in to list your verified fleet on AfriEstate.', 'info');
+                  addToast('Sign in to list or sell your car on AfriEstate.', 'info');
                 }
               }}
               className="bg-white/10 border border-white/20 text-white font-semibold px-6 py-3 rounded-xl text-sm hover:bg-white/20 transition-colors whitespace-nowrap"
             >
-              List Your Fleet
+              List or Sell Your Car
             </button>
           </div>
         </div>

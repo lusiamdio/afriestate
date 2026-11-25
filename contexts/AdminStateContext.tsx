@@ -525,20 +525,28 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     } catch {
       // Ignore storage quota errors
     }
-    // Best-effort sync to Supabase platform_governance table when Super Admin session is active
-    Promise.resolve(
-      supabase.from('platform_governance').upsert({
-        id: 'global',
-        settings: next.settings,
-        role_controls: next.roleControls,
-        country_configs: next.countryConfigs,
-        user_overrides: next.userOverrides,
-        listing_overrides: next.listingOverrides,
-        updated_at: new Date().toISOString(),
-      })
-    ).catch(() => {
-      // Non-blocking in demo/offline or non-admin contexts
-    });
+    // Sync to Supabase platform_governance table only when an authenticated admin session is active
+    (async () => {
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const user = sessionData?.session?.user;
+        const role = String(
+          user?.app_metadata?.role || user?.user_metadata?.role || ''
+        ).toLowerCase();
+        if (!user || (role !== 'super_admin' && role !== 'admin')) return;
+        await supabase.from('platform_governance').upsert({
+          id: 'global',
+          settings: next.settings,
+          role_controls: next.roleControls,
+          country_configs: next.countryConfigs,
+          user_overrides: next.userOverrides,
+          listing_overrides: next.listingOverrides,
+          updated_at: new Date().toISOString(),
+        });
+      } catch {
+        // Non-blocking in demo/offline or non-admin contexts
+      }
+    })();
   }, []);
 
   useEffect(() => {

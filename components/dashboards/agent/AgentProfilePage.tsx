@@ -5,6 +5,7 @@ import { TwitterIcon, LinkedInIcon, FacebookIcon } from '../../icons/SocialIcons
 import { StarIcon, UserCircleIcon, StarIconOutline } from '../../icons/ActionIcons';
 import { useCurrency } from '../../../contexts/CurrencyContext';
 import { useToast } from '../../../contexts/ToastContext';
+import { WidgetTabGroup } from '../../widgets/EmbeddedWidgetToolkit';
 
 interface AgentProfilePageProps {
   user: User;
@@ -322,6 +323,12 @@ const AgentProfilePage: React.FC<AgentProfilePageProps> = ({
             </p>
           )}
         </div>
+
+        <WidgetTabGroup
+          title="Brokerage Website & Contact Verification"
+          subtitle="Validate your agency website and social channel URLs, business email, direct phone line, and VAT tax details."
+          toolIds={['validate-url', 'validate-email', 'validate-phone', 'validate-vat']}
+        />
       </div>
     </div>
   );

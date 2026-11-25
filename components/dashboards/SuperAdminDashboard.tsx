@@ -53,6 +53,7 @@ import {
   type User,
 } from '../../types';
 import type { StayPropertyProfile } from '../../data/stayDetailData';
+import { WidgetTabGroup } from '../widgets/EmbeddedWidgetToolkit';
 import { STAY_CATALOG_PROPERTIES } from '../../data/stayDetailData';
 import { COUNTRY_MARKET_GUIDES } from '../../data/africanNeighborhoodDatabase';
 import {
@@ -2233,6 +2234,12 @@ export default function SuperAdminDashboard({
                   </table>
                 </div>
               </div>
+
+              <WidgetTabGroup
+                title="Escrow Payout, IBAN, Card & VAT Verification Desk"
+                subtitle="Validate partner IBAN accounts, international VAT numbers, card issuers, and card checksums prior to releasing escrow payouts."
+                toolIds={['validate-iban', 'validate-vat', 'validate-cc', 'cc-type']}
+              />
             </div>
           )}
 
@@ -2291,6 +2298,12 @@ export default function SuperAdminDashboard({
                   })}
                 </div>
               </div>
+
+              <WidgetTabGroup
+                title="Partner Directory, Fleet & Contact Verification Tools"
+                subtitle="Verify partner web URLs, corporate emails, international phone numbers, VAT registrations, and registered fleet license plates during onboarding."
+                toolIds={['validate-url', 'validate-email', 'validate-phone', 'validate-vat', 'license-plate']}
+              />
             </div>
           )}
 
@@ -2415,6 +2428,14 @@ export default function SuperAdminDashboard({
                     </div>
                   ))}
                 </div>
+              </div>
+
+              <div className="lg:col-span-12">
+                <WidgetTabGroup
+                  title="Forensic Document Signature, Signing & Hash Integrity Desk"
+                  subtitle="Validate counterparty digital signatures, verify unaltered KYC/title deed hashes, and execute governance sign-offs."
+                  toolIds={['signature', 'hash-compare', 'sign-pdf']}
+                />
               </div>
             </div>
           )}
@@ -2567,6 +2588,12 @@ export default function SuperAdminDashboard({
                       <span>Save &amp; Publish General Settings</span>
                     </button>
                   </div>
+
+                  <WidgetTabGroup
+                    title="Public Compliance & Consent Banner Configuration"
+                    subtitle="Generate and preview GDPR/POPIA-compliant cookie consent banners and validate public announcement target URLs."
+                    toolIds={['cookie-consent', 'validate-url']}
+                  />
                 </div>
               )}
 
@@ -2833,6 +2860,14 @@ export default function SuperAdminDashboard({
                       <Save className="w-4 h-4 text-amber-300" />
                       <span>Enforce Security Policies</span>
                     </button>
+                  </div>
+
+                  <div className="pt-4 border-t border-slate-200 dark:border-slate-800">
+                    <WidgetTabGroup
+                      title="Platform Credential & Breach Audit Workbench"
+                      subtitle="Verify administrative password entropy and screen platform contact accounts against known external data breaches."
+                      toolIds={['password-strength', 'breach-checker']}
+                    />
                   </div>
                 </div>
               )}

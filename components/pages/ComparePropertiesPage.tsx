@@ -16,6 +16,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { CheckBadgeIcon, StarIcon } from '../icons/ActionIcons';
 import { BedIcon, BathIcon, AreaIcon } from '../icons/PropertyIcons';
+import { WidgetTabGroup } from '../widgets/EmbeddedWidgetToolkit';
 
 interface ComparePropertiesPageProps {
   properties: Property[];
@@ -627,6 +628,12 @@ const ComparePropertiesPage: React.FC<ComparePropertiesPageProps> = ({
             </div>
           </div>
         )}
+
+        <WidgetTabGroup
+          title="Financial & Decision Scoring Workbench"
+          subtitle="Quantify asking price trade-offs, total ownership costs, and weighted shortlist rankings alongside your selected AfriEstate properties."
+          toolIds={['property-comparison', 'property-decider', 'rent-vs-buy', 'mortgage']}
+        />
       </div>
     </div>
   );

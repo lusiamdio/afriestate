@@ -4,6 +4,7 @@ import type { TaxLegalInfo, Currency } from '../../../types';
 import { ToolsIcon, BuildingLibraryIcon } from '../../icons/InvestorDashboardIcons';
 import { CpuChipIcon, ArrowUpIcon, ArrowDownIcon, ChartBarIcon } from '../../icons/ActionIcons';
 import { useCurrency } from '../../../contexts/CurrencyContext';
+import { WidgetTabGroup } from '../../widgets/EmbeddedWidgetToolkit';
 
 type FinancialToolTab = 'calculator' | 'tax';
 
@@ -123,6 +124,19 @@ const InvestorFinancialTools: React.FC<InvestorFinancialToolsProps> = () => {
       </div>
 
       {activeTab === 'calculator' ? <SmartROICalculator /> : <TaxLegalHub />}
+
+      <WidgetTabGroup
+        title="Institutional Underwriting & Deal Suite"
+        subtitle="Run granular cash-flow underwriting, CapEx renovation ROI, debt modeling, and side-by-side asset comparisons."
+        toolIds={[
+          'cash-flow',
+          'renovation-roi',
+          'mortgage',
+          'rent-vs-buy',
+          'property-decider',
+          'property-comparison',
+        ]}
+      />
     </div>
   );
 };

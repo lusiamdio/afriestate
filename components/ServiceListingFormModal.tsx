@@ -120,9 +120,9 @@ const ServiceListingFormModal: React.FC<ServiceListingFormModalProps> = ({
                     className="p-6 border-2 border-slate-200 dark:border-slate-700 rounded-2xl hover:border-emerald-700 dark:hover:border-amber-300 hover:bg-emerald-50/40 dark:hover:bg-slate-800 transition-all font-semibold text-base text-slate-800 dark:text-slate-200 flex flex-col items-center gap-3 text-center"
                   >
                     <TruckIcon className="w-8 h-8 text-emerald-700 dark:text-amber-300" />
-                    <span>Transport &amp; Rent a Car</span>
+                    <span>Transport · Sell or Hire a Car</span>
                     <span className="text-xs font-normal text-slate-500 dark:text-slate-400">
-                      Syncs to Transport Rentals page
+                      Syncs to Transport Rentals &amp; Car Sales
                     </span>
                   </button>
                 )}

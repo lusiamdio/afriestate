@@ -10,6 +10,8 @@ import {
   ShieldCheckIcon,
 } from '@heroicons/react/24/outline';
 import { fetchJsonStrict } from '../../lib/http';
+import { supabase } from '../../lib/supabase';
+import { WidgetTabGroup } from '../widgets/EmbeddedWidgetToolkit';
 
 export type AllowedSettlementCategory = 'flight' | 'short-stay' | 'car-hire';
 
@@ -84,6 +86,7 @@ export const PaymentSettlementPanel: React.FC<PaymentSettlementPanelProps> = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<SettlementReceipt | null>(null);
   const [copiedRef, setCopiedRef] = useState<boolean>(false);
+  const [showValidators, setShowValidators] = useState<boolean>(false);
 
   const handleSettleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -99,12 +102,24 @@ export const PaymentSettlementPanel: React.FC<PaymentSettlementPanelProps> = ({
       return;
     }
 
+    let cardBrand: string | undefined;
+    let cardLast4: string | undefined;
     if (paymentMethod === 'Card') {
       const digits = cardNumber.replace(/\D/g, '');
-      if (digits.length < 12 || !cardExpiry.trim() || cardCvv.replace(/\D/g, '').length < 3) {
-        setErrorMsg('Please enter valid card number (12+ digits), expiry (MM/YY), and CVV.');
+      const cleanExpiry = cardExpiry.trim();
+      const cleanCvv = cardCvv.replace(/\D/g, '');
+      if (digits.length < 13 || digits.length > 19 || !/^(0[1-9]|1[0-2])\/\d{2,4}$/.test(cleanExpiry) || cleanCvv.length < 3) {
+        setErrorMsg('Please enter valid card number (13-19 digits), expiry (MM/YY), and 3-4 digit CVV.');
         return;
       }
+      cardLast4 = digits.slice(-4);
+      cardBrand = digits.startsWith('4')
+        ? 'Visa'
+        : /^5[1-5]/.test(digits)
+        ? 'Mastercard'
+        : /^3[47]/.test(digits)
+        ? 'Amex'
+        : 'Card';
     }
 
     if (paymentMethod.includes('Mobile Money') && mobileMoneyPhone.replace(/\D/g, '').length < 8) {
@@ -128,9 +143,9 @@ export const PaymentSettlementPanel: React.FC<PaymentSettlementPanelProps> = ({
           customerName: customerName.trim(),
           customerEmail: customerEmail.trim().toLowerCase(),
           paymentDetails: {
-            cardNumber: paymentMethod === 'Card' ? cardNumber.replace(/\D/g, '').slice(-4).padStart(16, '4') : undefined,
+            cardLast4,
+            cardBrand,
             cardExpiry: paymentMethod === 'Card' ? cardExpiry.trim() : undefined,
-            cardCvv: paymentMethod === 'Card' ? cardCvv.trim() : undefined,
             mobileMoneyPhone: paymentMethod.includes('Mobile Money') ? mobileMoneyPhone.trim() : undefined,
             bankSelected: paymentMethod === 'Ozow Instant EFT' ? bankSelected : undefined,
           },
@@ -139,6 +154,31 @@ export const PaymentSettlementPanel: React.FC<PaymentSettlementPanelProps> = ({
       });
 
       setReceipt(settledReceipt);
+      try {
+        const { data: authData } = await supabase.auth.getUser().catch(() => ({ data: { user: null } }));
+        if (authData?.user?.id) {
+          await supabase.from('payment_settlements').insert({
+            settlement_id: settledReceipt.settlementId,
+            transaction_ref: settledReceipt.transactionRef,
+            authorization_code: settledReceipt.authorizationCode,
+            user_id: authData.user.id,
+            booking_category: bookingCategory,
+            item_id: itemId,
+            item_title: settledReceipt.itemTitle || itemTitle,
+            amount: settledReceipt.amount,
+            currency: settledReceipt.currency || currencyCode,
+            payment_method: settledReceipt.paymentMethod || paymentMethod,
+            customer_name: settledReceipt.customerName || customerName.trim(),
+            customer_email: settledReceipt.customerEmail || customerEmail.trim().toLowerCase(),
+            status: settledReceipt.status || 'Settled',
+            protection_guarantee: settledReceipt.protectionGuarantee,
+            metadata: metadata || {},
+            settled_at: settledReceipt.settledAt || new Date().toISOString(),
+          });
+        }
+      } catch {
+        // Non-blocking receipt persistence
+      }
       await onSettled(settledReceipt);
     } catch (err: any) {
       setErrorMsg(err?.message || 'Unable to authorize real-time payment settlement. Please retry.');
@@ -402,9 +442,28 @@ export const PaymentSettlementPanel: React.FC<PaymentSettlementPanelProps> = ({
         </div>
       )}
 
-      <div className="flex items-center gap-2 text-[11px] text-[#6B6B6B] dark:text-slate-400">
-        <ShieldCheckIcon className="w-4 h-4 text-[#008F45] dark:text-[#C99A3D] shrink-0" />
-        <span>256-bit encrypted real-time settlement · Immediate digital voucher issuance</span>
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-[11px] text-[#6B6B6B] dark:text-slate-400">
+            <ShieldCheckIcon className="w-4 h-4 text-[#008F45] dark:text-[#C99A3D] shrink-0" />
+            <span>256-bit encrypted real-time settlement · Immediate digital voucher issuance</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowValidators((prev) => !prev)}
+            className="text-[11px] font-semibold text-[#0F2D25] dark:text-[#C9A35D] hover:underline whitespace-nowrap shrink-0"
+          >
+            {showValidators ? 'Hide Pre-Settlement Validators' : 'Pre-Validate Card, Email or Phone'}
+          </button>
+        </div>
+
+        {showValidators && (
+          <WidgetTabGroup
+            title="Checkout Card & Contact Verification"
+            subtitle="Validate card checksums, identify card issuer networks, and verify guest email or mobile numbers before settling."
+            toolIds={['validate-cc', 'cc-type', 'validate-email', 'validate-phone']}
+          />
+        )}
       </div>
 
       <button

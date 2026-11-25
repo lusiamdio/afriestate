@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ArrowLeftIcon,
   CheckIcon,
@@ -9,6 +9,10 @@ import {
   ShieldCheckIcon,
 } from '@heroicons/react/24/outline';
 import { useToast } from '../../contexts/ToastContext';
+import { usePlatformState } from '../../contexts/PlatformStateContext';
+import { supabase } from '../../lib/supabase';
+import { sanitizeText } from '../../lib/security';
+import { WidgetTabGroup } from '../widgets/EmbeddedWidgetToolkit';
 
 export type CompliancePageSlug = 'privacy-policy' | 'data-protection' | 'popia';
 
@@ -282,7 +286,19 @@ const BrandedComplianceShell: React.FC<{
   nav: ComplianceNavProps;
 }> = ({ doc, nav }) => {
   const { addToast } = useToast();
+  const { currentUser } = usePlatformState();
   const [copiedEmail, setCopiedEmail] = useState(false);
+  const [reqName, setReqName] = useState(currentUser?.fullName || '');
+  const [reqEmail, setReqEmail] = useState(currentUser?.email || '');
+  const [reqType, setReqType] = useState<'access_export' | 'rectification' | 'erasure' | 'objection' | 'consent_withdrawal'>('access_export');
+  const [reqDetails, setReqDetails] = useState('');
+  const [isSubmittingReq, setIsSubmittingReq] = useState(false);
+  const [reqReference, setReqReference] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (currentUser?.fullName && !reqName) setReqName(currentUser.fullName);
+    if (currentUser?.email && !reqEmail) setReqEmail(currentUser.email);
+  }, [currentUser?.fullName, currentUser?.email]);
 
   const handleCopyEmail = async () => {
     try {
@@ -292,6 +308,42 @@ const BrandedComplianceShell: React.FC<{
       window.setTimeout(() => setCopiedEmail(false), 2500);
     } catch {
       addToast(`Contact: ${doc.officerEmail}`, 'info');
+    }
+  };
+
+  const handleSubmitComplianceRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanEmail = (reqEmail || currentUser?.email || '').trim().toLowerCase();
+    const cleanName = sanitizeText(reqName || currentUser?.fullName || '', 120);
+    const cleanDetails = sanitizeText(reqDetails, 1200);
+    if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      addToast('Please enter a valid email address for compliance correspondence.', 'error');
+      return;
+    }
+
+    const framework =
+      doc.slug === 'popia' ? 'POPIA' : doc.slug === 'data-protection' ? 'DataProtection' : 'Privacy';
+
+    setIsSubmittingReq(true);
+    try {
+      const { error } = await supabase.from('compliance_requests').insert({
+        user_id: currentUser?.id || null,
+        requester_email: cleanEmail,
+        requester_name: cleanName || null,
+        framework,
+        request_type: reqType,
+        details: cleanDetails || `${framework} formal ${reqType} request`,
+        status: 'Submitted',
+      });
+      if (error) throw error;
+      const refCode = `AE-${framework.toUpperCase().slice(0, 4)}-${Date.now().toString(36).toUpperCase().slice(-6)}`;
+      setReqReference(refCode);
+      setReqDetails('');
+      addToast(`Compliance request submitted (${refCode}).`, 'success');
+    } catch (err: any) {
+      addToast(err?.message || 'Unable to submit compliance request right now.', 'error');
+    } finally {
+      setIsSubmittingReq(false);
     }
   };
 
@@ -510,6 +562,121 @@ const BrandedComplianceShell: React.FC<{
               )}
             </section>
           ))}
+
+          {/* Interactive Data Subject & POPIA Request Desk */}
+          <section
+            id="submit-compliance-request"
+            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 sm:p-8 space-y-5"
+          >
+            <div className="flex items-start justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-[#C9A35D]">
+                  Direct Statutory Portal
+                </p>
+                <h2 className="font-heading text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mt-1">
+                  Submit a {doc.slug === 'popia' ? 'POPIA' : doc.slug === 'data-protection' ? 'Data Protection' : 'Privacy'} Request
+                </h2>
+              </div>
+              <ShieldCheckIcon className="w-6 h-6 text-[#0F2D25] dark:text-[#C9A35D] shrink-0" />
+            </div>
+
+            {reqReference ? (
+              <div className="rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 p-5 space-y-2">
+                <p className="text-sm font-bold text-emerald-900 dark:text-emerald-200">
+                  Request Logged &amp; Queued ({reqReference})
+                </p>
+                <p className="text-xs text-emerald-800 dark:text-emerald-300 leading-relaxed">
+                  Your statutory request has been recorded in AfriEstate&apos;s compliance ledger and routed to the {doc.officerTitle}.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setReqReference(null)}
+                  className="text-xs font-semibold text-[#0F2D25] dark:text-[#C9A35D] underline pt-1"
+                >
+                  Submit another request
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleSubmitComplianceRequest} className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                      Full Name
+                    </label>
+                    <input
+                      type="text"
+                      value={reqName}
+                      onChange={(e) => setReqName(e.target.value)}
+                      placeholder="Your full name"
+                      className="w-full px-3.5 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm outline-none focus:ring-2 focus:ring-[#0F2D25]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                      Email Address
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={reqEmail}
+                      onChange={(e) => setReqEmail(e.target.value)}
+                      placeholder="name@example.com"
+                      className="w-full px-3.5 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm outline-none focus:ring-2 focus:ring-[#0F2D25]"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                    Request Classification
+                  </label>
+                  <select
+                    value={reqType}
+                    onChange={(e) => setReqType(e.target.value as any)}
+                    className="w-full px-3.5 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm outline-none focus:ring-2 focus:ring-[#0F2D25]"
+                  >
+                    <option value="access_export">Access &amp; Export My Data (POPIA Sec 23)</option>
+                    <option value="rectification">Rectify / Correct Personal Records (Sec 24 / Form 2)</option>
+                    <option value="erasure">Delete / Destroy Personal Data (Sec 24 / Form 2)</option>
+                    <option value="objection">Object to Processing (Sec 11(3) / Form 1)</option>
+                    <option value="consent_withdrawal">Withdraw Direct Marketing Consent</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                    Request Scope &amp; Details
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={reqDetails}
+                    onChange={(e) => setReqDetails(e.target.value)}
+                    placeholder="Describe the account email, booking reference, or specific records covered by this request..."
+                    className="w-full px-3.5 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm outline-none focus:ring-2 focus:ring-[#0F2D25]"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between gap-4 pt-1">
+                  <span className="text-xs text-slate-500 dark:text-slate-400">
+                    Handled by {doc.officerTitle}
+                  </span>
+                  <button
+                    type="submit"
+                    disabled={isSubmittingReq}
+                    className="px-5 py-2.5 rounded-lg bg-[#0F2D25] hover:bg-[#173f34] disabled:opacity-60 text-white text-xs font-semibold transition-colors"
+                  >
+                    {isSubmittingReq ? 'Submitting...' : 'Submit Statutory Request'}
+                  </button>
+                </div>
+              </form>
+            )}
+          </section>
+
+          <WidgetTabGroup
+            title="Self-Service Security, Privacy &amp; Cookie Consent Toolkit"
+            subtitle="Generate compliant cookie consent banners, verify contact emails or policy URLs, screen breach exposure, and check document hashes under POPIA Section 19 controls."
+            toolIds={['cookie-consent', 'breach-checker', 'password-strength', 'hash-compare', 'validate-email', 'validate-url']}
+          />
         </article>
       </div>
     </div>

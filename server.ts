@@ -1,4 +1,5 @@
 import express from 'express';
+import crypto from 'crypto';
 import fs from 'fs';
 import http from 'http';
 import path from 'path';
@@ -10,9 +11,20 @@ import { createServer as createViteServer } from 'vite';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Load optional gitignored .env.local overrides into process.env on server startup
+// Load optional gitignored .env.local fallbacks without overriding Secrets-area env vars
 (() => {
   try {
+    const existingEnvKeys = Object.keys(process.env).filter((k) => Boolean((process.env[k] || '').trim()));
+    const hasSecretRapidKeys = existingEnvKeys.some((k) =>
+      /RAPID_?API.*KEY/i.test(k) && !/APP_ID/i.test(k)
+    );
+    const hasSecretGeminiKeys = existingEnvKeys.some((k) =>
+      /GEMINI.*API.*KEY/i.test(k) || /^(?:ROTATED_)?API_KEYS?(?:_.*)?$/i.test(k)
+    );
+    const hasSecretMapsKeys = existingEnvKeys.some((k) =>
+      /GOOGLE_MAPS.*KEY/i.test(k)
+    );
+
     const localEnvPath = path.join(__dirname, '.env.local');
     if (fs.existsSync(localEnvPath)) {
       const content = fs.readFileSync(localEnvPath, 'utf8');
@@ -29,9 +41,12 @@ const __dirname = path.dirname(__filename);
         ) {
           val = val.slice(1, -1);
         }
-        if (key && val) {
-          process.env[key] = val;
-        }
+        if (!key || !val) continue;
+        if ((process.env[key] || '').trim()) continue;
+        if (hasSecretRapidKeys && /RAPID_?API.*KEY/i.test(key)) continue;
+        if (hasSecretGeminiKeys && (/GEMINI.*API.*KEY/i.test(key) || /^API_KEYS?(?:_.*)?$/i.test(key))) continue;
+        if (hasSecretMapsKeys && /GOOGLE_MAPS.*KEY/i.test(key)) continue;
+        process.env[key] = val;
       }
     }
   } catch {
@@ -51,64 +66,159 @@ app.use((_req, res, next) => {
   next();
 });
 
-// Simple sliding-window per-IP rate limiter for AI proxy endpoints
+// Sliding-window per-IP rate limiter for AI, travel, visa, neighborhood, and payment endpoints
 const apiRateBuckets = new Map<string, number[]>();
 const API_WINDOW_MS = 60_000;
-const API_MAX_REQUESTS = 90;
 
-app.use('/api/gemini', (req, res, next) => {
-  const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
-  const now = Date.now();
-  const timestamps = (apiRateBuckets.get(clientIp) || []).filter((ts) => now - ts < API_WINDOW_MS);
-  if (timestamps.length >= API_MAX_REQUESTS) {
-    return res.status(429).json({ error: 'Rate limit exceeded. Please wait a moment before retrying.' });
-  }
-  timestamps.push(now);
-  apiRateBuckets.set(clientIp, timestamps);
-  // Periodic pruning to avoid unbounded memory growth
-  if (apiRateBuckets.size > 5000) {
-    for (const [key, list] of apiRateBuckets.entries()) {
-      if (list.every((ts) => now - ts >= API_WINDOW_MS)) {
-        apiRateBuckets.delete(key);
+function createRateLimiter(scope: string, maxRequests: number) {
+  return (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const clientIp =
+      (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
+      req.socket.remoteAddress ||
+      'unknown';
+    const bucketKey = `${scope}:${clientIp}`;
+    const now = Date.now();
+    const timestamps = (apiRateBuckets.get(bucketKey) || []).filter((ts) => now - ts < API_WINDOW_MS);
+    if (timestamps.length >= maxRequests) {
+      return res.status(429).json({ error: 'Rate limit exceeded. Please wait a moment before retrying.' });
+    }
+    timestamps.push(now);
+    apiRateBuckets.set(bucketKey, timestamps);
+    if (apiRateBuckets.size > 5000) {
+      for (const [key, list] of apiRateBuckets.entries()) {
+        if (list.every((ts) => now - ts >= API_WINDOW_MS)) {
+          apiRateBuckets.delete(key);
+        }
       }
     }
-  }
-  next();
-});
+    next();
+  };
+}
+
+app.use('/api/gemini', createRateLimiter('gemini', 90));
+app.use('/api/payments', createRateLimiter('payments', 30));
+app.use('/api/visa', createRateLimiter('visa', 90));
+app.use('/api/travel', createRateLimiter('travel', 120));
+app.use('/api/neighborhood', createRateLimiter('neighborhood', 120));
 
 // Enable JSON parsing with large body support for image/video base64 frames
 app.use(express.json({ limit: '25mb' }));
 
-// Resolve server-side Gemini API key dynamically
-function getActiveApiKey(): string {
-  return (process.env.GEMINI_API_KEY || process.env.API_KEY || '').trim();
-}
-
-function getRapidApiKeys(): string[] {
-  const raw = (
-    process.env.RAPIDAPI_KEY ||
-    process.env.X_RAPIDAPI_KEY ||
-    process.env.VITE_RAPIDAPI_KEY ||
-    ''
-  ).trim();
-  if (!raw) return [];
-  return raw
-    .split(',')
-    .map((k) => k.trim())
+// --- Secret-Area Key Pool & Automatic Round-Robin Rotation Engine ---
+function parseSecretKeyList(rawValue: string | undefined): string[] {
+  if (!rawValue) return [];
+  return rawValue
+    .split(/[\r\n,;]+/)
+    .map((s) => s.trim().replace(/^['"]|['"]$/g, ''))
     .filter(Boolean);
 }
 
-let rapidKeyRotationIdx = 0;
+function collectSecretKeyPool(patterns: RegExp[], excludePatterns: RegExp[] = []): string[] {
+  const seen = new Set<string>();
+  const collected: string[] = [];
+  const matchingNames = Object.keys(process.env)
+    .filter((envName) => {
+      if (excludePatterns.some((rx) => rx.test(envName))) return false;
+      return patterns.some((rx) => rx.test(envName));
+    })
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+
+  for (const envName of matchingNames) {
+    for (const token of parseSecretKeyList(process.env[envName])) {
+      if (!seen.has(token)) {
+        seen.add(token);
+        collected.push(token);
+      }
+    }
+  }
+  return collected;
+}
+
+const keyCooldownUntil = new Map<string, number>();
+
+function getKeyFingerprint(scope: string, key: string): string {
+  return `${scope}:${crypto.createHash('sha256').update(key).digest('hex').slice(0, 16)}`;
+}
+
+function isKeyCoolingDown(scope: string, key: string): boolean {
+  const fp = getKeyFingerprint(scope, key);
+  const until = keyCooldownUntil.get(fp) || 0;
+  if (until > Date.now()) return true;
+  if (until > 0) keyCooldownUntil.delete(fp);
+  return false;
+}
+
+function markKeyCooldown(scope: string, key: string, durationMs: number) {
+  keyCooldownUntil.set(getKeyFingerprint(scope, key), Date.now() + durationMs);
+}
+
+const geminiKeyCursor = { idx: 0 };
+const rapidKeyCursor = { idx: 0 };
+const mapsKeyCursor = { idx: 0 };
 let flightTrackerRotationIdx = 0;
 let visaAdvisorRotationIdx = 0;
 let travelLanguagesRotationIdx = 0;
 
-function getRapidApiKey(): string {
-  const keys = getRapidApiKeys();
-  if (keys.length === 0) return '';
-  const selected = keys[rapidKeyRotationIdx % keys.length];
-  rapidKeyRotationIdx += 1;
-  return selected;
+function getRotatedCandidates(scope: string, keys: string[], cursor: { idx: number }): string[] {
+  if (keys.length === 0) return [];
+  const start = cursor.idx % keys.length;
+  cursor.idx = (cursor.idx + 1) % keys.length;
+  const rotated = [...keys.slice(start), ...keys.slice(0, start)];
+  const healthy = rotated.filter((k) => !isKeyCoolingDown(scope, k));
+  const cooling = rotated.filter((k) => isKeyCoolingDown(scope, k));
+  return healthy.length > 0 ? [...healthy, ...cooling] : rotated;
+}
+
+function getGeminiApiKeys(): string[] {
+  return collectSecretKeyPool(
+    [/GEMINI.*API.*KEY/i, /^GOOGLE_AI.*KEY/i, /^(?:ROTATED_)?API_KEYS?(?:_.*)?$/i]
+  );
+}
+
+function getActiveApiKey(): string {
+  const candidates = getRotatedCandidates('gemini', getGeminiApiKeys(), geminiKeyCursor);
+  return candidates[0] || '';
+}
+
+function getGoogleMapsApiKeys(): string[] {
+  return collectSecretKeyPool([/GOOGLE_MAPS.*KEY/i, /^MAPS_API_KEYS?(?:_.*)?$/i]);
+}
+
+function getRotatedMapsApiKey(): string {
+  const candidates = getRotatedCandidates('maps', getGoogleMapsApiKeys(), mapsKeyCursor);
+  return candidates[0] || '';
+}
+
+const HOST_SPECIFIC_KEY_PATTERNS: Record<string, RegExp[]> = {
+  'aerodatabox.p.rapidapi.com': [/^(?:AERODATABOX|FLIGHT_TRACKER)_API_KEYS?(?:_.*)?$/i],
+  'booking-com15.p.rapidapi.com': [/^BOOKING(?:_COM)?_API_KEYS?(?:_.*)?$/i],
+  'tripadvisor16.p.rapidapi.com': [/^TRIPADVISOR_API_KEYS?(?:_.*)?$/i],
+  'google-flights2.p.rapidapi.com': [/^(?:GOOGLE_)?FLIGHTS?_API_KEYS?(?:_.*)?$/i],
+  'visa-requirement.p.rapidapi.com': [/^VISA(?:_MAP)?_API_KEYS?(?:_.*)?$/i],
+  'ranked-crime-cities.p.rapidapi.com': [/^(?:CRIME|SAFETY|RANKED_CRIME)_API_KEYS?(?:_.*)?$/i],
+};
+
+function getRapidApiKeys(host?: string): string[] {
+  const hostPatterns = host ? HOST_SPECIFIC_KEY_PATTERNS[host] || [] : [];
+  const hostKeys = hostPatterns.length > 0 ? collectSecretKeyPool(hostPatterns) : [];
+  const sharedKeys = collectSecretKeyPool(
+    [/RAPID_?API.*KEY/i, /TRAVEL_FEED.*KEY/i],
+    [/APP_ID/i]
+  );
+  const seen = new Set<string>();
+  const merged: string[] = [];
+  for (const key of [...hostKeys, ...sharedKeys]) {
+    if (!seen.has(key)) {
+      seen.add(key);
+      merged.push(key);
+    }
+  }
+  return merged;
+}
+
+function getRapidApiKey(host?: string): string {
+  const candidates = getRotatedCandidates(`rapid:${host || 'shared'}`, getRapidApiKeys(host), rapidKeyCursor);
+  return candidates[0] || '';
 }
 
 interface RapidApiCacheEntry<T = any> {
@@ -178,9 +288,9 @@ async function callRapidApi<T = any>(
     timeoutMs?: number;
   } = {}
 ): Promise<T> {
-  const apiKey = getRapidApiKey();
-  if (!apiKey) {
-    throw new Error('Server RAPIDAPI_KEY environment variable is not configured.');
+  const allKeys = getRapidApiKeys(host);
+  if (allKeys.length === 0) {
+    throw new Error('Server live feed credentials are not configured.');
   }
 
   const { method = 'GET', body, cacheKey, cacheTtlMs = 0, timeoutMs = 12000 } = options;
@@ -197,96 +307,124 @@ async function callRapidApi<T = any>(
     throw new Error('Live upstream data feed is in brief rate-limit cooldown.');
   }
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const keyScope = `rapid:${host}`;
+  const candidates = getRotatedCandidates(keyScope, allKeys, rapidKeyCursor);
+  let lastErrorMsg = 'Live upstream data feed temporarily unavailable.';
 
-  try {
-    const url = `https://${host}${pathAndQuery}`;
-    const headers: Record<string, string> = {
-      'x-rapidapi-host': host,
-      'x-rapidapi-key': apiKey,
-    };
-    if (method === 'POST') {
-      headers['Content-Type'] = 'application/json';
-    }
+  for (let i = 0; i < candidates.length; i += 1) {
+    const apiKey = candidates[i];
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
 
-    const res = await fetch(url, {
-      method,
-      headers,
-      body: method === 'POST' && body !== undefined ? JSON.stringify(body) : undefined,
-      signal: controller.signal,
-    });
-
-    const contentType = (res.headers.get('content-type') || '').toLowerCase();
-    const isJson = contentType.includes('application/json');
-
-    if (!res.ok) {
-      let detail = '';
-      if (isJson) {
-        try {
-          const errBody = await res.json();
-          detail = errBody?.message || errBody?.error || '';
-        } catch {
-          // ignore
-        }
+    try {
+      const url = `https://${host}${pathAndQuery}`;
+      const headers: Record<string, string> = {
+        'x-rapidapi-host': host,
+        'x-rapidapi-key': apiKey,
+      };
+      if (method === 'POST') {
+        headers['Content-Type'] = 'application/json';
       }
-      const internalMsg = detail
-        ? `RapidAPI (${host}) HTTP ${res.status}: ${detail}`
-        : `RapidAPI (${host}) failed with HTTP ${res.status}`;
-      const clientSafeMsg = `Live upstream data feed returned HTTP ${res.status}.`;
-      console.warn(`[Upstream Telemetry] ${internalMsg}`);
 
-      if (res.status === 429) {
-        updateRapidHostHealth(host, {
-          state: 'cooldown',
-          lastStatus: 429,
-          lastError: internalMsg,
-          cooldownUntil: Date.now() + 15000,
-        });
-      } else if (res.status === 403 && detail.toLowerCase().includes('not subscribed')) {
-        updateRapidHostHealth(host, {
-          state: 'unsubscribed',
-          lastStatus: 403,
-          lastError: internalMsg,
-          cooldownUntil: 0,
-        });
-      } else {
+      const res = await fetch(url, {
+        method,
+        headers,
+        body: method === 'POST' && body !== undefined ? JSON.stringify(body) : undefined,
+        signal: controller.signal,
+      });
+
+      const contentType = (res.headers.get('content-type') || '').toLowerCase();
+      const isJson = contentType.includes('application/json');
+
+      if (!res.ok) {
+        let detail = '';
+        if (isJson) {
+          try {
+            const errBody = await res.json();
+            detail = errBody?.message || errBody?.error || '';
+          } catch {
+            // ignore
+          }
+        }
+        const internalMsg = detail
+          ? `Upstream channel HTTP ${res.status}: ${detail}`
+          : `Upstream channel failed with HTTP ${res.status}`;
+        lastErrorMsg = `Live upstream data feed returned HTTP ${res.status}.`;
+        console.warn(`[Upstream Telemetry] ${internalMsg}`);
+
+        const shouldRotateToNextKey = res.status === 401 || res.status === 403 || res.status === 429;
+        if (res.status === 429) {
+          markKeyCooldown(keyScope, apiKey, 60_000);
+        } else if (res.status === 401 || res.status === 403) {
+          markKeyCooldown(keyScope, apiKey, 300_000);
+        }
+
+        if (shouldRotateToNextKey && i < candidates.length - 1) {
+          continue;
+        }
+
+        if (res.status === 429) {
+          updateRapidHostHealth(host, {
+            state: 'cooldown',
+            lastStatus: 429,
+            lastError: internalMsg,
+            cooldownUntil: Date.now() + 15000,
+          });
+        } else if (res.status === 403 && detail.toLowerCase().includes('not subscribed')) {
+          updateRapidHostHealth(host, {
+            state: 'unsubscribed',
+            lastStatus: 403,
+            lastError: internalMsg,
+            cooldownUntil: 0,
+          });
+        } else {
+          updateRapidHostHealth(host, {
+            state: 'error',
+            lastStatus: res.status,
+            lastError: internalMsg,
+            cooldownUntil: 0,
+          });
+        }
+        throw new Error(lastErrorMsg);
+      }
+
+      if (!isJson) {
+        const internalMsg = `Upstream channel returned non-JSON content-type (${contentType || 'unknown'}).`;
+        console.warn(`[Upstream Telemetry] ${internalMsg}`);
         updateRapidHostHealth(host, {
           state: 'error',
           lastStatus: res.status,
           lastError: internalMsg,
           cooldownUntil: 0,
         });
+        throw new Error('Live upstream data feed returned an unexpected response format.');
       }
-      throw new Error(clientSafeMsg);
-    }
 
-    if (!isJson) {
-      const internalMsg = `RapidAPI (${host}) returned non-JSON content-type (${contentType || 'unknown'}).`;
-      console.warn(`[Upstream Telemetry] ${internalMsg}`);
+      const data = (await res.json()) as T;
       updateRapidHostHealth(host, {
-        state: 'error',
+        state: 'healthy',
         lastStatus: res.status,
-        lastError: internalMsg,
+        lastError: null,
         cooldownUntil: 0,
       });
-      throw new Error('Live upstream data feed returned an unexpected response format.');
+      if (cacheKey && cacheTtlMs > 0) {
+        rapidApiCache.set(cacheKey, { expiresAt: Date.now() + cacheTtlMs, data });
+      }
+      return data;
+    } catch (err: any) {
+      lastErrorMsg = err?.message || lastErrorMsg;
+      if (i < candidates.length - 1 && (err?.name === 'AbortError' || /fetch failed|network/i.test(lastErrorMsg))) {
+        continue;
+      }
+      if (i === candidates.length - 1) {
+        throw err;
+      }
+    } finally {
+      clearTimeout(timer);
     }
-
-    const data = (await res.json()) as T;
-    updateRapidHostHealth(host, {
-      state: 'healthy',
-      lastStatus: res.status,
-      lastError: null,
-      cooldownUntil: 0,
-    });
-    if (cacheKey && cacheTtlMs > 0) {
-      rapidApiCache.set(cacheKey, { expiresAt: Date.now() + cacheTtlMs, data });
-    }
-    return data;
-  } finally {
-    clearTimeout(timer);
   }
+
+  throw new Error(lastErrorMsg);
 }
 
 const PASSPORT_NAME_TO_ISO2: Record<string, string> = {
@@ -362,17 +500,52 @@ function resolveIso2Code(input: string): string {
   return clean.slice(0, 2).toUpperCase();
 }
 
-function getGeminiClient(): GoogleGenAI | null {
-  const key = getActiveApiKey();
-  if (!key) return null;
+function createGeminiClientForKey(apiKey: string): GoogleGenAI {
   return new GoogleGenAI({
-    apiKey: key,
+    apiKey,
     httpOptions: {
       headers: {
         'User-Agent': 'aistudio-build',
       },
     },
   });
+}
+
+function getGeminiClient(): GoogleGenAI | null {
+  const key = getActiveApiKey();
+  if (!key) return null;
+  return createGeminiClientForKey(key);
+}
+
+async function executeWithGeminiRotation<T>(operation: (ai: GoogleGenAI) => Promise<T>): Promise<T> {
+  const keys = getGeminiApiKeys();
+  if (keys.length === 0) {
+    throw new Error('Server AI credentials are not configured.');
+  }
+  const candidates = getRotatedCandidates('gemini', keys, geminiKeyCursor);
+  let lastErr: any = null;
+  for (let i = 0; i < candidates.length; i += 1) {
+    const key = candidates[i];
+    try {
+      const ai = createGeminiClientForKey(key);
+      return await operation(ai);
+    } catch (err: any) {
+      lastErr = err;
+      const parsed = parseGeminiError(err);
+      const isRotatableAuthOrQuota =
+        parsed.code === 'API_KEY_INVALID' ||
+        parsed.code === 'PERMISSION_DENIED' ||
+        parsed.code === 'RESOURCE_EXHAUSTED';
+      if (isRotatableAuthOrQuota) {
+        markKeyCooldown('gemini', key, parsed.code === 'RESOURCE_EXHAUSTED' ? 60_000 : 300_000);
+        if (i < candidates.length - 1) {
+          continue;
+        }
+      }
+      throw err;
+    }
+  }
+  throw lastErr;
 }
 
 function parseGeminiError(error: any): { status: number; code: string; message: string } {
@@ -427,7 +600,7 @@ function parseGeminiError(error: any): { status: number; code: string; message: 
   };
 }
 
-if (!getActiveApiKey()) {
+if (getGeminiApiKeys().length === 0) {
   console.warn('[Server] Warning: GEMINI_API_KEY is not set in environment.');
 }
 
@@ -458,8 +631,7 @@ function sanitizeConfig(config: any = {}) {
 // 1. Generate content (Text, Structured JSON, Multimodal analysis, Audio/TTS, Search Grounding)
 app.post('/api/gemini/generate', async (req, res) => {
   try {
-    const ai = getGeminiClient();
-    if (!ai) {
+    if (getGeminiApiKeys().length === 0) {
       return res.status(503).json({
         error: 'Live AI service is currently unavailable because server credentials are not configured.',
       });
@@ -471,11 +643,13 @@ app.post('/api/gemini/generate', async (req, res) => {
     const targetModel = mapModel(model);
     const sanitizedConfig = sanitizeConfig(config);
 
-    const response = await ai.models.generateContent({
-      model: targetModel,
-      contents,
-      config: sanitizedConfig,
-    });
+    const response = await executeWithGeminiRotation((ai) =>
+      ai.models.generateContent({
+        model: targetModel,
+        contents,
+        config: sanitizedConfig,
+      })
+    );
 
     res.json({
       text: response.text || '',
@@ -491,8 +665,7 @@ app.post('/api/gemini/generate', async (req, res) => {
 // 2. Chat Streaming (SSE)
 app.post('/api/gemini/chat-stream', async (req, res) => {
   try {
-    const ai = getGeminiClient();
-    if (!ai) {
+    if (getGeminiApiKeys().length === 0) {
       return res.status(503).json({
         error: 'Live AI service is currently unavailable because server credentials are not configured.',
       });
@@ -527,11 +700,13 @@ app.post('/api/gemini/chat-stream', async (req, res) => {
       contents = message;
     }
 
-    const responseStream = await ai.models.generateContentStream({
-      model: targetModel,
-      contents,
-      config: sanitizeConfig(config),
-    });
+    const responseStream = await executeWithGeminiRotation((ai) =>
+      ai.models.generateContentStream({
+        model: targetModel,
+        contents,
+        config: sanitizeConfig(config),
+      })
+    );
 
     for await (const chunk of responseStream) {
       if (res.writableEnded) break;
@@ -558,8 +733,7 @@ app.post('/api/gemini/chat-stream', async (req, res) => {
 // 3. Image Generation
 app.post('/api/gemini/generate-images', async (req, res) => {
   try {
-    const ai = getGeminiClient();
-    if (!ai) {
+    if (getGeminiApiKeys().length === 0) {
       return res.status(503).json({
         error: 'Live AI service is currently unavailable because server credentials are not configured.',
       });
@@ -569,11 +743,13 @@ app.post('/api/gemini/generate-images', async (req, res) => {
       return res.status(400).json({ error: 'Prompt is required' });
     }
     const targetModel = mapModel(model || 'gemini-nano-banana-2.1');
-    const response = await ai.models.generateImages({
-      model: targetModel,
-      prompt,
-      config,
-    });
+    const response = await executeWithGeminiRotation((ai) =>
+      ai.models.generateImages({
+        model: targetModel,
+        prompt,
+        config,
+      })
+    );
     res.json(response);
   } catch (error: any) {
     const parsed = parseGeminiError(error);
@@ -585,8 +761,7 @@ app.post('/api/gemini/generate-images', async (req, res) => {
 // 4. Video Generation & Operations
 app.post('/api/gemini/generate-videos', async (req, res) => {
   try {
-    const ai = getGeminiClient();
-    if (!ai) {
+    if (getGeminiApiKeys().length === 0) {
       return res.status(503).json({
         error: 'Live AI service is currently unavailable because server credentials are not configured.',
       });
@@ -596,11 +771,13 @@ app.post('/api/gemini/generate-videos', async (req, res) => {
       return res.status(400).json({ error: 'Prompt is required' });
     }
     const targetModel = model || 'veo-3.1-fast-generate-preview';
-    const operation = await ai.models.generateVideos({
-      model: targetModel,
-      prompt,
-      config,
-    });
+    const operation = await executeWithGeminiRotation((ai) =>
+      ai.models.generateVideos({
+        model: targetModel,
+        prompt,
+        config,
+      })
+    );
     res.json(operation);
   } catch (error: any) {
     const parsed = parseGeminiError(error);
@@ -611,8 +788,7 @@ app.post('/api/gemini/generate-videos', async (req, res) => {
 
 app.post('/api/gemini/get-videos-operation', async (req, res) => {
   try {
-    const ai = getGeminiClient();
-    if (!ai) {
+    if (getGeminiApiKeys().length === 0) {
       return res.status(503).json({
         error: 'Live AI service is currently unavailable because server credentials are not configured.',
       });
@@ -621,7 +797,9 @@ app.post('/api/gemini/get-videos-operation', async (req, res) => {
     if (!operation) {
       return res.status(400).json({ error: 'Missing operation payload' });
     }
-    const updatedOperation = await ai.operations.getVideosOperation({ operation });
+    const updatedOperation = await executeWithGeminiRotation((ai) =>
+      ai.operations.getVideosOperation({ operation })
+    );
     res.json(updatedOperation);
   } catch (error: any) {
     const parsed = parseGeminiError(error);
@@ -633,8 +811,8 @@ app.post('/api/gemini/get-videos-operation', async (req, res) => {
 // 5. Video Secure Proxy (strict Google APIs host allowlist prevents SSRF & key exfiltration)
 app.get('/api/gemini/video-proxy', async (req, res) => {
   try {
-    const activeKey = getActiveApiKey();
-    if (!activeKey) {
+    const geminiKeys = getGeminiApiKeys();
+    if (geminiKeys.length === 0) {
       return res.status(503).send('AI service key is not configured');
     }
     const { uri } = req.query;
@@ -658,19 +836,30 @@ app.get('/api/gemini/video-proxy', async (req, res) => {
       return res.status(403).send('Disallowed video proxy target host');
     }
 
-    const videoRes = await fetch(parsedUrl.toString(), {
-      headers: {
-        'x-goog-api-key': activeKey,
-        'User-Agent': 'aistudio-build',
-      },
-    });
-    if (!videoRes.ok) {
-      return res.status(videoRes.status).send('Upstream video fetch failed');
+    const candidates = getRotatedCandidates('gemini', geminiKeys, geminiKeyCursor);
+    let lastStatus = 502;
+    for (let i = 0; i < candidates.length; i += 1) {
+      const activeKey = candidates[i];
+      const videoRes = await fetch(parsedUrl.toString(), {
+        headers: {
+          'x-goog-api-key': activeKey,
+          'User-Agent': 'aistudio-build',
+        },
+      });
+      if (videoRes.ok) {
+        const contentType = videoRes.headers.get('content-type') || 'video/mp4';
+        res.setHeader('Content-Type', contentType);
+        const buffer = await videoRes.arrayBuffer();
+        return res.send(Buffer.from(buffer));
+      }
+      lastStatus = videoRes.status;
+      if (videoRes.status === 401 || videoRes.status === 403 || videoRes.status === 429) {
+        markKeyCooldown('gemini', activeKey, videoRes.status === 429 ? 60_000 : 300_000);
+        if (i < candidates.length - 1) continue;
+      }
+      break;
     }
-    const contentType = videoRes.headers.get('content-type') || 'video/mp4';
-    res.setHeader('Content-Type', contentType);
-    const buffer = await videoRes.arrayBuffer();
-    res.send(Buffer.from(buffer));
+    return res.status(lastStatus).send('Upstream video fetch failed');
   } catch (error: any) {
     console.error('[API /api/gemini/video-proxy error]:', error);
     res.status(500).send('Failed to proxy video');
@@ -747,9 +936,8 @@ app.post('/api/gemini/flight-tracker', async (req, res) => {
   };
 
   const runGeminiFlightGrounding = async () => {
-    const ai = getGeminiClient();
-    if (!ai) {
-      throw new Error('Gemini server credentials are not configured.');
+    if (getGeminiApiKeys().length === 0) {
+      throw new Error('Server AI credentials are not configured.');
     }
 
     const prompt = `Search the live web for the real-time or scheduled flight status of flight "${cleanFlight}" on date "${cleanDate}".
@@ -764,13 +952,15 @@ GATE_TERMINAL: <Departure Terminal / Gate if available or Check Airport Monitor>
 AIRCRAFT: <Aircraft type if available or N/A>
 SUMMARY: <2 factual sentences on current status, recent performance on this route, and any delays or advisories for ${cleanDate}.>`;
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-4-hydrogen',
-      contents: prompt,
-      config: {
-        tools: [{ googleSearch: {} }],
-      },
-    });
+    const response = await executeWithGeminiRotation((ai) =>
+      ai.models.generateContent({
+        model: 'gemini-4-hydrogen',
+        contents: prompt,
+        config: {
+          tools: [{ googleSearch: {} }],
+        },
+      })
+    );
 
     const reportText = (response.text || '').trim();
     const rawChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
@@ -819,7 +1009,7 @@ SUMMARY: <2 factual sentences on current status, recent performance on this rout
       ? true
       : preferredProvider === 'gemini'
       ? false
-      : Boolean(getRapidApiKey()) && flightTrackerRotationIdx++ % 2 === 0;
+      : getRapidApiKeys('aerodatabox.p.rapidapi.com').length > 0 && flightTrackerRotationIdx++ % 2 === 0;
 
   const order = turnAeroFirst
     ? [
@@ -983,9 +1173,8 @@ app.post('/api/gemini/visa-advisor', async (req, res) => {
   const todayIso = new Date().toISOString().slice(0, 10);
 
   const runGeminiVisaVerification = async () => {
-    const ai = getGeminiClient();
-    if (!ai) {
-      throw new Error('Server Gemini credentials are not configured.');
+    if (getGeminiApiKeys().length === 0) {
+      throw new Error('Server AI credentials are not configured.');
     }
 
     const dossierBlock = inputItems
@@ -1009,15 +1198,17 @@ Return valid JSON matching the requested schema:
 
     let response: any;
     try {
-      response = await ai.models.generateContent({
-        model: 'gemini-4-hydrogen',
-        contents: prompt,
-        config: {
-          tools: [{ googleSearch: {} }],
-          responseMimeType: 'application/json',
-          responseSchema: visaVerificationSchema,
-        },
-      });
+      response = await executeWithGeminiRotation((ai) =>
+        ai.models.generateContent({
+          model: 'gemini-4-hydrogen',
+          contents: prompt,
+          config: {
+            tools: [{ googleSearch: {} }],
+            responseMimeType: 'application/json',
+            responseSchema: visaVerificationSchema,
+          },
+        })
+      );
     } catch (schemaErr: any) {
       const parsedErr = parseGeminiError(schemaErr);
       const rawMsg = String(schemaErr?.message || '');
@@ -1029,13 +1220,15 @@ Return valid JSON matching the requested schema:
       if (!isSchemaToolConflict) {
         throw schemaErr;
       }
-      response = await ai.models.generateContent({
-        model: 'gemini-4-hydrogen',
-        contents: `${prompt}\n\nRespond ONLY with raw valid JSON matching keys: entryCategory, stayLimit, estimatedFee, processingTime, officialPortal, bureaucraticSummary, propertyAdvisory, items (array of { id, label, status, summary, last_verified_date, sources: [{ title, url }] }).`,
-        config: {
-          tools: [{ googleSearch: {} }],
-        },
-      });
+      response = await executeWithGeminiRotation((ai) =>
+        ai.models.generateContent({
+          model: 'gemini-4-hydrogen',
+          contents: `${prompt}\n\nRespond ONLY with raw valid JSON matching keys: entryCategory, stayLimit, estimatedFee, processingTime, officialPortal, bureaucraticSummary, propertyAdvisory, items (array of { id, label, status, summary, last_verified_date, sources: [{ title, url }] }).`,
+          config: {
+            tools: [{ googleSearch: {} }],
+          },
+        })
+      );
     }
 
     const reportText = (response.text || '').trim();
@@ -1230,7 +1423,7 @@ Return valid JSON matching the requested schema:
     };
   };
 
-  const turnVisaMapFirst = Boolean(getRapidApiKey()) && visaAdvisorRotationIdx++ % 2 === 1;
+  const turnVisaMapFirst = getRapidApiKeys('visa-requirement.p.rapidapi.com').length > 0 && visaAdvisorRotationIdx++ % 2 === 1;
   const order = turnVisaMapFirst
     ? [
         { name: 'VisaMapAPI', fn: runRapidVisaMapVerification },
@@ -1319,7 +1512,6 @@ app.post('/api/visa/map', async (req, res) => {
 // NOTE: Strictly never combined with googleSearch or responseMimeType/responseSchema
 app.post('/api/gemini/maps-grounding', async (req, res) => {
   try {
-    const ai = getGeminiClient();
     const { query, lat, lng, city, country } = req.body || {};
     const cleanQuery = typeof query === 'string' ? query.trim().slice(0, 260) : '';
     const cleanCity = typeof city === 'string' ? city.trim().slice(0, 80) : '';
@@ -1328,9 +1520,9 @@ app.post('/api/gemini/maps-grounding', async (req, res) => {
     if (!cleanQuery) {
       return res.status(400).json({ error: 'A location intelligence query is required.' });
     }
-    if (!ai) {
+    if (getGeminiApiKeys().length === 0) {
       return res.status(503).json({
-        error: 'Live Google Maps Grounding service is unavailable because server credentials are not configured.',
+        error: 'Live Maps Grounding service is unavailable because server credentials are not configured.',
       });
     }
 
@@ -1356,11 +1548,13 @@ app.post('/api/gemini/maps-grounding', async (req, res) => {
       };
     }
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-4-hydrogen',
-      contents: prompt,
-      config,
-    });
+    const response = await executeWithGeminiRotation((ai) =>
+      ai.models.generateContent({
+        model: 'gemini-4-hydrogen',
+        contents: prompt,
+        config,
+      })
+    );
 
     const summary = (response.text || '').trim();
     const candidate = response.candidates?.[0];
@@ -1416,7 +1610,6 @@ app.post('/api/gemini/maps-grounding', async (req, res) => {
 // 5b-4. Live Real Estate & Neighborhood Search Grounding (gemini-4-hydrogen + googleSearch)
 app.post('/api/gemini/search-grounding', async (req, res) => {
   try {
-    const ai = getGeminiClient();
     const { query, city, country } = req.body || {};
     const cleanQuery = typeof query === 'string' ? query.trim().slice(0, 300) : '';
     const cleanCity = typeof city === 'string' ? city.trim().slice(0, 80) : '';
@@ -1425,7 +1618,7 @@ app.post('/api/gemini/search-grounding', async (req, res) => {
     if (!cleanQuery) {
       return res.status(400).json({ error: 'A market search query is required.' });
     }
-    if (!ai) {
+    if (getGeminiApiKeys().length === 0) {
       return res.status(503).json({
         error: 'Live neighborhood intelligence service is unavailable because server credentials are not configured.',
       });
@@ -1436,13 +1629,15 @@ app.post('/api/gemini/search-grounding', async (req, res) => {
       ? `Search the live web regarding real estate, urban infrastructure, rental yields, and neighborhood developments for ${locationScope}: ${cleanQuery}. Summarize factual recent findings clearly in 3-4 concise sentences.`
       : `Search the live web for factual recent African real estate & travel intelligence: ${cleanQuery}. Summarize clearly in 3-4 concise sentences.`;
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-4-hydrogen',
-      contents: prompt,
-      config: {
-        tools: [{ googleSearch: {} }],
-      },
-    });
+    const response = await executeWithGeminiRotation((ai) =>
+      ai.models.generateContent({
+        model: 'gemini-4-hydrogen',
+        contents: prompt,
+        config: {
+          tools: [{ googleSearch: {} }],
+        },
+      })
+    );
 
     const summary = (response.text || '').trim();
     const rawChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
@@ -1472,18 +1667,65 @@ app.post('/api/gemini/search-grounding', async (req, res) => {
   }
 });
 
-// Provide client Maps JS key when injected via server runtime environment
+// Provide client Maps JS key rotated from server runtime environment
 app.get('/api/maps/client-config', (_req, res) => {
-  const apiKey = (
-    process.env.VITE_GOOGLE_MAPS_API_KEY ||
-    process.env.GOOGLE_MAPS_API_KEY ||
-    ''
-  ).trim();
+  const apiKey = getRotatedMapsApiKey();
   res.json({ apiKey });
 });
 
-// 5b-5. TripAdvisor Flights Airport Search (rotates into FlightSearchWidget airport picker)
-const GLOBAL_GATEWAY_AIRPORTS = [
+// 5b-5. Multi-Provider Airport Search (African hubs + Global gateways + TripAdvisor/Booking fallback)
+const AFRICAN_AND_GLOBAL_AIRPORTS = [
+  // Southern Africa
+  { code: 'CPT', city: 'Cape Town', country: 'South Africa', airport: 'Cape Town International Airport' },
+  { code: 'JNB', city: 'Johannesburg', country: 'South Africa', airport: 'O.R. Tambo International Airport' },
+  { code: 'HLA', city: 'Johannesburg', country: 'South Africa', airport: 'Lanseria International Airport' },
+  { code: 'DUR', city: 'Durban', country: 'South Africa', airport: 'King Shaka International Airport' },
+  { code: 'GRJ', city: 'George', country: 'South Africa', airport: 'George Airport' },
+  { code: 'PLZ', city: 'Gqeberha (Port Elizabeth)', country: 'South Africa', airport: 'Chief Dawid Stuurman International Airport' },
+  { code: 'BFN', city: 'Bloemfontein', country: 'South Africa', airport: 'Bram Fischer International Airport' },
+  { code: 'GBE', city: 'Gaborone', country: 'Botswana', airport: 'Sir Seretse Khama International Airport' },
+  { code: 'MUB', city: 'Maun', country: 'Botswana', airport: 'Maun Airport' },
+  { code: 'WDH', city: 'Windhoek', country: 'Namibia', airport: 'Hosea Kutako International Airport' },
+  { code: 'MPM', city: 'Maputo', country: 'Mozambique', airport: 'Maputo International Airport' },
+  { code: 'LUN', city: 'Lusaka', country: 'Zambia', airport: 'Kenneth Kaunda International Airport' },
+  { code: 'HRE', city: 'Harare', country: 'Zimbabwe', airport: 'Robert Gabriel Mugabe International Airport' },
+  { code: 'VFA', city: 'Victoria Falls', country: 'Zimbabwe', airport: 'Victoria Falls International Airport' },
+  { code: 'LLW', city: 'Lilongwe', country: 'Malawi', airport: 'Kamuzu International Airport' },
+  // West & Central Africa
+  { code: 'LOS', city: 'Lagos', country: 'Nigeria', airport: 'Murtala Muhammed International Airport' },
+  { code: 'ABV', city: 'Abuja', country: 'Nigeria', airport: 'Nnamdi Azikiwe International Airport' },
+  { code: 'PHC', city: 'Port Harcourt', country: 'Nigeria', airport: 'Port Harcourt International Airport' },
+  { code: 'KAN', city: 'Kano', country: 'Nigeria', airport: 'Mallam Aminu Kano International Airport' },
+  { code: 'ACC', city: 'Accra', country: 'Ghana', airport: 'Kotoka International Airport' },
+  { code: 'DKR', city: 'Dakar', country: 'Senegal', airport: 'Blaise Diagne International Airport' },
+  { code: 'ABJ', city: 'Abidjan', country: 'Côte d’Ivoire', airport: 'Félix-Houphouët-Boigny International Airport' },
+  { code: 'LAD', city: 'Luanda', country: 'Angola', airport: 'Quatro de Fevereiro International Airport' },
+  { code: 'FIH', city: 'Kinshasa', country: 'DR Congo', airport: 'N’djili International Airport' },
+  { code: 'DLA', city: 'Douala', country: 'Cameroon', airport: 'Douala International Airport' },
+  { code: 'NSI', city: 'Yaoundé', country: 'Cameroon', airport: 'Yaoundé Nsimalen International Airport' },
+  { code: 'LFW', city: 'Lomé', country: 'Togo', airport: 'Gnassingbé Eyadéma International Airport' },
+  { code: 'COO', city: 'Cotonou', country: 'Benin', airport: 'Cadjehoun Airport' },
+  { code: 'BJL', city: 'Banjul', country: 'Gambia', airport: 'Banjul International Airport' },
+  // East Africa & Indian Ocean
+  { code: 'NBO', city: 'Nairobi', country: 'Kenya', airport: 'Jomo Kenyatta International Airport' },
+  { code: 'MBA', city: 'Mombasa', country: 'Kenya', airport: 'Moi International Airport' },
+  { code: 'KGL', city: 'Kigali', country: 'Rwanda', airport: 'Kigali International Airport' },
+  { code: 'ADD', city: 'Addis Ababa', country: 'Ethiopia', airport: 'Bole International Airport' },
+  { code: 'DAR', city: 'Dar es Salaam', country: 'Tanzania', airport: 'Julius Nyerere International Airport' },
+  { code: 'ZNZ', city: 'Zanzibar', country: 'Tanzania', airport: 'Abeid Amani Karume International Airport' },
+  { code: 'JRO', city: 'Kilimanjaro', country: 'Tanzania', airport: 'Kilimanjaro International Airport' },
+  { code: 'EBB', city: 'Entebbe', country: 'Uganda', airport: 'Entebbe International Airport' },
+  { code: 'MRU', city: 'Port Louis', country: 'Mauritius', airport: 'Sir Seewoosagur Ramgoolam International Airport' },
+  { code: 'SEZ', city: 'Mahé', country: 'Seychelles', airport: 'Seychelles International Airport' },
+  // North Africa
+  { code: 'CAI', city: 'Cairo', country: 'Egypt', airport: 'Cairo International Airport' },
+  { code: 'HRG', city: 'Hurghada', country: 'Egypt', airport: 'Hurghada International Airport' },
+  { code: 'SSH', city: 'Sharm El Sheikh', country: 'Egypt', airport: 'Sharm El Sheikh International Airport' },
+  { code: 'CMN', city: 'Casablanca', country: 'Morocco', airport: 'Mohammed V International Airport' },
+  { code: 'RAK', city: 'Marrakesh', country: 'Morocco', airport: 'Marrakesh Menara Airport' },
+  { code: 'TUN', city: 'Tunis', country: 'Tunisia', airport: 'Tunis–Carthage International Airport' },
+  { code: 'ALG', city: 'Algiers', country: 'Algeria', airport: 'Houari Boumediene Airport' },
+  // Global Gateways
   { code: 'LHR', city: 'London', country: 'United Kingdom', airport: 'London Heathrow Airport' },
   { code: 'LGW', city: 'London', country: 'United Kingdom', airport: 'London Gatwick Airport' },
   { code: 'STN', city: 'London', country: 'United Kingdom', airport: 'London Stansted Airport' },
@@ -1498,19 +1740,32 @@ const GLOBAL_GATEWAY_AIRPORTS = [
   { code: 'SIN', city: 'Singapore', country: 'Singapore', airport: 'Singapore Changi Airport' },
 ];
 
+function matchDirectoryAirports(query: string) {
+  const qLower = query.toLowerCase();
+  return AFRICAN_AND_GLOBAL_AIRPORTS.filter(
+    (a) =>
+      a.city.toLowerCase().includes(qLower) ||
+      a.code.toLowerCase().includes(qLower) ||
+      a.country.toLowerCase().includes(qLower) ||
+      a.airport.toLowerCase().includes(qLower)
+  );
+}
+
 app.get('/api/travel/airports/search', async (req, res) => {
   const query = typeof req.query.query === 'string' ? req.query.query.trim().slice(0, 60) : '';
   if (query.length < 2) {
     return res.json({ airports: [], isLive: true, providerUsed: 'AfriEstate Global Airport Directory' });
   }
+  const directoryMatches = matchDirectoryAirports(query);
   try {
+    let mappedAirports: Array<{ code: string; city: string; country: string; airport: string }> = [];
     const raw = await callRapidApi<any>(
       'tripadvisor16.p.rapidapi.com',
       `/api/v1/flights/searchAirport?query=${encodeURIComponent(query)}`,
       { cacheKey: `ta_airport:${query.toLowerCase()}`, cacheTtlMs: 3600_000 }
     );
     const list = Array.isArray(raw?.data) ? raw.data : Array.isArray(raw) ? raw : [];
-    const mappedAirports = list
+    mappedAirports = list
       .map((item: any) => {
         const code = String(item?.airportCode || item?.iataCode || item?.code || '').trim().toUpperCase();
         const city = String(
@@ -1525,20 +1780,36 @@ app.get('/api/travel/airports/search', async (req, res) => {
         if (!code || code.length < 3) return null;
         return { code: code.slice(0, 3), city: city || airport, country, airport };
       })
-      .filter(Boolean);
+      .filter(Boolean) as Array<{ code: string; city: string; country: string; airport: string }>;
 
-    const qLower = query.toLowerCase();
-    const gatewayMatches = GLOBAL_GATEWAY_AIRPORTS.filter(
-      (a) =>
-        a.city.toLowerCase().includes(qLower) ||
-        a.code.toLowerCase().includes(qLower) ||
-        a.country.toLowerCase().includes(qLower) ||
-        a.airport.toLowerCase().includes(qLower)
-    );
-    const seenCodes = new Set(mappedAirports.map((a: any) => a.code));
+    if (mappedAirports.length === 0) {
+      try {
+        const bookingRaw = await callRapidApi<any>(
+          'booking-com15.p.rapidapi.com',
+          `/api/v1/flights/searchDestination?query=${encodeURIComponent(query)}`,
+          { cacheKey: `bk_airport:${query.toLowerCase()}`, cacheTtlMs: 3600_000 }
+        );
+        const bkList = Array.isArray(bookingRaw?.data) ? bookingRaw.data : [];
+        mappedAirports = bkList
+          .filter((item: any) => String(item?.type || '').toUpperCase() === 'AIRPORT' || item?.code)
+          .map((item: any) => {
+            const code = String(item?.code || item?.id || '').split('.')[0].trim().toUpperCase();
+            const city = String(item?.cityName || item?.name || '').trim();
+            const country = String(item?.countryName || 'International').trim();
+            const airport = String(item?.name || `${city} Airport`).trim();
+            if (!code || code.length !== 3) return null;
+            return { code, city: city || airport, country, airport };
+          })
+          .filter(Boolean) as Array<{ code: string; city: string; country: string; airport: string }>;
+      } catch {
+        // Directory fallback merges below
+      }
+    }
+
+    const seenCodes = new Set(mappedAirports.map((a) => a.code));
     const mergedAirports = [
       ...mappedAirports,
-      ...gatewayMatches.filter((g) => !seenCodes.has(g.code)),
+      ...directoryMatches.filter((g) => !seenCodes.has(g.code)),
     ];
 
     res.json({
@@ -1548,19 +1819,11 @@ app.get('/api/travel/airports/search', async (req, res) => {
     });
   } catch (error: any) {
     console.warn('[API /api/travel/airports/search warning]:', error?.message || 'unavailable');
-    const qLower = query.toLowerCase();
-    const fallbackMatches = GLOBAL_GATEWAY_AIRPORTS.filter(
-      (a) =>
-        a.city.toLowerCase().includes(qLower) ||
-        a.code.toLowerCase().includes(qLower) ||
-        a.country.toLowerCase().includes(qLower) ||
-        a.airport.toLowerCase().includes(qLower)
-    );
     res.json({
-      airports: fallbackMatches,
-      isLive: false,
-      upstreamWarning: 'Live airport directory lookup temporarily unavailable.',
-      providerUsed: 'AfriEstate Gateway Airport Directory (Fallback)',
+      airports: directoryMatches,
+      isLive: directoryMatches.length > 0,
+      upstreamWarning: directoryMatches.length === 0 ? 'Live airport directory lookup temporarily unavailable.' : undefined,
+      providerUsed: 'AfriEstate Gateway Airport Directory',
     });
   }
 });
@@ -1667,7 +1930,7 @@ app.get('/api/neighborhood/safety-index', async (req, res) => {
       ? raw.cities
       : [];
 
-    const normalized = rows
+    const baseNormalized = rows
       .filter((r: any) => {
         const rawLabel = String(r?.Name || r?.City || r?.city || r?.name || '').trim();
         return rawLabel && rawLabel.toLowerCase() !== 'city';
@@ -1700,6 +1963,19 @@ app.get('/api/neighborhood/safety-index', async (req, res) => {
           safetyIndex: Number.isFinite(safetyIndex) ? Number(safetyIndex.toFixed(1)) : null,
         };
       });
+
+    const totalCount = Math.max(1, baseNormalized.length);
+    const normalized = baseNormalized.map((item) => ({
+      ...item,
+      hasNumericIndices: item.crimeIndex !== null && item.safetyIndex !== null,
+      riskTier:
+        item.rank <= 25
+          ? 'Top-25 High Watchlist'
+          : item.rank <= 60
+          ? 'Elevated Metro Watch'
+          : 'Standard Metro Watch',
+      globalRankPercentile: Math.max(1, Math.round((item.rank / totalCount) * 100)),
+    }));
 
     const cityLower = city.toLowerCase();
     const countryLower = country.toLowerCase();
@@ -1755,9 +2031,11 @@ app.get('/api/neighborhood/safety-index', async (req, res) => {
 app.get('/api/travel/rotation-status', (_req, res) => {
   res.json({
     liveFeedsConfigured: getRapidApiKeys().length > 0,
-    feedAppConfigured: Boolean(process.env.RAPIDAPI_APP_ID),
+    feedAppConfigured: collectSecretKeyPool([/^(?:X_)?RAPID_?API_APP_IDS?(?:_.*)?$/i]).length > 0,
     keyPoolSize: getRapidApiKeys().length,
-    aiConfigured: Boolean(getActiveApiKey()),
+    geminiKeyPoolSize: getGeminiApiKeys().length,
+    mapsKeyPoolSize: getGoogleMapsApiKeys().length,
+    aiConfigured: getGeminiApiKeys().length > 0,
     rotationCounters: {
       flightTracker: flightTrackerRotationIdx,
       visaAdvisor: visaAdvisorRotationIdx,
@@ -1807,8 +2085,13 @@ app.post('/api/payments/settle', async (req, res) => {
     }
 
     const numericAmount = Number(amount);
-    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
-      return res.status(400).json({ error: 'A valid positive settlement amount is required.' });
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0 || numericAmount > 50_000_000) {
+      return res.status(400).json({ error: 'A valid positive settlement amount within transaction limits is required.' });
+    }
+
+    const normalizedCurrency = String(currency || 'ZAR').trim().toUpperCase();
+    if (!/^[A-Z]{3}$/.test(normalizedCurrency)) {
+      return res.status(400).json({ error: 'A valid 3-letter ISO currency code is required.' });
     }
 
     const cleanName = typeof customerName === 'string' ? customerName.trim().slice(0, 120) : '';
@@ -1824,27 +2107,38 @@ app.post('/api/payments/settle', async (req, res) => {
       return res.status(400).json({ error: 'Unsupported payment method selected.' });
     }
 
+    if (paymentDetails?.cardCvv || (typeof paymentDetails?.cardNumber === 'string' && paymentDetails.cardNumber.replace(/\D/g, '').length > 4)) {
+      return res.status(400).json({
+        error: 'Raw card PAN and CVV codes must never be transmitted to this endpoint; supply cardLast4 or a payment gateway token.',
+      });
+    }
+
+    let safeCardBrand: string | undefined;
+    let safeCardLast4: string | undefined;
     if (paymentMethod === 'Card') {
-      const digits = String(paymentDetails?.cardNumber || '').replace(/\D/g, '');
+      const last4 = String(paymentDetails?.cardLast4 || '').replace(/\D/g, '');
       const expiry = String(paymentDetails?.cardExpiry || '').trim();
-      const cvv = String(paymentDetails?.cardCvv || '').replace(/\D/g, '');
-      if (digits.length < 12 || !expiry || cvv.length < 3) {
+      const brand = String(paymentDetails?.cardBrand || 'Card').trim().slice(0, 24);
+      if (last4.length !== 4 || !/^(0[1-9]|1[0-2])\/\d{2,4}$/.test(expiry)) {
         return res.status(400).json({
-          error: 'Card authorization details are incomplete. Please verify card number, expiry (MM/YY), and CVV.',
+          error: 'Tokenized card authorization requires valid last 4 digits and expiry (MM/YY).',
         });
       }
+      safeCardLast4 = last4;
+      safeCardBrand = brand;
     }
 
     if (paymentMethod.includes('Mobile Money')) {
       const msisdn = String(paymentDetails?.mobileMoneyPhone || '').replace(/\D/g, '');
-      if (msisdn.length < 8) {
+      if (msisdn.length < 8 || msisdn.length > 16) {
         return res.status(400).json({
           error: 'Please enter a valid Mobile Money MSISDN phone number to receive the authorization prompt.',
         });
       }
     }
 
-    const randomBlock = Math.floor(100000 + Math.random() * 899999);
+    const randomBlock = crypto.randomInt(100000, 999999);
+    const randomSuffix = crypto.randomBytes(3).toString('hex').toUpperCase();
     const prefix =
       normalizedCategory === 'flight'
         ? 'AFR-FLT'
@@ -1853,26 +2147,34 @@ app.post('/api/payments/settle', async (req, res) => {
         : 'AFR-CAR';
 
     const transactionRef = `${prefix}-${randomBlock}`;
-    const settlementId = `STL-${Date.now().toString(36).toUpperCase()}-${Math.floor(100 + Math.random() * 899)}`;
-    const authorizationCode = `AUTH-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+    const settlementId = `STL-${Date.now().toString(36).toUpperCase()}-${randomSuffix}`;
+    const authorizationCode = `AUTH-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
+
+    const cleanMetadata =
+      typeof metadata === 'object' && metadata !== null && !Array.isArray(metadata)
+        ? Object.fromEntries(Object.entries(metadata).slice(0, 20))
+        : {};
 
     res.json({
       ok: true,
       status: 'Settled',
+      settlementMode: 'sandbox-gateway',
       bookingCategory: normalizedCategory,
-      itemId: String(itemId || ''),
-      itemTitle: String(itemTitle || 'AfriEstate Reservation'),
+      itemId: String(itemId || '').slice(0, 120),
+      itemTitle: String(itemTitle || 'AfriEstate Reservation').slice(0, 180),
       amount: Math.round(numericAmount * 100) / 100,
-      currency: String(currency || 'ZAR').toUpperCase(),
+      currency: normalizedCurrency,
       paymentMethod,
+      cardBrand: safeCardBrand,
+      cardLast4: safeCardLast4,
       customerName: cleanName,
       customerEmail: cleanEmail,
       transactionRef,
       settlementId,
       authorizationCode,
       settledAt: new Date().toISOString(),
-      protectionGuarantee: 'AfriEstate Real-Time Verified Settlement & Escrow Protection',
-      metadata: typeof metadata === 'object' && metadata ? metadata : {},
+      protectionGuarantee: 'AfriEstate Scoped Booking Escrow Protection (Sandbox Settlement)',
+      metadata: cleanMetadata,
     });
   } catch (error: any) {
     console.error('[API /api/payments/settle error]:', error);
@@ -1880,10 +2182,27 @@ app.post('/api/payments/settle', async (req, res) => {
   }
 });
 
-// 6. Gemini Live API WebSocket Bridge
-const wss = new WebSocketServer({ server, path: '/api/live' });
+// 6. Gemini Live API WebSocket Bridge (bounded payload & connection cap)
+const MAX_LIVE_WS_CONNECTIONS = 25;
+let activeLiveWsCount = 0;
+const wss = new WebSocketServer({ server, path: '/api/live', maxPayload: 2 * 1024 * 1024 });
 
 wss.on('connection', async (clientWs: WebSocket) => {
+  if (activeLiveWsCount >= MAX_LIVE_WS_CONNECTIONS) {
+    if (clientWs.readyState === WebSocket.OPEN) {
+      clientWs.send(JSON.stringify({ type: 'error', error: 'Live voice capacity temporarily reached. Please retry shortly.' }));
+      clientWs.close();
+    }
+    return;
+  }
+  activeLiveWsCount += 1;
+  let released = false;
+  const releaseSlot = () => {
+    if (!released) {
+      released = true;
+      activeLiveWsCount = Math.max(0, activeLiveWsCount - 1);
+    }
+  };
   console.log('[LiveAPI] Client connected to WebSocket');
   let session: any = null;
 
@@ -1957,6 +2276,7 @@ wss.on('connection', async (clientWs: WebSocket) => {
     });
 
     clientWs.on('close', () => {
+      releaseSlot();
       console.log('[LiveAPI] Client WebSocket closed');
       try {
         session?.close();
@@ -1966,6 +2286,7 @@ wss.on('connection', async (clientWs: WebSocket) => {
     });
 
     clientWs.on('error', (err) => {
+      releaseSlot();
       console.error('[LiveAPI] Client WebSocket error:', err);
       try {
         session?.close();
@@ -1974,6 +2295,7 @@ wss.on('connection', async (clientWs: WebSocket) => {
       }
     });
   } catch (err: any) {
+    releaseSlot();
     console.error('[LiveAPI] Failed to initialize Gemini Live session:', err);
     if (clientWs.readyState === WebSocket.OPEN) {
       clientWs.send(JSON.stringify({ type: 'error', error: err?.message || 'Failed to connect to Live API' }));

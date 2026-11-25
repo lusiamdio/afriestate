@@ -15,6 +15,7 @@ export type ServiceListingMode = 'hub' | 'transport' | 'wellness';
 
 interface ServiceListingPageProps {
   mode: ServiceListingMode;
+  initialTransportMode?: 'hire' | 'sale';
   currentUser: User | null;
   onSelectMode: (nextMode: ServiceListingMode) => void;
   onRedirectToHotelRegistration: () => void;
@@ -28,6 +29,7 @@ interface ServiceListingPageProps {
 
 const ServiceListingPage: React.FC<ServiceListingPageProps> = ({
   mode,
+  initialTransportMode = 'hire',
   currentUser,
   onSelectMode,
   onRedirectToHotelRegistration,
@@ -70,14 +72,14 @@ const ServiceListingPage: React.FC<ServiceListingPageProps> = ({
 
   const heroTitle =
     mode === 'transport'
-      ? 'List Transport & Fleet Rental'
+      ? 'List a Car for Sale or Hire'
       : mode === 'wellness'
       ? 'List Wellness Retreat & Spa'
       : 'Publish a Service or Hospitality Listing';
 
   const heroSubtitle =
     mode === 'transport'
-      ? 'Publish verified luxury SUVs, executive sedans, and chauffeur fleets with drag-and-drop photography synced straight to Transport Rentals.'
+      ? 'Publish verified vehicles for outright sale or daily executive hire with drag-and-drop photography synced straight to the Transport marketplace.'
       : mode === 'wellness'
       ? 'Showcase sanctuaries, thermal spas, holistic retreats, and clinical practitioners synced straight to Wellness Retreats.'
       : 'Choose a category below to open its full dedicated publishing workspace or register your hotel.';
@@ -104,7 +106,7 @@ const ServiceListingPage: React.FC<ServiceListingPageProps> = ({
                 <>
                   <span aria-hidden="true">→</span>
                   <span className="font-semibold text-slate-900 dark:text-white">
-                    {mode === 'transport' ? 'Transport & Rent a Car' : 'Wellness Retreat & Spa'}
+                    {mode === 'transport' ? 'Transport · Sell or Hire a Car' : 'Wellness Retreat & Spa'}
                   </span>
                 </>
               )}
@@ -174,9 +176,9 @@ const ServiceListingPage: React.FC<ServiceListingPageProps> = ({
                     className="p-7 border-2 border-slate-200 dark:border-slate-700 rounded-2xl hover:border-emerald-700 dark:hover:border-amber-300 hover:bg-emerald-50/40 dark:hover:bg-slate-800 transition-all font-semibold text-base text-slate-800 dark:text-slate-200 flex flex-col items-center gap-3 text-center"
                   >
                     <TruckIcon className="w-9 h-9 text-emerald-700 dark:text-amber-300" />
-                    <span>Transport &amp; Rent a Car</span>
+                    <span>Transport · Sell or Hire a Car</span>
                     <span className="text-xs font-normal text-slate-500 dark:text-slate-400">
-                      Syncs to Transport Rentals page
+                      Syncs to Transport Rentals &amp; Car Sales
                     </span>
                   </button>
                 )}
@@ -210,6 +212,8 @@ const ServiceListingPage: React.FC<ServiceListingPageProps> = ({
             </div>
           ) : mode === 'transport' ? (
             <RentACarListingForm
+              key={initialTransportMode}
+              initialListingMode={initialTransportMode}
               currentUser={currentUser}
               onSuccess={(published) => finalizePublished(published, 'rent-a-car')}
               onBack={() => onSelectMode('hub')}

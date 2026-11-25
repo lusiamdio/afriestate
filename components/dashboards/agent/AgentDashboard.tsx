@@ -14,8 +14,9 @@ import { DashboardIcon, ListingsIcon, LeadsIcon, AnalyticsIcon, CalendarIcon as 
 import AgentInvestmentRequests from './AgentInvestmentRequests';
 import AgentEarnings from './AgentEarnings';
 import AgentBilling from './AgentBilling';
-import { ChatBubbleLeftRightIcon } from '../../icons/ActionIcons';
+import { ChatBubbleLeftRightIcon, ShieldCheckIcon } from '../../icons/ActionIcons';
 import AgentMessages from './AgentMessages';
+import AgentClosingAndRoiDesk from './AgentClosingAndRoiDesk';
 
 
 interface AgentDashboardProps {
@@ -41,7 +42,7 @@ interface AgentDashboardProps {
   onUpdateAchievements: (achievements: Achievement[]) => void;
 }
 
-type AgentView = 'dashboard' | 'listings' | 'leads' | 'analytics' | 'calendar' | 'profile' | 'support' | 'aiTools' | 'teamHub' | 'investmentRequests' | 'earnings' | 'billing' | 'messages';
+type AgentView = 'dashboard' | 'listings' | 'leads' | 'analytics' | 'calendar' | 'profile' | 'support' | 'aiTools' | 'closingDesk' | 'teamHub' | 'investmentRequests' | 'earnings' | 'billing' | 'messages';
 
 const Sidebar: React.FC<{ activeView: AgentView; setActiveView: (view: AgentView) => void; }> = ({ activeView, setActiveView }) => {
     const navItems = [
@@ -54,6 +55,7 @@ const Sidebar: React.FC<{ activeView: AgentView; setActiveView: (view: AgentView
         { id: 'earnings', label: 'Earnings', icon: BanknotesIcon },
         { id: 'calendar', label: 'Calendar', icon: NavCalendarIcon },
         { id: 'aiTools', label: 'AI Tools', icon: SparklesIcon },
+        { id: 'closingDesk', label: 'Closing & ROI Desk', icon: ShieldCheckIcon },
         { id: 'profile', label: 'Profile & Branding', icon: ProfileIcon },
     ] as const;
 
@@ -121,6 +123,8 @@ const AgentDashboard: React.FC<AgentDashboardProps> = (props) => {
                 return <AgentMessages {...props} />;
             case 'aiTools':
                 return <AgentAITools />;
+            case 'closingDesk':
+                return <AgentClosingAndRoiDesk />;
             case 'teamHub':
                 return <AgentTeamHub />;
             case 'investmentRequests':

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import type { InvestorSettings, User } from '../../../types';
 import { ClipboardDocumentIcon, CheckBadgeIcon } from '../../icons/ActionIcons';
 import { useToast } from '../../../contexts/ToastContext';
+import { WidgetTabGroup } from '../../widgets/EmbeddedWidgetToolkit';
 
 interface InvestorSettingsProps {
   settings: InvestorSettings | null;
@@ -253,6 +254,12 @@ const InvestorSettingsPage: React.FC<InvestorSettingsProps> = ({ settings, onUpd
           </div>
         </div>
       </div>
+
+      <WidgetTabGroup
+        title="Distribution IBAN, Tax VAT & Webhook URL Validator"
+        subtitle="Verify cross-border IBAN distribution accounts, investor VAT registrations, callback URLs, and reporting emails."
+        toolIds={['validate-iban', 'validate-vat', 'validate-url', 'validate-email']}
+      />
     </div>
   );
 };

@@ -2,9 +2,9 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import type { NeighborhoodGuide } from '../types';
 import { NEIGHBORHOOD_GUIDES } from '../constants';
 import { CloseIcon, LocationPinIcon } from './icons/NavIcons';
-import { BanknotesIcon, ShieldCheckIcon, AcademicCapIcon, MoonIcon, UserGroupIcon, BuildingStorefrontIcon, SparklesIcon, MapIcon, VrHeadsetIcon, ShareIcon, LinkIcon, CheckIcon, HeartIcon, HeartIconSolid, ClockIcon, TicketIcon, BikeIcon, CalendarIcon } from './icons/ActionIcons';
+import { BanknotesIcon, ShieldCheckIcon, AcademicCapIcon, MoonIcon, UserGroupIcon, BuildingStorefrontIcon, SparklesIcon, MapIcon, VrHeadsetIcon, ShareIcon, LinkIcon, CheckIcon, HeartIcon, HeartIconSolid, ClockIcon, TicketIcon, BikeIcon, CalendarIcon, EnvelopeIcon } from './icons/ActionIcons';
 import LifestyleMatcherModal from './LifestyleMatcherModal';
-import { FacebookIcon, TwitterIcon, WhatsAppIcon } from './icons/SocialIcons';
+import { WhatsAppIcon } from './icons/SocialIcons';
 
 interface NeighborhoodExplorerModalProps {
   isOpen: boolean;
@@ -30,14 +30,11 @@ const ShareMenu: React.FC<{ neighborhood: NeighborhoodGuide }> = ({ neighborhood
   
   return (
     <div className="absolute top-full right-0 mt-2 w-48 glass-panel rounded-lg shadow-xl border border-slate-200/80 dark:border-slate-700 py-2 z-20 animate-fade-in-up-sm">
-      <a href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}&text=${encodeURIComponent(shareText)}`} target="_blank" rel="noopener noreferrer" className="share-button">
-        <TwitterIcon className="w-5 h-5" /><span>Twitter</span>
-      </a>
-      <a href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`} target="_blank" rel="noopener noreferrer" className="share-button">
-        <FacebookIcon className="w-5 h-5" /><span>Facebook</span>
-      </a>
       <a href={`https://api.whatsapp.com/send?text=${encodeURIComponent(`${shareText} ${url}`)}`} target="_blank" rel="noopener noreferrer" className="share-button">
-        <WhatsAppIcon className="w-5 h-5" /><span>WhatsApp</span>
+        <WhatsAppIcon className="w-5 h-5 text-emerald-500" /><span>WhatsApp</span>
+      </a>
+      <a href={`mailto:?subject=${encodeURIComponent(`${neighborhood.name} Neighborhood Guide — AfriEstate`)}&body=${encodeURIComponent(`${shareText}\n\n${url}`)}`} className="share-button">
+        <EnvelopeIcon className="w-5 h-5 text-amber-500" /><span>Email</span>
       </a>
       <div className="border-t border-slate-200 dark:border-slate-700 my-1"></div>
       <button onClick={handleCopy} className="share-button">

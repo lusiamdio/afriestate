@@ -6,7 +6,9 @@ import {
   LinkIcon,
   CheckIcon,
   DevicePhoneMobileIcon,
+  EnvelopeIcon,
 } from '@heroicons/react/24/outline';
+import { WhatsAppIcon } from './icons/SocialIcons';
 
 export function buildPropertyShareUrl(propertyId: string): string {
   if (typeof window === 'undefined') {
@@ -33,6 +35,9 @@ const PropertyQrCodeCard: React.FC<PropertyQrCodeCardProps> = ({
   variant = 'sidebar',
 }) => {
   const shareUrl = useMemo(() => buildPropertyShareUrl(propertyId), [propertyId]);
+  const shareSummary = `Check out this property on AfriEstate: ${propertyTitle}${propertyLocation ? ` (${propertyLocation})` : ''}`;
+  const whatsappShareUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(`${shareSummary} ${shareUrl}`)}`;
+  const emailShareUrl = `mailto:?subject=${encodeURIComponent(propertyTitle)}&body=${encodeURIComponent(`${shareSummary}\n\n${shareUrl}`)}`;
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState<boolean>(true);
   const [generationError, setGenerationError] = useState<string>('');
@@ -172,6 +177,25 @@ const PropertyQrCodeCard: React.FC<PropertyQrCodeCardProps> = ({
             <span>Save QR PNG</span>
           </span>
         )}
+      </div>
+
+      <div className="grid grid-cols-2 gap-2.5">
+        <a
+          href={whatsappShareUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/70 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:hover:bg-emerald-950/60 text-xs font-semibold text-emerald-800 dark:text-emerald-300 transition-colors"
+        >
+          <WhatsAppIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+          <span>WhatsApp</span>
+        </a>
+        <a
+          href={emailShareUrl}
+          className="inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl border border-amber-200 dark:border-amber-900/50 bg-amber-50/70 hover:bg-amber-100 dark:bg-amber-950/30 dark:hover:bg-amber-950/60 text-xs font-semibold text-amber-900 dark:text-amber-300 transition-colors"
+        >
+          <EnvelopeIcon className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+          <span>Email</span>
+        </a>
       </div>
     </div>
   );

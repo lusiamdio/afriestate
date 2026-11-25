@@ -28,6 +28,7 @@ export enum ThinkingLevel {
   LOW = "LOW",
   MEDIUM = "MEDIUM",
   HIGH = "HIGH",
+  XHIGH = "XHIGH",
 }
 
 export interface Blob {

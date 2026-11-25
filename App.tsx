@@ -174,6 +174,7 @@ const App: React.FC = () => {
   const { settings, roleControls, userOverrides, applyListingOverrides, lastAction } = useAdminState();
   const { setSessionUser, setAuthLoading, updateSharedJourney } = usePlatformState();
   const [page, setPage] = useState<Page>('home');
+  const [transportListMode, setTransportListMode] = useState<'hire' | 'sale'>('hire');
   const [filters, setFilters] = useState<SearchFilters>(initialFilters);
   
   const scrollToSection = (targetPage: Page, sectionId?: string) => {
@@ -1293,7 +1294,12 @@ const App: React.FC = () => {
     }
 
     if (savedRecord.propertyType === PropertyType.TRANSPORT) {
-      addToast(`Published "${savedRecord.title}" to Transport Rentals.`, 'success');
+      addToast(
+        savedRecord.listingType === ListingType.SALE
+          ? `Published "${savedRecord.title}" to Transport Car Sales.`
+          : `Published "${savedRecord.title}" to Transport Rentals.`,
+        'success'
+      );
       scrollToSection('rent-a-car');
     } else if (savedRecord.propertyType === PropertyType.WELLNESS) {
       addToast(`Published "${savedRecord.title}" to Wellness Retreats.`, 'success');
@@ -1713,7 +1719,8 @@ const App: React.FC = () => {
             <RentACarPage
               properties={governedProperties.filter(p => p.propertyType === PropertyType.TRANSPORT && p.status === PropertyStatus.ACTIVE)}
               onNavigate={(target) => scrollToSection(target as Page)}
-              onListFleet={() => {
+              onListFleet={(mode = 'hire') => {
+                setTransportListMode(mode);
                 if (!currentUser) {
                   openAuthPage('login');
                 } else if (canCurrentUserPublish()) {
@@ -1751,6 +1758,7 @@ const App: React.FC = () => {
           return (
             <ServiceListingPage
               mode={page === 'list-transport' ? 'transport' : page === 'list-wellness' ? 'wellness' : 'hub'}
+              initialTransportMode={transportListMode}
               currentUser={currentUser}
               onSelectMode={(nextMode) =>
                 scrollToSection(

@@ -46,7 +46,7 @@ import {
   HeartIcon as ClinicIcon,
 } from '@heroicons/react/24/outline';
 import { HeartIcon as HeartIconSolid, CheckBadgeIcon, StarIcon } from '@heroicons/react/24/solid';
-import { FacebookIcon, TwitterIcon, WhatsAppIcon } from '../icons/SocialIcons';
+import { WhatsAppIcon } from '../icons/SocialIcons';
 import { VrHeadsetIcon } from '../icons/ActionIcons';
 
 interface NeighborhoodExplorerPageProps {
@@ -67,6 +67,9 @@ interface CitySafetyBenchmarkRow {
   country: string;
   crimeIndex: number | null;
   safetyIndex: number | null;
+  hasNumericIndices?: boolean;
+  riskTier?: string;
+  globalRankPercentile?: number;
 }
 
 interface SafetyIndexResponse {
@@ -117,24 +120,6 @@ const ShareMenu: React.FC<{ profile: StructuredNeighborhoodProfile }> = ({ profi
       >
         <EnvelopeIcon className="w-4 h-4 text-amber-600 shrink-0" />
         <span>Share via Email</span>
-      </a>
-      <a
-        href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}&text=${encodeURIComponent(shareText)}`}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="w-full px-4 py-2.5 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-3 transition-colors"
-      >
-        <TwitterIcon className="w-4 h-4 text-slate-800 dark:text-white shrink-0" />
-        <span>Share on X / Twitter</span>
-      </a>
-      <a
-        href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="w-full px-4 py-2.5 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-3 transition-colors"
-      >
-        <FacebookIcon className="w-4 h-4 text-blue-600 shrink-0" />
-        <span>Share on Facebook</span>
       </a>
       <div className="h-px bg-slate-100 dark:bg-slate-800 my-1" />
       <button
@@ -1410,15 +1395,23 @@ const NeighborhoodExplorerPage: React.FC<NeighborhoodExplorerPageProps> = ({
                       <div className="space-y-2.5">
                         <div className="grid grid-cols-3 gap-2.5">
                           <div className="p-2.5 rounded-lg bg-[#FAF8F5] dark:bg-slate-800">
-                            <span className="text-[10px] text-slate-500 dark:text-slate-400 block">Safety Index</span>
+                            <span className="text-[10px] text-slate-500 dark:text-slate-400 block">
+                              {safetyBenchmark.matched.hasNumericIndices ? 'Safety Index' : 'Watchlist Tier'}
+                            </span>
                             <span className="text-sm font-mono font-bold tabular-nums text-emerald-700 dark:text-emerald-400">
-                              {safetyBenchmark.matched.safetyIndex ?? 'N/A'}
+                              {safetyBenchmark.matched.hasNumericIndices
+                                ? safetyBenchmark.matched.safetyIndex
+                                : safetyBenchmark.matched.riskTier || 'Ranked Metro'}
                             </span>
                           </div>
                           <div className="p-2.5 rounded-lg bg-[#FAF8F5] dark:bg-slate-800">
-                            <span className="text-[10px] text-slate-500 dark:text-slate-400 block">Crime Index</span>
+                            <span className="text-[10px] text-slate-500 dark:text-slate-400 block">
+                              {safetyBenchmark.matched.hasNumericIndices ? 'Crime Index' : 'Country Peers'}
+                            </span>
                             <span className="text-sm font-mono font-bold tabular-nums text-slate-900 dark:text-white">
-                              {safetyBenchmark.matched.crimeIndex ?? 'N/A'}
+                              {safetyBenchmark.matched.hasNumericIndices
+                                ? safetyBenchmark.matched.crimeIndex
+                                : `${safetyBenchmark.countryPeerCount} Ranked`}
                             </span>
                           </div>
                           <div className="p-2.5 rounded-lg bg-[#FAF8F5] dark:bg-slate-800">
@@ -1434,7 +1427,7 @@ const NeighborhoodExplorerPage: React.FC<NeighborhoodExplorerPageProps> = ({
                             <span className="font-semibold text-slate-700 dark:text-slate-300">African Peers:</span>
                             {safetyBenchmark.sampleAfricanPeers.slice(0, 3).map((peer) => (
                               <span key={`${peer.city}-${peer.rank}`} className="font-mono tabular-nums">
-                                {peer.city} ({peer.safetyIndex ?? '-'})
+                                {peer.city} (#{peer.rank})
                               </span>
                             ))}
                           </div>

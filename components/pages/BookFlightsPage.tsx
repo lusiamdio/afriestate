@@ -31,6 +31,8 @@ import PanAfricanVisaHub from '../flights/PanAfricanVisaHub';
 import { useCurrency } from '../../contexts/CurrencyContext';
 import { usePlatformState, resolveCityFromAirport } from '../../contexts/PlatformStateContext';
 import { fetchJsonStrict } from '../../lib/http';
+import { supabase } from '../../lib/supabase';
+import { WidgetTabGroup } from '../widgets/EmbeddedWidgetToolkit';
 
 interface BookFlightsPageProps {
   currentUser: User | null;
@@ -38,7 +40,7 @@ interface BookFlightsPageProps {
   onNavigate?: (target: 'book-a-stay' | 'long-term-stays' | 'rent-a-car' | 'find-wellness') => void;
 }
 
-type FlightHubSection = 'flights' | 'explore' | 'trips' | 'status' | 'visa';
+type FlightHubSection = 'flights' | 'explore' | 'trips' | 'status' | 'visa' | 'route-tools';
 
 const TRIPS_STORAGE_KEY = 'afriestate_flight_trips_v2';
 const ALERTS_STORAGE_KEY = 'afriestate_flight_alerts_v2';
@@ -130,7 +132,75 @@ const BookFlightsPage: React.FC<BookFlightsPageProps> = ({ currentUser, onBack, 
     } catch {
       // ignore
     }
-  }, [scopedTripsKey, scopedAlertsKey]);
+
+    if (!currentUser?.id) return;
+    let active = true;
+    (async () => {
+      try {
+        const [{ data: dbTrips }, { data: dbAlerts }] = await Promise.all([
+          supabase.from('flight_bookings').select('*').order('created_at', { ascending: false }).limit(40),
+          supabase.from('flight_price_alerts').select('*').eq('is_active', true).order('created_at', { ascending: false }).limit(40),
+        ]);
+        if (!active) return;
+
+        if (Array.isArray(dbTrips) && dbTrips.length > 0) {
+          const mappedTrips: BookedTripRecord[] = dbTrips
+            .filter((r: any) => r.itinerary && typeof r.itinerary === 'object' && r.itinerary.reference)
+            .map((r: any) => ({ ...r.itinerary, status: r.status || r.itinerary.status || 'Confirmed' }));
+          if (mappedTrips.length > 0) {
+            setTrips((prev) => {
+              const byRef = new Map<string, BookedTripRecord>();
+              mappedTrips.forEach((t) => byRef.set(t.reference, t));
+              prev.forEach((t) => {
+                if (!byRef.has(t.reference)) byRef.set(t.reference, t);
+              });
+              const merged = Array.from(byRef.values());
+              try {
+                localStorage.setItem(scopedTripsKey, JSON.stringify(merged));
+              } catch {
+                // ignore
+              }
+              return merged;
+            });
+          }
+        }
+
+        if (Array.isArray(dbAlerts) && dbAlerts.length > 0) {
+          const mappedAlerts: PriceAlertRecord[] = dbAlerts.map((a: any) => ({
+            id: String(a.id),
+            origin: a.origin_airport,
+            destination: a.destination_airport,
+            currentZar: Number(a.target_price_zar) || 2399,
+            rule: 'below-target' as const,
+            targetZar: Number(a.target_price_zar) || 2150,
+            email: currentUser.email || a.username || '',
+            active: Boolean(a.is_active),
+            createdAt: a.created_at || new Date().toISOString(),
+          }));
+          setAlerts((prev) => {
+            const byId = new Map<string, PriceAlertRecord>();
+            mappedAlerts.forEach((a) => byId.set(a.id, a));
+            prev.forEach((a) => {
+              if (!byId.has(a.id)) byId.set(a.id, a);
+            });
+            const merged = Array.from(byId.values());
+            try {
+              localStorage.setItem(scopedAlertsKey, JSON.stringify(merged));
+            } catch {
+              // ignore
+            }
+            return merged;
+          });
+        }
+      } catch {
+        // offline fallback preserved
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [scopedTripsKey, scopedAlertsKey, currentUser?.id, currentUser?.email]);
 
   useEffect(() => {
     const destCity = resolveCityFromAirport(search.destination);
@@ -194,6 +264,35 @@ const BookFlightsPage: React.FC<BookFlightsPageProps> = ({ currentUser, onBack, 
     }
   };
 
+  const syncTripToSupabase = (trip: BookedTripRecord) => {
+    const email = (trip.contactEmail || currentUser?.email || '').trim().toLowerCase();
+    if (!currentUser?.id && email.length < 3) return;
+    Promise.resolve(
+      supabase.from('flight_bookings').upsert(
+        {
+          user_id: currentUser?.id || null,
+          username: currentUser?.username || email,
+          booking_ref: trip.reference,
+          airline: trip.airline,
+          flight_number: trip.flightNumber,
+          origin_airport: trip.origin,
+          destination_airport: trip.destination,
+          departure_date: trip.departureDate,
+          return_date: trip.returnDate || null,
+          cabin_class: trip.cabin,
+          passengers: Math.max(1, Number(trip.travellersCount) || 1),
+          passenger_name: trip.leadTravellerName,
+          passenger_email: email,
+          total_amount_zar: Math.max(0, Number(trip.totalZar) || 0),
+          currency: 'ZAR',
+          status: trip.status === 'Cancelled' ? 'Cancelled' : 'Confirmed',
+          itinerary: trip,
+        },
+        { onConflict: 'booking_ref' }
+      )
+    ).catch(() => undefined);
+  };
+
   const persistAlerts = (next: PriceAlertRecord[]) => {
     setAlerts(next);
     try {
@@ -201,6 +300,30 @@ const BookFlightsPage: React.FC<BookFlightsPageProps> = ({ currentUser, onBack, 
       localStorage.setItem(ALERTS_STORAGE_KEY, JSON.stringify(next));
     } catch {
       // ignore quota
+    }
+  };
+
+  const syncCreateAlertToSupabase = (alert: PriceAlertRecord) => {
+    if (!currentUser?.id) return;
+    Promise.resolve(
+      supabase.from('flight_price_alerts').insert({
+        user_id: currentUser.id,
+        username: currentUser.username || currentUser.email,
+        origin_airport: alert.origin,
+        destination_airport: alert.destination,
+        target_price_zar: Math.max(1, Number(alert.targetZar) || 2000),
+        departure_date: search.departDate || null,
+        is_active: true,
+      })
+    ).catch(() => undefined);
+  };
+
+  const syncDeleteAlertFromSupabase = (alertId: string) => {
+    if (!currentUser?.id) return;
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(alertId)) {
+      Promise.resolve(
+        supabase.from('flight_price_alerts').delete().eq('id', alertId)
+      ).catch(() => undefined);
     }
   };
 
@@ -293,6 +416,15 @@ const BookFlightsPage: React.FC<BookFlightsPageProps> = ({ currentUser, onBack, 
                   >
                     <GlobeAltIcon className="w-4 h-4 text-[#008F45]" />
                     <span>Visa &amp; Entry (54)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSection('route-tools')}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/85 dark:bg-slate-800/85 border border-slate-200/80 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:border-[#008F45]"
+                    title="Flight Time & Distance Planner"
+                  >
+                    <ClockIcon className="w-4 h-4 text-[#008F45]" />
+                    <span>Flight &amp; Distance Tools</span>
                   </button>
                   <button
                     type="button"
@@ -431,6 +563,7 @@ const BookFlightsPage: React.FC<BookFlightsPageProps> = ({ currentUser, onBack, 
                 [
                   { id: 'flights', label: 'Flights' },
                   { id: 'status', label: 'Flight Tracker' },
+                  { id: 'route-tools', label: 'Route & Flight Calculator' },
                   { id: 'explore', label: 'Explore' },
                   { id: 'trips', label: `My Trips (${trips.length})` },
                   { id: 'visa', label: 'Visa & Entry' },
@@ -474,20 +607,19 @@ const BookFlightsPage: React.FC<BookFlightsPageProps> = ({ currentUser, onBack, 
             }}
             onOpenPriceAlert={(suggestedZar) => setPriceAlertModal({ open: true, zar: suggestedZar })}
             onSubscribeDealsEmail={(email) => {
-              persistAlerts([
-                {
-                  id: `pa-${Date.now()}`,
-                  origin: search.origin,
-                  destination: search.destination.startsWith('ANYWHERE') ? 'LOS' : search.destination,
-                  currentZar: 2399,
-                  rule: 'drop-10',
-                  targetZar: 2159,
-                  email,
-                  active: true,
-                  createdAt: new Date().toISOString(),
-                },
-                ...alerts,
-              ]);
+              const newAlert: PriceAlertRecord = {
+                id: `pa-${Date.now()}`,
+                origin: search.origin,
+                destination: search.destination.startsWith('ANYWHERE') ? 'LOS' : search.destination,
+                currentZar: 2399,
+                rule: 'drop-10',
+                targetZar: 2159,
+                email,
+                active: true,
+                createdAt: new Date().toISOString(),
+              };
+              persistAlerts([newAlert, ...alerts]);
+              syncCreateAlertToSupabase(newAlert);
             }}
               onApplyAiRoute={(orig, dest) => triggerSearch({ origin: orig, destination: dest })}
               onOpenFullVisaHub={() => {
@@ -495,9 +627,14 @@ const BookFlightsPage: React.FC<BookFlightsPageProps> = ({ currentUser, onBack, 
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
             />
-            {/* Embedded Real-Time Flight Tracker Section */}
-            <section className="pt-2">
+            {/* Embedded Real-Time Flight Tracker & Route Calculator Section */}
+            <section className="pt-2 space-y-6">
               <FlightStatusPanel initialQuery={statusQuery} initialDate={statusDate} />
+              <WidgetTabGroup
+                title="Aviation Route & Airport Distance Planner"
+                subtitle="Estimate exact sector flight durations and map airport-to-property transfer distances across Africa."
+                toolIds={['flight-time', 'map-distance']}
+              />
             </section>
           </>
         )}
@@ -512,6 +649,7 @@ const BookFlightsPage: React.FC<BookFlightsPageProps> = ({ currentUser, onBack, 
             onExploreHotels={() => onNavigate?.('book-a-stay')}
             onBookingCompleted={(trip) => {
               persistTrips([trip, ...trips]);
+              syncTripToSupabase(trip);
               const destCity =
                 trip.destinationCity ||
                 resolveCityFromAirport(trip.destination) ||
@@ -593,7 +731,25 @@ const BookFlightsPage: React.FC<BookFlightsPageProps> = ({ currentUser, onBack, 
         )}
 
         {/* Live Flight Status */}
-        {section === 'status' && <FlightStatusPanel initialQuery={statusQuery} initialDate={statusDate} />}
+        {section === 'status' && (
+          <div className="space-y-6">
+            <FlightStatusPanel initialQuery={statusQuery} initialDate={statusDate} />
+            <WidgetTabGroup
+              title="Aviation Route & Airport Distance Planner"
+              subtitle="Estimate sector flight times and measure ground transfer distance from arrival terminal to destination."
+              toolIds={['flight-time', 'map-distance']}
+            />
+          </div>
+        )}
+
+        {/* Dedicated Route & Flight Calculator Hub */}
+        {section === 'route-tools' && (
+          <WidgetTabGroup
+            title="Flight Time & Distance Route Planner"
+            subtitle="Calculate sector flight durations and measure airport-to-city travel distances across hubs."
+            toolIds={['flight-time', 'map-distance']}
+          />
+        )}
 
         {/* Visa & Entry Hub (All 54 African Nations + Gemini Policy Check) */}
         {section === 'visa' && <PanAfricanVisaHub />}
@@ -612,9 +768,10 @@ const BookFlightsPage: React.FC<BookFlightsPageProps> = ({ currentUser, onBack, 
 
             <MyTripsPanel
               trips={trips}
-              onUpdateTrip={(updated) =>
-                persistTrips(trips.map((t) => (t.id === updated.id ? updated : t)))
-              }
+              onUpdateTrip={(updated) => {
+                persistTrips(trips.map((t) => (t.id === updated.id ? updated : t)));
+                syncTripToSupabase(updated);
+              }}
               onFindHotel={() => onNavigate?.('book-a-stay')}
               onBookTransport={() => onNavigate?.('rent-a-car')}
               onCheckStatus={(flightNum) => {
@@ -635,8 +792,14 @@ const BookFlightsPage: React.FC<BookFlightsPageProps> = ({ currentUser, onBack, 
         destination={search.destination}
         currentZar={priceAlertModal.zar}
         alerts={alerts}
-        onCreateAlert={(alert) => persistAlerts([alert, ...alerts])}
-        onDeleteAlert={(id) => persistAlerts(alerts.filter((a) => a.id !== id))}
+        onCreateAlert={(alert) => {
+          persistAlerts([alert, ...alerts]);
+          syncCreateAlertToSupabase(alert);
+        }}
+        onDeleteAlert={(id) => {
+          persistAlerts(alerts.filter((a) => a.id !== id));
+          syncDeleteAlertFromSupabase(id);
+        }}
       />
     </div>
   );

@@ -2,6 +2,7 @@ import React from 'react';
 import { BanknotesIcon, ShieldCheckIcon, TruckIcon, HomeIcon } from './icons/ActionIcons';
 import { ArrowRightIcon } from '@heroicons/react/24/outline';
 import { useTranslations } from '../contexts/LanguageContext';
+import { WidgetTabGroup } from './widgets/EmbeddedWidgetToolkit';
 
 interface FinancialServicesProps {
   onOpenMortgageCalculator?: () => void;
@@ -138,6 +139,23 @@ const FinancialServices: React.FC<FinancialServicesProps> = ({
               </button>
             ))}
           </div>
+        </div>
+
+        <div className="mt-14">
+          <WidgetTabGroup
+            title="Interactive Financial, Ownership & Utilities Workbench"
+            subtitle="Run mortgage amortisation, rent-vs-buy breakevens, home insurance quotes, shared lease splits, and household energy or water projections directly inside AfriEstate."
+            toolIds={[
+              'mortgage',
+              'rent-vs-buy',
+              'property-decider',
+              'property-comparison',
+              'home-insurance',
+              'rent-splitter',
+              'energy-cost',
+              'water-usage',
+            ]}
+          />
         </div>
       </div>
     </section>

@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import type { ForumPost } from '../types';
 import { CloseIcon, SendIcon } from './icons/NavIcons';
 import { HeartIcon, HeartIconSolid, ChatBubbleLeftRightIcon, ShareIcon, LinkIcon, CheckIcon, EnvelopeIcon } from './icons/ActionIcons';
-import { FacebookIcon, TwitterIcon, WhatsAppIcon } from './icons/SocialIcons';
+import { WhatsAppIcon } from './icons/SocialIcons';
 
 
 interface Comment {
@@ -26,8 +26,6 @@ const ShareMenu: React.FC<{ postTitle: string }> = ({ postTitle }) => {
   const shareText = `Check out this discussion on AfriEstate: ${postTitle}`;
   
   const socialLinks = {
-    facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(postUrl)}&quote=${encodeURIComponent(shareText)}`,
-    twitter: `https://twitter.com/intent/tweet?url=${encodeURIComponent(postUrl)}&text=${encodeURIComponent(shareText)}`,
     whatsapp: `https://api.whatsapp.com/send?text=${encodeURIComponent(`${shareText} ${postUrl}`)}`,
     email: `mailto:?subject=${encodeURIComponent(postTitle)}&body=${encodeURIComponent(`${shareText}\n\n${postUrl}`)}`
   };
@@ -46,12 +44,6 @@ const ShareMenu: React.FC<{ postTitle: string }> = ({ postTitle }) => {
         </a>
         <a href={socialLinks.email} onClick={(e) => e.stopPropagation()} className="w-full text-left px-4 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-3">
             <EnvelopeIcon className="w-4 h-4 text-amber-500" /><span>Email</span>
-        </a>
-        <a href={socialLinks.facebook} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="w-full text-left px-4 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-3">
-            <FacebookIcon className="w-4 h-4 text-blue-600" /><span>Facebook</span>
-        </a>
-        <a href={socialLinks.twitter} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="w-full text-left px-4 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-3">
-            <TwitterIcon className="w-4 h-4 text-slate-700 dark:text-slate-300" /><span>X (Twitter)</span>
         </a>
         <div className="border-t border-slate-200 dark:border-slate-700 my-1"></div>
         <button onClick={handleCopy} className="w-full text-left px-4 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-3">
