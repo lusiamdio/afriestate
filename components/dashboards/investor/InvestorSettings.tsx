@@ -3,6 +3,7 @@ import type { InvestorSettings, User } from '../../../types';
 import { ClipboardDocumentIcon, CheckBadgeIcon } from '../../icons/ActionIcons';
 import { useToast } from '../../../contexts/ToastContext';
 import { WidgetTabGroup } from '../../widgets/EmbeddedWidgetToolkit';
+import { VisaBankingConnectPanel } from '../../payments/VisaBankingConnectPanel';
 
 interface InvestorSettingsProps {
   settings: InvestorSettings | null;
@@ -254,6 +255,13 @@ const InvestorSettingsPage: React.FC<InvestorSettingsProps> = ({ settings, onUpd
           </div>
         </div>
       </div>
+
+      <VisaBankingConnectPanel
+        user={user}
+        roleLabel="Investor Distribution Account"
+        defaultCategories={['distributions', 'short-stay']}
+        onNotify={addToast}
+      />
 
       <WidgetTabGroup
         title="Distribution IBAN, Tax VAT & Webhook URL Validator"

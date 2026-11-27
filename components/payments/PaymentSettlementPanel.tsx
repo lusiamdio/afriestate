@@ -234,9 +234,14 @@ export const PaymentSettlementPanel: React.FC<PaymentSettlementPanelProps> = ({
               </h4>
             </div>
           </div>
-          <span className="px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-200 font-mono text-xs font-bold">
-            {receipt.status}
-          </span>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="px-2 py-0.5 rounded bg-[#1434CB] text-white font-bold text-[10px] tracking-wider uppercase">
+              VISA Supported
+            </span>
+            <span className="px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-200 font-mono text-xs font-bold">
+              {receipt.status}
+            </span>
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-3 rounded-xl bg-black/25 p-3.5 text-xs">
@@ -355,6 +360,14 @@ export const PaymentSettlementPanel: React.FC<PaymentSettlementPanelProps> = ({
 
       {paymentMethod === 'Card' && (
         <div className="space-y-2.5 p-3.5 rounded-xl bg-[#F8F7F3] dark:bg-slate-800/70 border border-[#E4E1D9] dark:border-slate-700">
+          <div className="flex items-center justify-between gap-2 pb-1">
+            <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+              Visa Checkout &amp; Direct Settlement Enabled
+            </span>
+            <span className="px-2 py-0.5 rounded bg-[#1434CB] text-white text-[10px] font-bold tracking-wider uppercase">
+              VISA Supported
+            </span>
+          </div>
           <div>
             <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1">
               Card Number

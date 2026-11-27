@@ -43,6 +43,7 @@ import { useCurrency } from '../../contexts/CurrencyContext';
 import { useToast } from '../../contexts/ToastContext';
 import { usePlatformState, type PlatformVerticalTarget } from '../../contexts/PlatformStateContext';
 import { WidgetTabGroup } from '../widgets/EmbeddedWidgetToolkit';
+import { VisaBankingConnectPanel } from '../payments/VisaBankingConnectPanel';
 
 export type SeekerView =
   | 'overview'
@@ -276,7 +277,7 @@ const UserDashboard: React.FC<UserDashboardProps> = (props) => {
       case 'documents':
         return <DocumentVaultView user={user} addToast={addToast} />;
       case 'payments':
-        return <PaymentsView addToast={addToast} unifiedBookings={unifiedBookings} onNavigatePlatformPage={onNavigatePlatformPage} />;
+        return <PaymentsView user={user} addToast={addToast} unifiedBookings={unifiedBookings} onNavigatePlatformPage={onNavigatePlatformPage} />;
       case 'security':
         return <SeekerSecurityView />;
       default:
@@ -1340,10 +1341,11 @@ const SeekerSecurityView: React.FC = () => (
 );
 
 const PaymentsView: React.FC<{
+  user: User;
   addToast: (msg: string, type?: 'success' | 'info' | 'error') => void;
   unifiedBookings: ReturnType<typeof usePlatformState>['unifiedBookings'];
   onNavigatePlatformPage?: (target: PlatformVerticalTarget) => void;
-}> = ({ addToast, unifiedBookings, onNavigatePlatformPage }) => {
+}> = ({ user, addToast, unifiedBookings, onNavigatePlatformPage }) => {
   const [savedCards, setSavedCards] = useState<{ id: string; brand: string; last4: string; expiry: string }[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
   const [cardLabel, setCardLabel] = useState('Visa Corporate');
@@ -1370,12 +1372,19 @@ const PaymentsView: React.FC<{
     <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-[1400px] mx-auto">
       <div>
         <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white tracking-tight">
-          Payments &amp; Escrow Readiness
+          Payments, Banking &amp; Escrow Readiness
         </h2>
         <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-          Manage booking deposit methods and view holding deposit activity.
+          Connect banking &amp; Visa payout accounts to receive payments, manage deposit cards, and review booking settlements.
         </p>
       </div>
+
+      <VisaBankingConnectPanel
+        user={user}
+        roleLabel="Seeker / Host Account"
+        defaultCategories={['short-stay', 'car-hire']}
+        onNotify={addToast}
+      />
 
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-xl space-y-5">
         <div className="flex flex-wrap items-center justify-between gap-3">

@@ -3,7 +3,9 @@ import type { Property, User } from '../../../types';
 import { PropertyStatus } from '../../../types';
 import { BanknotesIcon, ClockIcon } from '../../icons/ActionIcons';
 import { useCurrency } from '../../../contexts/CurrencyContext';
+import { useToast } from '../../../contexts/ToastContext';
 import { WidgetTabGroup } from '../../widgets/EmbeddedWidgetToolkit';
+import { VisaBankingConnectPanel } from '../../payments/VisaBankingConnectPanel';
 
 interface AgentEarningsProps {
   user: User;
@@ -12,6 +14,7 @@ interface AgentEarningsProps {
 
 const AgentEarnings: React.FC<AgentEarningsProps> = ({ user, allProperties }) => {
   const { formatCurrency } = useCurrency();
+  const { addToast } = useToast();
   const commissionRate = 0.025;
 
   const soldProperties = useMemo(() => {
@@ -125,6 +128,13 @@ const AgentEarnings: React.FC<AgentEarningsProps> = ({ user, allProperties }) =>
           </p>
         )}
       </div>
+
+      <VisaBankingConnectPanel
+        user={user}
+        roleLabel="Agent / Brokerage Payout Account"
+        defaultCategories={['commissions', 'short-stay', 'car-hire']}
+        onNotify={addToast}
+      />
 
       <WidgetTabGroup
         title="Commission Payout Banking & Tax Verification"
