@@ -35,6 +35,7 @@
 | Security Response Headers | `server.ts` | Applies `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN`, `Referrer-Policy: strict-origin-when-cross-origin`, and `Permissions-Policy`. |
 | Markdown & URL Sanitization | `components/BlogDetailModal.tsx`, `lib/security.ts` | Renders Markdown without `rehype-raw` (raw HTML disabled) and sanitizes dynamic URLs via `sanitizeSafeUrl` / `isSafeExternalHref` (`https://`, `mailto:`, `/images/`). |
 | CSV Export Formula Neutralization | `lib/security.ts` (`escapeCsvCell`) | Prefixes spreadsheet formula triggers (`=`, `+`, `-`, `@`, tab, CR) with a single quote and escapes embedded quotes. |
+| Rotated Web3 JSON-RPC Proxy & SSRF Guard | `server.ts` (`/api/web3/rpc`, `/api/web3/health`) | Rotates Alchemy/EVM RPC URLs and keys strictly server-side, blocks private/local URL targets, rate-limits requests (`90/min`), and restricts RPC calls to allowlisted read-only methods. |
 
 ---
 

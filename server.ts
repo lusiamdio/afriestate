@@ -19,10 +19,24 @@ const __dirname = path.dirname(__filename);
       /RAPID_?API.*KEY/i.test(k) && !/APP_ID/i.test(k)
     );
     const hasSecretGeminiKeys = existingEnvKeys.some((k) =>
-      /GEMINI.*API.*KEY/i.test(k) || /^(?:ROTATED_)?API_KEYS?(?:_.*)?$/i.test(k)
+      /GEMINI.*(?:API_?)?KEY/i.test(k) ||
+      /^GOOGLE_(?:AI|API|GENAI).*KEY/i.test(k) ||
+      /^GENAI.*KEY/i.test(k) ||
+      /^(?:ROTATED_)?API_KEYS?(?:_.*)?$/i.test(k)
     );
     const hasSecretMapsKeys = existingEnvKeys.some((k) =>
-      /GOOGLE_MAPS.*KEY/i.test(k)
+      /GOOGLE_MAPS.*KEY/i.test(k) || /^(?:MAPS|GMP)_.*KEY/i.test(k)
+    );
+    const hasSecretWeb3Rpc = existingEnvKeys.some((k) =>
+      /^(?:ALCHEMY|ETH(?:EREUM)?|EVM|WEB3|BLOCKCHAIN|JSON_?RPC|RPC).*(?:KEY|URL)/i.test(k)
+    );
+    const hasSecretMailerLite = existingEnvKeys.some((k) => /^MAILERLITE/i.test(k));
+    const hasSecretTwilio = existingEnvKeys.some((k) => /^TWILIO/i.test(k));
+    const hasSecretMeetingBaas = existingEnvKeys.some((k) => /^MEETING_?BAAS/i.test(k));
+    const hasSecretPwPush = existingEnvKeys.some((k) => /^PWPUSH/i.test(k));
+    const hasSecretOpenRouter = existingEnvKeys.some((k) => /^OPENROUTER/i.test(k));
+    const hasSecretAltAi = existingEnvKeys.some((k) =>
+      /^(?:AI_APIS?|AI_API_KEYS?|ALT_AI|OPENAI|GROQ|TOGETHER|AIML|DEEPSEEK|MISTRAL|AUTHENTICATION_KEY|AI_AUTH_KEY)/i.test(k)
     );
 
     const localEnvPath = path.join(__dirname, '.env.local');
@@ -44,8 +58,22 @@ const __dirname = path.dirname(__filename);
         if (!key || !val) continue;
         if ((process.env[key] || '').trim()) continue;
         if (hasSecretRapidKeys && /RAPID_?API.*KEY/i.test(key)) continue;
-        if (hasSecretGeminiKeys && (/GEMINI.*API.*KEY/i.test(key) || /^API_KEYS?(?:_.*)?$/i.test(key))) continue;
-        if (hasSecretMapsKeys && /GOOGLE_MAPS.*KEY/i.test(key)) continue;
+        if (
+          hasSecretGeminiKeys &&
+          (/GEMINI.*(?:API_?)?KEY/i.test(key) ||
+            /^GOOGLE_(?:AI|API|GENAI).*KEY/i.test(key) ||
+            /^API_KEYS?(?:_.*)?$/i.test(key))
+        ) {
+          continue;
+        }
+        if (hasSecretMapsKeys && (/GOOGLE_MAPS.*KEY/i.test(key) || /^(?:MAPS|GMP)_.*KEY/i.test(key))) continue;
+        if (hasSecretWeb3Rpc && /^(?:ALCHEMY|ETH(?:EREUM)?|EVM|WEB3|BLOCKCHAIN|JSON_?RPC|RPC).*(?:KEY|URL)/i.test(key)) continue;
+        if (hasSecretMailerLite && /^MAILERLITE/i.test(key)) continue;
+        if (hasSecretTwilio && /^TWILIO/i.test(key)) continue;
+        if (hasSecretMeetingBaas && /^MEETING_?BAAS/i.test(key)) continue;
+        if (hasSecretPwPush && /^PWPUSH/i.test(key)) continue;
+        if (hasSecretOpenRouter && /^OPENROUTER/i.test(key)) continue;
+        if (hasSecretAltAi && /^(?:AI_APIS?|AI_API_KEYS?|ALT_AI|OPENAI|GROQ|TOGETHER|AIML|DEEPSEEK|MISTRAL|AUTHENTICATION_KEY|AI_AUTH_KEY)/i.test(key)) continue;
         process.env[key] = val;
       }
     }
@@ -96,10 +124,13 @@ function createRateLimiter(scope: string, maxRequests: number) {
 }
 
 app.use('/api/gemini', createRateLimiter('gemini', 90));
+app.use('/api/ai', createRateLimiter('ai', 90));
 app.use('/api/payments', createRateLimiter('payments', 30));
 app.use('/api/visa', createRateLimiter('visa', 90));
 app.use('/api/travel', createRateLimiter('travel', 120));
 app.use('/api/neighborhood', createRateLimiter('neighborhood', 120));
+app.use('/api/web3', createRateLimiter('web3', 90));
+app.use('/api/integrations', createRateLimiter('integrations', 60));
 
 // Enable JSON parsing with large body support for image/video base64 frames
 app.use(express.json({ limit: '25mb' }));
@@ -153,11 +184,51 @@ function markKeyCooldown(scope: string, key: string, durationMs: number) {
 }
 
 const geminiKeyCursor = { idx: 0 };
+const geminiUrlCursor = { idx: 0 };
 const rapidKeyCursor = { idx: 0 };
 const mapsKeyCursor = { idx: 0 };
+const web3RpcCursor = { idx: 0 };
+const mailerLiteKeyCursor = { idx: 0 };
+const twilioKeyCursor = { idx: 0 };
+const meetingBaasKeyCursor = { idx: 0 };
+const pwPushUrlCursor = { idx: 0 };
+const openRouterKeyCursor = { idx: 0 };
+const alternativeAiKeyCursor = { idx: 0 };
 let flightTrackerRotationIdx = 0;
 let visaAdvisorRotationIdx = 0;
 let travelLanguagesRotationIdx = 0;
+let web3RpcRotationCount = 0;
+let mailerLiteRotationCount = 0;
+let twilioRotationCount = 0;
+let meetingBaasRotationCount = 0;
+let pwPushRotationCount = 0;
+let openRouterRotationCount = 0;
+let alternativeAiRotationCount = 0;
+
+function isSafeHttpsUrl(rawUrl: string): boolean {
+  try {
+    const parsed = new URL(rawUrl);
+    if (parsed.protocol !== 'https:') return false;
+    const host = parsed.hostname.toLowerCase();
+    if (
+      host === 'localhost' ||
+      host === '::1' ||
+      host === '0.0.0.0' ||
+      host.endsWith('.local') ||
+      host.endsWith('.internal') ||
+      /^127\./.test(host) ||
+      /^10\./.test(host) ||
+      /^192\.168\./.test(host) ||
+      /^169\.254\./.test(host) ||
+      /^172\.(1[6-9]|2\d|3[0-1])\./.test(host)
+    ) {
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 function getRotatedCandidates(scope: string, keys: string[], cursor: { idx: number }): string[] {
   if (keys.length === 0) return [];
@@ -171,8 +242,21 @@ function getRotatedCandidates(scope: string, keys: string[], cursor: { idx: numb
 
 function getGeminiApiKeys(): string[] {
   return collectSecretKeyPool(
-    [/GEMINI.*API.*KEY/i, /^GOOGLE_AI.*KEY/i, /^(?:ROTATED_)?API_KEYS?(?:_.*)?$/i]
-  );
+    [
+      /GEMINI.*(?:API_?)?KEYS?(?:_.*)?$/i,
+      /^GOOGLE_AI.*KEYS?(?:_.*)?$/i,
+      /^GOOGLE_API_KEYS?(?:_.*)?$/i,
+      /^GENAI.*KEYS?(?:_.*)?$/i,
+      /^(?:ROTATED_)?API_KEYS?(?:_.*)?$/i,
+    ],
+    [/URL/i, /BASE_URL/i, /ENDPOINT/i, /OPENROUTER/i, /OPENAI/i, /AUTH/i]
+  ).filter((token) => !/^https?:\/\//i.test(token) && !/^sk-/i.test(token));
+}
+
+function getGeminiBaseUrls(): string[] {
+  return collectSecretKeyPool([
+    /^(?:GEMINI|GOOGLE_AI|GENAI).*(?:BASE_?)?URLS?(?:_.*)?$/i,
+  ]).filter((u) => isSafeHttpsUrl(u));
 }
 
 function getActiveApiKey(): string {
@@ -180,13 +264,167 @@ function getActiveApiKey(): string {
   return candidates[0] || '';
 }
 
+function getOpenRouterApiKeys(): string[] {
+  const direct = collectSecretKeyPool(
+    [/^OPENROUTER(?:_API)?_KEYS?(?:_.*)?$/i],
+    [/URL/i, /MODEL/i]
+  ).filter((token) => !/^https?:\/\//i.test(token));
+  const sharedOrTokens = collectSecretKeyPool(
+    [/^AI_APIS?(?:_KEYS?)?(?:_.*)?$/i, /^ALT(?:ERNATIVE)?_AI_KEYS?(?:_.*)?$/i],
+    [/URL/i, /MODEL/i, /AUTH/i]
+  ).filter((token) => /^sk-or-/i.test(token));
+  return Array.from(new Set([...direct, ...sharedOrTokens]));
+}
+
+function getOpenRouterBaseUrls(): string[] {
+  const configured = collectSecretKeyPool([
+    /^OPENROUTER(?:_API)?_(?:BASE_?)?URLS?(?:_.*)?$/i,
+  ]).filter((u) => isSafeHttpsUrl(u));
+  return configured.length > 0 ? configured : ['https://openrouter.ai/api/v1'];
+}
+
+function getAlternativeAiApiKeys(): string[] {
+  return collectSecretKeyPool(
+    [
+      /^AI_APIS?(?:_KEYS?)?(?:_.*)?$/i,
+      /^ALT(?:ERNATIVE)?_AI(?:_API)?_KEYS?(?:_.*)?$/i,
+      /^OPENAI(?:_API)?_KEYS?(?:_.*)?$/i,
+      /^GROQ(?:_API)?_KEYS?(?:_.*)?$/i,
+      /^TOGETHER(?:_API)?_KEYS?(?:_.*)?$/i,
+      /^AIML(?:_API)?_KEYS?(?:_.*)?$/i,
+      /^DEEPSEEK(?:_API)?_KEYS?(?:_.*)?$/i,
+      /^MISTRAL(?:_API)?_KEYS?(?:_.*)?$/i,
+    ],
+    [/URL/i, /BASE_URL/i, /ENDPOINT/i, /MODEL/i, /AUTH/i, /OPENROUTER/i]
+  ).filter((token) => !/^https?:\/\//i.test(token) && !/^sk-or-/i.test(token));
+}
+
+function getAlternativeAiBaseUrls(): string[] {
+  const configured = collectSecretKeyPool([
+    /^AI(?:_API)?_(?:BASE_?)?URLS?(?:_.*)?$/i,
+    /^ALT(?:ERNATIVE)?_AI_(?:BASE_?)?URLS?(?:_.*)?$/i,
+    /^OPENAI_(?:BASE_?)?URLS?(?:_.*)?$/i,
+    /^GROQ_(?:BASE_?)?URLS?(?:_.*)?$/i,
+    /^TOGETHER_(?:BASE_?)?URLS?(?:_.*)?$/i,
+    /^AIML_(?:BASE_?)?URLS?(?:_.*)?$/i,
+  ]).filter((u) => isSafeHttpsUrl(u));
+  if (configured.length > 0) return configured;
+  if (collectSecretKeyPool([/^GROQ(?:_API)?_KEYS?(?:_.*)?$/i]).length > 0) {
+    return ['https://api.groq.com/openai/v1'];
+  }
+  if (collectSecretKeyPool([/^TOGETHER(?:_API)?_KEYS?(?:_.*)?$/i]).length > 0) {
+    return ['https://api.together.xyz/v1'];
+  }
+  if (collectSecretKeyPool([/^DEEPSEEK(?:_API)?_KEYS?(?:_.*)?$/i]).length > 0) {
+    return ['https://api.deepseek.com/v1'];
+  }
+  return ['https://api.openai.com/v1'];
+}
+
+function getAiGatewayAuthKeys(): string[] {
+  return collectSecretKeyPool(
+    [
+      /^(?:AI_)?AUTHENTICATION(?:_KEYS?)?(?:_.*)?$/i,
+      /^(?:AI|GATEWAY|OPENROUTER|API)?_?AUTH_KEYS?(?:_.*)?$/i,
+    ],
+    [/URL/i]
+  ).filter((token) => !/^https?:\/\//i.test(token));
+}
+
+function hasAnyTextAiConfigured(): boolean {
+  return (
+    getGeminiApiKeys().length > 0 ||
+    getOpenRouterApiKeys().length > 0 ||
+    getAlternativeAiApiKeys().length > 0
+  );
+}
+
 function getGoogleMapsApiKeys(): string[] {
-  return collectSecretKeyPool([/GOOGLE_MAPS.*KEY/i, /^MAPS_API_KEYS?(?:_.*)?$/i]);
+  return collectSecretKeyPool(
+    [/GOOGLE_MAPS.*KEY/i, /^MAPS_API_KEYS?(?:_.*)?$/i, /^GMP_.*KEYS?(?:_.*)?$/i],
+    [/URL/i]
+  ).filter((token) => !/^https?:\/\//i.test(token));
 }
 
 function getRotatedMapsApiKey(): string {
   const candidates = getRotatedCandidates('maps', getGoogleMapsApiKeys(), mapsKeyCursor);
   return candidates[0] || '';
+}
+
+function getWeb3RpcEndpoints(): string[] {
+  const rawUrls = collectSecretKeyPool([
+    /^(?:ALCHEMY|ETH(?:EREUM)?|EVM|WEB3|BLOCKCHAIN|CHAIN|JSON_?RPC|MAINNET).*URLS?(?:_.*)?$/i,
+    /^RPC_URLS?(?:_.*)?$/i,
+  ]);
+  const rawKeys = collectSecretKeyPool(
+    [
+      /^ALCHEMY.*(?:API_?)?KEYS?(?:_.*)?$/i,
+      /^(?:WEB3|ETH(?:EREUM)?|RPC)_API_KEYS?(?:_.*)?$/i,
+    ],
+    [/URL/i, /WEBHOOK/i]
+  );
+
+  const seen = new Set<string>();
+  const endpoints: string[] = [];
+
+  for (const candidate of rawUrls) {
+    if (isSafeHttpsUrl(candidate) && !seen.has(candidate)) {
+      seen.add(candidate);
+      endpoints.push(candidate);
+    }
+  }
+
+  for (const token of rawKeys) {
+    const resolved = /^https?:\/\//i.test(token)
+      ? token
+      : `https://eth-mainnet.g.alchemy.com/v2/${token}`;
+    if (isSafeHttpsUrl(resolved) && !seen.has(resolved)) {
+      seen.add(resolved);
+      endpoints.push(resolved);
+    }
+  }
+
+  return endpoints;
+}
+
+function getMailerLiteApiKeys(): string[] {
+  return collectSecretKeyPool(
+    [/^MAILERLITE(?:_API)?_KEYS?(?:_.*)?$/i],
+    [/URL/i]
+  ).filter((token) => !/^https?:\/\//i.test(token));
+}
+
+function getTwilioApiKeys(): string[] {
+  return collectSecretKeyPool(
+    [/^TWILIO(?:_API)?_KEYS?(?:_.*)?$/i, /^TWILIO_AUTH_TOKENS?(?:_.*)?$/i],
+    [/URL/i, /SID/i]
+  ).filter((token) => !/^https?:\/\//i.test(token));
+}
+
+function getTwilioAccountSids(): string[] {
+  return collectSecretKeyPool(
+    [/^TWILIO_ACCOUNT_SIDS?(?:_.*)?$/i],
+    [/URL/i]
+  ).filter((token) => !/^https?:\/\//i.test(token));
+}
+
+function getMeetingBaasApiKeys(): string[] {
+  return collectSecretKeyPool(
+    [/^MEETING_?BAAS(?:_API)?_KEYS?(?:_.*)?$/i],
+    [/URL/i]
+  ).filter((token) => !/^https?:\/\//i.test(token));
+}
+
+function getPwPushUrls(): string[] {
+  return collectSecretKeyPool([/^PWPUSH(?:_API)?_URLS?(?:_.*)?$/i]).filter((u) => {
+    if (!isSafeHttpsUrl(u)) return false;
+    try {
+      const host = new URL(u).hostname.toLowerCase();
+      return /(?:^|\.)pwpush\.com$/i.test(host);
+    } catch {
+      return false;
+    }
+  });
 }
 
 const HOST_SPECIFIC_KEY_PATTERNS: Record<string, RegExp[]> = {
@@ -202,8 +440,8 @@ function getRapidApiKeys(host?: string): string[] {
   const hostPatterns = host ? HOST_SPECIFIC_KEY_PATTERNS[host] || [] : [];
   const hostKeys = hostPatterns.length > 0 ? collectSecretKeyPool(hostPatterns) : [];
   const sharedKeys = collectSecretKeyPool(
-    [/RAPID_?API.*KEY/i, /TRAVEL_FEED.*KEY/i],
-    [/APP_ID/i]
+    [/RAPID_?API.*KEY/i, /TRAVEL_FEED.*KEY/i, /^RAPID_?KEYS?(?:_.*)?$/i],
+    [/APP_ID/i, /URL/i]
   );
   const seen = new Set<string>();
   const merged: string[] = [];
@@ -500,21 +738,27 @@ function resolveIso2Code(input: string): string {
   return clean.slice(0, 2).toUpperCase();
 }
 
-function createGeminiClientForKey(apiKey: string): GoogleGenAI {
+function createGeminiClientForKey(apiKey: string, baseUrl?: string): GoogleGenAI {
+  const httpOptions: { headers: Record<string, string>; baseUrl?: string } = {
+    headers: {
+      'User-Agent': 'aistudio-build',
+    },
+  };
+  if (baseUrl && isSafeHttpsUrl(baseUrl)) {
+    httpOptions.baseUrl = baseUrl;
+  }
   return new GoogleGenAI({
     apiKey,
-    httpOptions: {
-      headers: {
-        'User-Agent': 'aistudio-build',
-      },
-    },
+    httpOptions,
   });
 }
 
 function getGeminiClient(): GoogleGenAI | null {
   const key = getActiveApiKey();
   if (!key) return null;
-  return createGeminiClientForKey(key);
+  const baseUrls = getGeminiBaseUrls();
+  const baseUrl = baseUrls.length > 0 ? getRotatedCandidates('gemini-url', baseUrls, geminiUrlCursor)[0] : undefined;
+  return createGeminiClientForKey(key, baseUrl);
 }
 
 async function executeWithGeminiRotation<T>(operation: (ai: GoogleGenAI) => Promise<T>): Promise<T> {
@@ -522,12 +766,14 @@ async function executeWithGeminiRotation<T>(operation: (ai: GoogleGenAI) => Prom
   if (keys.length === 0) {
     throw new Error('Server AI credentials are not configured.');
   }
+  const baseUrls = getGeminiBaseUrls();
+  const baseUrl = baseUrls.length > 0 ? getRotatedCandidates('gemini-url', baseUrls, geminiUrlCursor)[0] : undefined;
   const candidates = getRotatedCandidates('gemini', keys, geminiKeyCursor);
   let lastErr: any = null;
   for (let i = 0; i < candidates.length; i += 1) {
     const key = candidates[i];
     try {
-      const ai = createGeminiClientForKey(key);
+      const ai = createGeminiClientForKey(key, baseUrl);
       return await operation(ai);
     } catch (err: any) {
       lastErr = err;
@@ -549,6 +795,13 @@ async function executeWithGeminiRotation<T>(operation: (ai: GoogleGenAI) => Prom
 }
 
 function parseGeminiError(error: any): { status: number; code: string; message: string } {
+  if (error?.code === 'ALL_AI_PROVIDERS_FAILED') {
+    return {
+      status: Number(error?.status || 502),
+      code: 'ALL_AI_PROVIDERS_FAILED',
+      message: String(error?.message || 'All configured AI providers failed.'),
+    };
+  }
   const rawMessage = typeof error?.message === 'string' ? error.message.trim() : String(error || 'Upstream Gemini request failed');
   let parsedBody: any = null;
   if (rawMessage.startsWith('{')) {
@@ -628,32 +881,508 @@ function sanitizeConfig(config: any = {}) {
   return clean;
 }
 
-// 1. Generate content (Text, Structured JSON, Multimodal analysis, Audio/TTS, Search Grounding)
+// --- OpenRouter & Alternative OpenAI-Compatible AI Failover Engine ---
+function mapOpenRouterModel(modelName?: string, provider: 'openrouter' | 'alternative' = 'openrouter'): string {
+  const envDefault =
+    provider === 'openrouter'
+      ? (process.env.OPENROUTER_MODEL || '').trim()
+      : (process.env.AI_API_MODEL || process.env.OPENAI_MODEL || '').trim();
+  if (modelName && modelName.includes('/')) {
+    return modelName.trim();
+  }
+  if (provider === 'alternative' && modelName && /^(?:gpt-|o[134]-|claude-|deepseek-|llama-|mistral-)/i.test(modelName)) {
+    return modelName.trim();
+  }
+  if (envDefault) return envDefault;
+  const lower = (modelName || '').toLowerCase();
+  if (provider === 'openrouter') {
+    if (lower.includes('argon') || lower.includes('pro') || lower.includes('carbon')) {
+      return 'google/gemini-2.5-pro';
+    }
+    return 'google/gemini-2.5-flash';
+  }
+  if (lower.includes('argon') || lower.includes('pro') || lower.includes('carbon')) {
+    return 'gpt-4o';
+  }
+  return 'gpt-4o-mini';
+}
+
+function convertGeminiContentsToMessages(
+  contents: any,
+  systemInstruction?: string
+): Array<{ role: 'system' | 'user' | 'assistant'; content: any }> {
+  const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: any }> = [];
+  if (systemInstruction && systemInstruction.trim()) {
+    messages.push({ role: 'system', content: systemInstruction.trim() });
+  }
+
+  const convertPartsToContent = (parts: any[]): any => {
+    const hasMedia = parts.some((p) => p?.inlineData?.data);
+    if (!hasMedia) {
+      return parts
+        .map((p) => (typeof p === 'string' ? p : typeof p?.text === 'string' ? p.text : ''))
+        .filter(Boolean)
+        .join('\n');
+    }
+    const contentBlocks: any[] = [];
+    for (const part of parts) {
+      if (typeof part === 'string' && part.trim()) {
+        contentBlocks.push({ type: 'text', text: part });
+      } else if (typeof part?.text === 'string' && part.text.trim()) {
+        contentBlocks.push({ type: 'text', text: part.text });
+      } else if (part?.inlineData?.data && part?.inlineData?.mimeType) {
+        const mime = String(part.inlineData.mimeType);
+        if (mime.startsWith('image/')) {
+          contentBlocks.push({
+            type: 'image_url',
+            image_url: { url: `data:${mime};base64,${part.inlineData.data}` },
+          });
+        }
+      }
+    }
+    return contentBlocks.length > 0 ? contentBlocks : '';
+  };
+
+  if (typeof contents === 'string') {
+    messages.push({ role: 'user', content: contents });
+    return messages;
+  }
+
+  if (Array.isArray(contents)) {
+    for (const item of contents) {
+      if (typeof item === 'string') {
+        messages.push({ role: 'user', content: item });
+      } else if (item && Array.isArray(item.parts)) {
+        const role = item.role === 'model' || item.role === 'assistant' ? 'assistant' : 'user';
+        const converted = convertPartsToContent(item.parts);
+        if (converted && (typeof converted !== 'string' || converted.trim())) {
+          messages.push({ role, content: converted });
+        }
+      } else if (item && typeof item.text === 'string') {
+        messages.push({ role: 'user', content: item.text });
+      }
+    }
+    return messages.length > 0 ? messages : [{ role: 'user', content: '' }];
+  }
+
+  if (contents && Array.isArray(contents.parts)) {
+    messages.push({ role: 'user', content: convertPartsToContent(contents.parts) });
+    return messages;
+  }
+
+  messages.push({ role: 'user', content: JSON.stringify(contents || '') });
+  return messages;
+}
+
+function extractTextFromOpenAICompatibleResponse(data: any): string {
+  const content = data?.choices?.[0]?.message?.content;
+  if (typeof content === 'string') return content;
+  if (Array.isArray(content)) {
+    return content
+      .map((part) => (typeof part?.text === 'string' ? part.text : ''))
+      .filter(Boolean)
+      .join('');
+  }
+  return '';
+}
+
+async function callOpenAICompatibleProvider(options: {
+  provider: 'openrouter' | 'alternative';
+  contents: any;
+  systemInstruction?: string;
+  model?: string;
+  config?: any;
+}): Promise<{ text: string; candidates: any[]; providerUsed: string; modelUsed: string }> {
+  const { provider, contents, systemInstruction, model, config } = options;
+  const keys = provider === 'openrouter' ? getOpenRouterApiKeys() : getAlternativeAiApiKeys();
+  if (keys.length === 0) {
+    throw new Error(
+      provider === 'openrouter'
+        ? 'OpenRouter API key is not configured.'
+        : 'Alternative AI API keys are not configured.'
+    );
+  }
+
+  const baseUrls = provider === 'openrouter' ? getOpenRouterBaseUrls() : getAlternativeAiBaseUrls();
+  const baseUrl = baseUrls[0].replace(/\/+$/, '');
+  const scope = provider === 'openrouter' ? 'openrouter' : 'alternative-ai';
+  const cursor = provider === 'openrouter' ? openRouterKeyCursor : alternativeAiKeyCursor;
+  const candidates = getRotatedCandidates(scope, keys, cursor);
+  if (provider === 'openrouter') {
+    openRouterRotationCount += 1;
+  } else {
+    alternativeAiRotationCount += 1;
+  }
+
+  const resolvedSystem =
+    typeof config?.systemInstruction === 'string'
+      ? config.systemInstruction
+      : systemInstruction;
+  const messages = convertGeminiContentsToMessages(contents, resolvedSystem);
+  const targetModel = mapOpenRouterModel(model, provider);
+  const wantsJson = config?.responseMimeType === 'application/json';
+  const customAltBaseConfigured =
+    provider === 'alternative' &&
+    collectSecretKeyPool([
+      /^AI(?:_API)?_(?:BASE_?)?URLS?(?:_.*)?$/i,
+      /^ALT(?:ERNATIVE)?_AI_(?:BASE_?)?URLS?(?:_.*)?$/i,
+    ]).length > 0;
+  const authKeys = customAltBaseConfigured ? getAiGatewayAuthKeys() : [];
+
+  let lastError = `${provider === 'openrouter' ? 'OpenRouter' : 'Alternative AI'} service temporarily unavailable.`;
+
+  for (let i = 0; i < candidates.length; i += 1) {
+    const apiKey = candidates[i];
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 28_000);
+    try {
+      const headers: Record<string, string> = {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      };
+      if (provider === 'openrouter') {
+        headers['HTTP-Referer'] = 'https://afriestate.app';
+        headers['X-Title'] = 'AfriEstate';
+      }
+      if (authKeys.length > 0) {
+        headers['x-auth-key'] = authKeys[0];
+      }
+
+      const payload: Record<string, any> = {
+        model: targetModel,
+        messages,
+      };
+      if (typeof config?.temperature === 'number') {
+        payload.temperature = config.temperature;
+      }
+      if (wantsJson) {
+        payload.response_format = { type: 'json_object' };
+      }
+
+      const response = await fetch(`${baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        let detail = `HTTP ${response.status}`;
+        try {
+          const errJson = await response.json();
+          detail = errJson?.error?.message || errJson?.message || detail;
+        } catch {
+          // ignore
+        }
+        if (/incorrect api key|invalid api key/i.test(detail)) {
+          detail = `Upstream endpoint (${new URL(baseUrl).hostname}) rejected the configured API key — verify the provider base URL or key in Settings > Secrets.`;
+        }
+        lastError = `${provider === 'openrouter' ? 'OpenRouter' : 'Alternative AI'}: ${detail}`;
+        if (
+          response.status === 401 ||
+          response.status === 402 ||
+          response.status === 403 ||
+          response.status === 429 ||
+          response.status >= 500
+        ) {
+          markKeyCooldown(scope, apiKey, response.status === 429 ? 60_000 : 300_000);
+          if (i < candidates.length - 1) continue;
+        }
+        throw new Error(lastError);
+      }
+
+      const data = await response.json();
+      const text = extractTextFromOpenAICompatibleResponse(data);
+      return {
+        text,
+        candidates: [{ content: { parts: [{ text }] }, finishReason: data?.choices?.[0]?.finish_reason || 'STOP' }],
+        providerUsed: provider === 'openrouter' ? 'OpenRouter' : 'Alternative AI Gateway',
+        modelUsed: data?.model || targetModel,
+      };
+    } catch (err: any) {
+      lastError = err?.message || lastError;
+      if (i < candidates.length - 1) {
+        markKeyCooldown(scope, apiKey, 60_000);
+        continue;
+      }
+      throw new Error(lastError);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  throw new Error(lastError);
+}
+
+async function streamOpenAICompatibleProvider(options: {
+  provider: 'openrouter' | 'alternative';
+  contents: any;
+  systemInstruction?: string;
+  model?: string;
+  config?: any;
+  res: express.Response;
+}): Promise<boolean> {
+  const { provider, contents, systemInstruction, model, config, res } = options;
+  const keys = provider === 'openrouter' ? getOpenRouterApiKeys() : getAlternativeAiApiKeys();
+  if (keys.length === 0) return false;
+
+  const baseUrls = provider === 'openrouter' ? getOpenRouterBaseUrls() : getAlternativeAiBaseUrls();
+  const baseUrl = baseUrls[0].replace(/\/+$/, '');
+  const scope = provider === 'openrouter' ? 'openrouter' : 'alternative-ai';
+  const cursor = provider === 'openrouter' ? openRouterKeyCursor : alternativeAiKeyCursor;
+  const candidates = getRotatedCandidates(scope, keys, cursor);
+  if (provider === 'openrouter') {
+    openRouterRotationCount += 1;
+  } else {
+    alternativeAiRotationCount += 1;
+  }
+
+  const messages = convertGeminiContentsToMessages(contents, systemInstruction);
+  const targetModel = mapOpenRouterModel(model, provider);
+  const modelsToTry =
+    provider === 'openrouter' && (!model || !model.includes('/'))
+      ? Array.from(new Set([targetModel, 'openrouter/free']))
+      : [targetModel];
+
+  for (let i = 0; i < candidates.length; i += 1) {
+    const apiKey = candidates[i];
+    for (const candidateModel of modelsToTry) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 35_000);
+      try {
+        const headers: Record<string, string> = {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+          Accept: 'text/event-stream',
+        };
+        if (provider === 'openrouter') {
+          headers['HTTP-Referer'] = 'https://afriestate.app';
+          headers['X-Title'] = 'AfriEstate';
+        }
+
+        const upstream = await fetch(`${baseUrl}/chat/completions`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            model: candidateModel,
+            messages,
+            stream: true,
+            ...(typeof config?.temperature === 'number' ? { temperature: config.temperature } : {}),
+          }),
+          signal: controller.signal,
+        });
+
+        if (!upstream.ok || !upstream.body) {
+          if (provider === 'openrouter' && (upstream.status === 402 || upstream.status === 404) && candidateModel !== 'openrouter/free') {
+            continue;
+          }
+          if (
+            upstream.status === 401 ||
+            upstream.status === 403 ||
+            upstream.status === 429 ||
+            upstream.status >= 500
+          ) {
+            markKeyCooldown(scope, apiKey, upstream.status === 429 ? 60_000 : 300_000);
+          }
+          break;
+        }
+
+        if (!res.headersSent) {
+          res.setHeader('Content-Type', 'text/event-stream');
+          res.setHeader('Cache-Control', 'no-cache');
+          res.setHeader('Connection', 'keep-alive');
+          res.flushHeaders?.();
+        }
+
+        const reader = upstream.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+          for (const rawLine of lines) {
+            const line = rawLine.trim();
+            if (!line.startsWith('data:')) continue;
+            const payloadStr = line.slice(5).trim();
+            if (payloadStr === '[DONE]') {
+              if (!res.writableEnded) {
+                res.write('data: [DONE]\n\n');
+                res.end();
+              }
+              return true;
+            }
+            try {
+              const parsed = JSON.parse(payloadStr);
+              const deltaText = parsed?.choices?.[0]?.delta?.content;
+              if (typeof deltaText === 'string' && deltaText.length > 0 && !res.writableEnded) {
+                res.write(`data: ${JSON.stringify({ text: deltaText })}\n\n`);
+              }
+            } catch {
+              // ignore partial JSON frames
+            }
+          }
+        }
+
+        if (!res.writableEnded) {
+          res.write('data: [DONE]\n\n');
+          res.end();
+        }
+        return true;
+      } catch {
+        markKeyCooldown(scope, apiKey, 60_000);
+        break;
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+  }
+  return false;
+}
+
+async function executeTextAiWithFallback(options: {
+  model?: string;
+  contents: any;
+  systemInstruction?: string;
+  config?: any;
+  preferredProvider?: 'auto' | 'gemini' | 'openrouter' | 'alternative';
+}): Promise<{ text: string; candidates: any[]; providerUsed: string; modelUsed: string }> {
+  const { model, contents, systemInstruction, config, preferredProvider = 'auto' } = options;
+  const explicitlyOpenRouter = preferredProvider === 'openrouter' || Boolean(model && model.includes('/'));
+  const explicitlyAlternative = preferredProvider === 'alternative';
+  const explicitlyGemini = preferredProvider === 'gemini';
+
+  const steps: Array<'gemini' | 'openrouter' | 'alternative'> = explicitlyOpenRouter
+    ? ['openrouter']
+    : explicitlyAlternative
+    ? ['alternative']
+    : explicitlyGemini
+    ? ['gemini']
+    : ['gemini', 'openrouter', 'alternative'];
+
+  const stepErrors: string[] = [];
+  let lastError: any = new Error('Live AI service is currently unavailable because server credentials are not configured.');
+
+  for (const step of steps) {
+    if (step === 'gemini' && getGeminiApiKeys().length > 0) {
+      try {
+        const targetModel = mapModel(model);
+        const sanitizedConfig = sanitizeConfig(config);
+        const response = await executeWithGeminiRotation((ai) =>
+          ai.models.generateContent({
+            model: targetModel,
+            contents,
+            config: sanitizedConfig,
+          })
+        );
+        return {
+          text: response.text || '',
+          candidates: response.candidates || [],
+          providerUsed: 'Gemini',
+          modelUsed: targetModel,
+        };
+      } catch (err: any) {
+        lastError = err;
+        stepErrors.push(`Gemini: ${parseGeminiError(err).message}`);
+        continue;
+      }
+    }
+
+    if (step === 'openrouter' && getOpenRouterApiKeys().length > 0) {
+      try {
+        return await callOpenAICompatibleProvider({
+          provider: 'openrouter',
+          contents,
+          systemInstruction,
+          model,
+          config,
+        });
+      } catch (err: any) {
+        if (!model || !model.includes('/')) {
+          try {
+            return await callOpenAICompatibleProvider({
+              provider: 'openrouter',
+              contents,
+              systemInstruction,
+              model: 'openrouter/free',
+              config,
+            });
+          } catch (freeErr: any) {
+            try {
+              return await callOpenAICompatibleProvider({
+                provider: 'openrouter',
+                contents,
+                systemInstruction,
+                model: 'openrouter/auto',
+                config,
+              });
+            } catch (autoErr: any) {
+              lastError = autoErr;
+              stepErrors.push(autoErr?.message || freeErr?.message || err?.message || 'OpenRouter failed');
+              continue;
+            }
+          }
+        }
+        lastError = err;
+        stepErrors.push(err?.message || 'OpenRouter failed');
+        continue;
+      }
+    }
+
+    if (step === 'alternative' && getAlternativeAiApiKeys().length > 0) {
+      try {
+        return await callOpenAICompatibleProvider({
+          provider: 'alternative',
+          contents,
+          systemInstruction,
+          model,
+          config,
+        });
+      } catch (err: any) {
+        lastError = err;
+        stepErrors.push(err?.message || 'Alternative AI failed');
+        continue;
+      }
+    }
+  }
+
+  if (stepErrors.length > 1) {
+    const combined: any = new Error(stepErrors.join(' | '));
+    combined.status = 502;
+    combined.code = 'ALL_AI_PROVIDERS_FAILED';
+    throw combined;
+  }
+  throw lastError;
+}
+
+// 1. Generate content (Text, Structured JSON, Multimodal analysis, Audio/TTS, Search Grounding + OpenRouter/AI API failover)
 app.post('/api/gemini/generate', async (req, res) => {
   try {
-    if (getGeminiApiKeys().length === 0) {
+    if (!hasAnyTextAiConfigured()) {
       return res.status(503).json({
         error: 'Live AI service is currently unavailable because server credentials are not configured.',
       });
     }
-    const { model, contents, config } = req.body || {};
+    const { model, contents, config, provider } = req.body || {};
     if (!contents) {
       return res.status(400).json({ error: 'Missing contents payload' });
     }
-    const targetModel = mapModel(model);
-    const sanitizedConfig = sanitizeConfig(config);
 
-    const response = await executeWithGeminiRotation((ai) =>
-      ai.models.generateContent({
-        model: targetModel,
-        contents,
-        config: sanitizedConfig,
-      })
-    );
+    const response = await executeTextAiWithFallback({
+      model,
+      contents,
+      config,
+      preferredProvider: provider,
+    });
 
     res.json({
       text: response.text || '',
       candidates: response.candidates || [],
+      providerUsed: response.providerUsed,
+      modelUsed: response.modelUsed,
     });
   } catch (error: any) {
     const parsed = parseGeminiError(error);
@@ -662,10 +1391,10 @@ app.post('/api/gemini/generate', async (req, res) => {
   }
 });
 
-// 2. Chat Streaming (SSE)
+// 2. Chat Streaming (SSE with automatic OpenRouter / Alternative AI failover)
 app.post('/api/gemini/chat-stream', async (req, res) => {
   try {
-    if (getGeminiApiKeys().length === 0) {
+    if (!hasAnyTextAiConfigured()) {
       return res.status(503).json({
         error: 'Live AI service is currently unavailable because server credentials are not configured.',
       });
@@ -675,11 +1404,6 @@ app.post('/api/gemini/chat-stream', async (req, res) => {
       return res.status(400).json({ error: 'Message text is required' });
     }
     const targetModel = mapModel(model);
-
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
-    res.flushHeaders?.();
 
     let contents: any;
     if (Array.isArray(history) && history.length > 0) {
@@ -700,23 +1424,72 @@ app.post('/api/gemini/chat-stream', async (req, res) => {
       contents = message;
     }
 
-    const responseStream = await executeWithGeminiRotation((ai) =>
-      ai.models.generateContentStream({
-        model: targetModel,
-        contents,
-        config: sanitizeConfig(config),
-      })
-    );
+    let streamedViaGemini = false;
+    if (getGeminiApiKeys().length > 0 && !(model && String(model).includes('/'))) {
+      try {
+        const responseStream = await executeWithGeminiRotation((ai) =>
+          ai.models.generateContentStream({
+            model: targetModel,
+            contents,
+            config: sanitizeConfig(config),
+          })
+        );
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+        res.flushHeaders?.();
+        streamedViaGemini = true;
 
-    for await (const chunk of responseStream) {
-      if (res.writableEnded) break;
-      const text = chunk.text || '';
-      res.write(`data: ${JSON.stringify({ text })}\n\n`);
+        for await (const chunk of responseStream) {
+          if (res.writableEnded) break;
+          const text = chunk.text || '';
+          res.write(`data: ${JSON.stringify({ text })}\n\n`);
+        }
+        if (!res.writableEnded) {
+          res.write('data: [DONE]\n\n');
+          res.end();
+        }
+        return;
+      } catch (geminiErr: any) {
+        if (getOpenRouterApiKeys().length === 0 && getAlternativeAiApiKeys().length === 0) {
+          throw geminiErr;
+        }
+      }
     }
 
-    if (!res.writableEnded) {
-      res.write('data: [DONE]\n\n');
-      res.end();
+    if (!streamedViaGemini) {
+      const openAiMessages: any[] = [];
+      if (Array.isArray(history)) {
+        for (const h of history.slice(-20)) {
+          openAiMessages.push({
+            role: h.role === 'user' ? 'user' : 'model',
+            parts: [{ text: String(h.text || h.content || '') }],
+          });
+        }
+      }
+      openAiMessages.push({ role: 'user', parts: [{ text: message }] });
+
+      const orStreamed = await streamOpenAICompatibleProvider({
+        provider: 'openrouter',
+        contents: openAiMessages,
+        systemInstruction,
+        model,
+        config,
+        res,
+      });
+      if (orStreamed) return;
+
+      const altStreamed = await streamOpenAICompatibleProvider({
+        provider: 'alternative',
+        contents: openAiMessages,
+        systemInstruction,
+        model,
+        config,
+        res,
+      });
+      if (altStreamed) return;
+
+      throw new Error('All configured AI streaming providers are currently unavailable.');
     }
   } catch (error: any) {
     const parsed = parseGeminiError(error);
@@ -936,7 +1709,7 @@ app.post('/api/gemini/flight-tracker', async (req, res) => {
   };
 
   const runGeminiFlightGrounding = async () => {
-    if (getGeminiApiKeys().length === 0) {
+    if (!hasAnyTextAiConfigured()) {
       throw new Error('Server AI credentials are not configured.');
     }
 
@@ -952,15 +1725,13 @@ GATE_TERMINAL: <Departure Terminal / Gate if available or Check Airport Monitor>
 AIRCRAFT: <Aircraft type if available or N/A>
 SUMMARY: <2 factual sentences on current status, recent performance on this route, and any delays or advisories for ${cleanDate}.>`;
 
-    const response = await executeWithGeminiRotation((ai) =>
-      ai.models.generateContent({
-        model: 'gemini-4-hydrogen',
-        contents: prompt,
-        config: {
-          tools: [{ googleSearch: {} }],
-        },
-      })
-    );
+    const response = await executeTextAiWithFallback({
+      model: 'gemini-4-hydrogen',
+      contents: prompt,
+      config: {
+        tools: [{ googleSearch: {} }],
+      },
+    });
 
     const reportText = (response.text || '').trim();
     const rawChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
@@ -1173,7 +1944,7 @@ app.post('/api/gemini/visa-advisor', async (req, res) => {
   const todayIso = new Date().toISOString().slice(0, 10);
 
   const runGeminiVisaVerification = async () => {
-    if (getGeminiApiKeys().length === 0) {
+    if (!hasAnyTextAiConfigured()) {
       throw new Error('Server AI credentials are not configured.');
     }
 
@@ -1198,37 +1969,29 @@ Return valid JSON matching the requested schema:
 
     let response: any;
     try {
-      response = await executeWithGeminiRotation((ai) =>
-        ai.models.generateContent({
-          model: 'gemini-4-hydrogen',
-          contents: prompt,
-          config: {
-            tools: [{ googleSearch: {} }],
-            responseMimeType: 'application/json',
-            responseSchema: visaVerificationSchema,
-          },
-        })
-      );
-    } catch (schemaErr: any) {
-      const parsedErr = parseGeminiError(schemaErr);
-      const rawMsg = String(schemaErr?.message || '');
-      const isSchemaToolConflict =
-        parsedErr.status === 400 &&
-        (rawMsg.toLowerCase().includes('schema') ||
-          rawMsg.toLowerCase().includes('mime') ||
-          rawMsg.toLowerCase().includes('tool'));
-      if (!isSchemaToolConflict) {
-        throw schemaErr;
+      if (getGeminiApiKeys().length > 0) {
+        response = await executeWithGeminiRotation((ai) =>
+          ai.models.generateContent({
+            model: 'gemini-4-hydrogen',
+            contents: prompt,
+            config: {
+              tools: [{ googleSearch: {} }],
+              responseMimeType: 'application/json',
+              responseSchema: visaVerificationSchema,
+            },
+          })
+        );
+      } else {
+        throw new Error('Gemini unconfigured');
       }
-      response = await executeWithGeminiRotation((ai) =>
-        ai.models.generateContent({
-          model: 'gemini-4-hydrogen',
-          contents: `${prompt}\n\nRespond ONLY with raw valid JSON matching keys: entryCategory, stayLimit, estimatedFee, processingTime, officialPortal, bureaucraticSummary, propertyAdvisory, items (array of { id, label, status, summary, last_verified_date, sources: [{ title, url }] }).`,
-          config: {
-            tools: [{ googleSearch: {} }],
-          },
-        })
-      );
+    } catch (schemaErr: any) {
+      response = await executeTextAiWithFallback({
+        model: 'gemini-4-hydrogen',
+        contents: `${prompt}\n\nRespond ONLY with raw valid JSON matching keys: entryCategory, stayLimit, estimatedFee, processingTime, officialPortal, bureaucraticSummary, propertyAdvisory, items (array of { id, label, status, summary, last_verified_date, sources: [{ title, url }] }).`,
+        config: {
+          responseMimeType: 'application/json',
+        },
+      });
     }
 
     const reportText = (response.text || '').trim();
@@ -1618,7 +2381,7 @@ app.post('/api/gemini/search-grounding', async (req, res) => {
     if (!cleanQuery) {
       return res.status(400).json({ error: 'A market search query is required.' });
     }
-    if (getGeminiApiKeys().length === 0) {
+    if (!hasAnyTextAiConfigured()) {
       return res.status(503).json({
         error: 'Live neighborhood intelligence service is unavailable because server credentials are not configured.',
       });
@@ -1629,15 +2392,13 @@ app.post('/api/gemini/search-grounding', async (req, res) => {
       ? `Search the live web regarding real estate, urban infrastructure, rental yields, and neighborhood developments for ${locationScope}: ${cleanQuery}. Summarize factual recent findings clearly in 3-4 concise sentences.`
       : `Search the live web for factual recent African real estate & travel intelligence: ${cleanQuery}. Summarize clearly in 3-4 concise sentences.`;
 
-    const response = await executeWithGeminiRotation((ai) =>
-      ai.models.generateContent({
-        model: 'gemini-4-hydrogen',
-        contents: prompt,
-        config: {
-          tools: [{ googleSearch: {} }],
-        },
-      })
-    );
+    const response = await executeTextAiWithFallback({
+      model: 'gemini-4-hydrogen',
+      contents: prompt,
+      config: {
+        tools: [{ googleSearch: {} }],
+      },
+    });
 
     const summary = (response.text || '').trim();
     const rawChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
@@ -2027,19 +2788,54 @@ app.get('/api/neighborhood/safety-index', async (req, res) => {
   }
 });
 
-// 5b-8. Internal Feed Rotation Health Snapshot (provider hostnames anonymized in JSON output)
-app.get('/api/travel/rotation-status', (_req, res) => {
-  res.json({
+// 5b-8. Internal Secret & Endpoint Rotation Health Snapshot (never exposes raw keys, paths, or secret URLs)
+function buildRotationStatusPayload() {
+  const rpcEndpoints = getWeb3RpcEndpoints();
+  const mailerLiteKeys = getMailerLiteApiKeys();
+  const twilioKeys = getTwilioApiKeys();
+  const meetingBaasKeys = getMeetingBaasApiKeys();
+  const pwPushUrls = getPwPushUrls();
+  const openRouterKeys = getOpenRouterApiKeys();
+  const alternativeAiKeys = getAlternativeAiApiKeys();
+  const aiAuthKeys = getAiGatewayAuthKeys();
+  return {
     liveFeedsConfigured: getRapidApiKeys().length > 0,
     feedAppConfigured: collectSecretKeyPool([/^(?:X_)?RAPID_?API_APP_IDS?(?:_.*)?$/i]).length > 0,
     keyPoolSize: getRapidApiKeys().length,
+    rapidAppIdPoolSize: collectSecretKeyPool([/^(?:X_)?RAPID_?API_APP_IDS?(?:_.*)?$/i]).length,
     geminiKeyPoolSize: getGeminiApiKeys().length,
+    geminiUrlPoolSize: getGeminiBaseUrls().length,
+    openRouterKeyPoolSize: openRouterKeys.length,
+    alternativeAiKeyPoolSize: alternativeAiKeys.length,
+    aiAuthKeyPoolSize: aiAuthKeys.length,
     mapsKeyPoolSize: getGoogleMapsApiKeys().length,
-    aiConfigured: getGeminiApiKeys().length > 0,
+    web3RpcPoolSize: rpcEndpoints.length,
+    mailerLiteKeyPoolSize: mailerLiteKeys.length,
+    twilioKeyPoolSize: twilioKeys.length,
+    meetingBaasKeyPoolSize: meetingBaasKeys.length,
+    pwPushUrlPoolSize: pwPushUrls.length,
+    aiConfigured: hasAnyTextAiConfigured(),
+    geminiConfigured: getGeminiApiKeys().length > 0,
+    openRouterConfigured: openRouterKeys.length > 0,
+    alternativeAiConfigured: alternativeAiKeys.length > 0,
+    aiAuthKeyConfigured: aiAuthKeys.length > 0,
+    mapsConfigured: getGoogleMapsApiKeys().length > 0,
+    web3Configured: rpcEndpoints.length > 0,
+    mailerLiteConfigured: mailerLiteKeys.length > 0,
+    twilioConfigured: twilioKeys.length > 0,
+    meetingBaasConfigured: meetingBaasKeys.length > 0,
+    pwPushConfigured: pwPushUrls.length > 0,
     rotationCounters: {
       flightTracker: flightTrackerRotationIdx,
       visaAdvisor: visaAdvisorRotationIdx,
       travelLanguages: travelLanguagesRotationIdx,
+      web3Rpc: web3RpcRotationCount,
+      mailerLite: mailerLiteRotationCount,
+      twilio: twilioRotationCount,
+      meetingBaas: meetingBaasRotationCount,
+      pwPush: pwPushRotationCount,
+      openRouter: openRouterRotationCount,
+      alternativeAi: alternativeAiRotationCount,
     },
     channels: Array.from(rapidHostHealth.values()).map((h, idx) => ({
       channel: `feed-${idx + 1}`,
@@ -2047,8 +2843,477 @@ app.get('/api/travel/rotation-status', (_req, res) => {
       lastStatus: h.lastStatus,
       lastCheckedAt: h.lastCheckedAt,
     })),
+    rpcChannels: rpcEndpoints.map((url, idx) => {
+      let hostLabel = 'rpc-endpoint';
+      try {
+        hostLabel = new URL(url).hostname;
+      } catch {
+        // ignore
+      }
+      return {
+        channel: `rpc-${idx + 1}`,
+        host: hostLabel,
+        state: isKeyCoolingDown('web3-rpc', url) ? 'cooldown' : 'ready',
+      };
+    }),
+    pwPushChannels: pwPushUrls.map((url, idx) => {
+      let hostLabel = 'pwpush.com';
+      try {
+        hostLabel = new URL(url).hostname;
+      } catch {
+        // ignore
+      }
+      return {
+        channel: `pwpush-${idx + 1}`,
+        host: hostLabel,
+        state: isKeyCoolingDown('pwpush-url', url) ? 'cooldown' : 'ready',
+      };
+    }),
+    checkedAt: new Date().toISOString(),
+  };
+}
+
+app.get('/api/travel/rotation-status', (_req, res) => {
+  res.json(buildRotationStatusPayload());
+});
+
+app.get('/api/secrets/rotation-status', (_req, res) => {
+  res.json(buildRotationStatusPayload());
+});
+
+// 5b-9. Rotated Server-Side Web3 / Alchemy JSON-RPC Proxy (no secrets ever leave server)
+const ALLOWED_WEB3_RPC_METHODS = new Set([
+  'eth_blockNumber',
+  'eth_chainId',
+  'eth_getBalance',
+  'eth_call',
+  'eth_getTransactionByHash',
+  'eth_getTransactionReceipt',
+  'eth_getBlockByNumber',
+  'eth_getBlockByHash',
+  'eth_gasPrice',
+  'eth_feeHistory',
+  'eth_estimateGas',
+  'eth_getCode',
+  'eth_getLogs',
+  'net_version',
+  'web3_clientVersion',
+  'alchemy_getTokenBalances',
+  'alchemy_getAssetTransfers',
+]);
+
+async function executeWeb3RpcWithRotation(rpcPayload: { id: number | string; jsonrpc: '2.0'; method: string; params: any[] }) {
+  const endpoints = getWeb3RpcEndpoints();
+  if (endpoints.length === 0) {
+    throw new Error('No Web3/Alchemy RPC URLs or API keys are configured in Secrets.');
+  }
+  const candidates = getRotatedCandidates('web3-rpc', endpoints, web3RpcCursor);
+  web3RpcRotationCount += 1;
+  let lastError = 'Web3 RPC provider unavailable.';
+
+  for (let i = 0; i < candidates.length; i += 1) {
+    const endpointUrl = candidates[i];
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 12_000);
+    try {
+      const rpcRes = await fetch(endpointUrl, {
+        method: 'POST',
+        headers: {
+          accept: 'application/json',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify(rpcPayload),
+        signal: controller.signal,
+      });
+
+      if (!rpcRes.ok) {
+        lastError = `Upstream Web3 RPC returned HTTP ${rpcRes.status}.`;
+        if (rpcRes.status === 401 || rpcRes.status === 403 || rpcRes.status === 429 || rpcRes.status >= 500) {
+          markKeyCooldown('web3-rpc', endpointUrl, rpcRes.status === 429 ? 60_000 : 300_000);
+          if (i < candidates.length - 1) continue;
+        }
+        throw new Error(lastError);
+      }
+
+      const data = await rpcRes.json();
+      if (data?.error && Number(data.error?.code) === 429 && i < candidates.length - 1) {
+        markKeyCooldown('web3-rpc', endpointUrl, 60_000);
+        continue;
+      }
+      return {
+        data,
+        poolSize: endpoints.length,
+        channelIndex: (endpoints.indexOf(endpointUrl) + 1) || 1,
+      };
+    } catch (err: any) {
+      lastError = err?.message || lastError;
+      if (i < candidates.length - 1) {
+        markKeyCooldown('web3-rpc', endpointUrl, 60_000);
+        continue;
+      }
+      throw new Error(lastError);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  throw new Error(lastError);
+}
+
+app.get('/api/web3/health', async (_req, res) => {
+  const endpoints = getWeb3RpcEndpoints();
+  if (endpoints.length === 0) {
+    return res.status(503).json({
+      ok: false,
+      rpcPoolSize: 0,
+      error: 'No Web3/Alchemy RPC URLs or API keys found in Secrets.',
+      checkedAt: new Date().toISOString(),
+    });
+  }
+  try {
+    const result = await executeWeb3RpcWithRotation({
+      id: 1,
+      jsonrpc: '2.0',
+      method: 'eth_blockNumber',
+      params: [],
+    });
+    const hexBlock = typeof result.data?.result === 'string' ? result.data.result : null;
+    const blockNumber = hexBlock ? parseInt(hexBlock, 16) : null;
+    res.json({
+      ok: Boolean(hexBlock),
+      chain: 'eth-mainnet',
+      blockNumberHex: hexBlock,
+      blockNumber: Number.isFinite(blockNumber) ? blockNumber : null,
+      rpcPoolSize: result.poolSize,
+      channelUsed: `rpc-${result.channelIndex}`,
+      checkedAt: new Date().toISOString(),
+    });
+  } catch (err: any) {
+    res.status(502).json({
+      ok: false,
+      rpcPoolSize: endpoints.length,
+      error: err?.message || 'Web3 RPC health check failed.',
+      checkedAt: new Date().toISOString(),
+    });
+  }
+});
+
+app.post('/api/web3/rpc', async (req, res) => {
+  try {
+    const { id = 1, method, params = [] } = req.body || {};
+    const cleanMethod = typeof method === 'string' ? method.trim() : '';
+    if (!cleanMethod || !ALLOWED_WEB3_RPC_METHODS.has(cleanMethod)) {
+      return res.status(400).json({
+        error: 'Unsupported or disallowed JSON-RPC method.',
+      });
+    }
+    const safeParams = Array.isArray(params) ? params.slice(0, 10) : [];
+    const safeId = typeof id === 'number' || typeof id === 'string' ? id : 1;
+
+    const result = await executeWeb3RpcWithRotation({
+      id: safeId,
+      jsonrpc: '2.0',
+      method: cleanMethod,
+      params: safeParams,
+    });
+    res.json(result.data);
+  } catch (err: any) {
+    const status = String(err?.message || '').includes('configured') ? 503 : 502;
+    res.status(status).json({ error: err?.message || 'Web3 JSON-RPC request failed.' });
+  }
+});
+
+// 5b-10. Rotated Server-Side Integrations (MailerLite, Twilio, MeetingBaas, Password Pusher)
+async function callMailerLiteWithRotation(
+  endpointPath: string,
+  options: { method?: 'GET' | 'POST'; body?: Record<string, any> } = {}
+) {
+  const keys = getMailerLiteApiKeys();
+  if (keys.length === 0) {
+    throw new Error('MailerLite API key is not configured in Secrets.');
+  }
+  const candidates = getRotatedCandidates('mailerlite', keys, mailerLiteKeyCursor);
+  mailerLiteRotationCount += 1;
+  let lastError = 'MailerLite service temporarily unavailable.';
+
+  for (let i = 0; i < candidates.length; i += 1) {
+    const apiKey = candidates[i];
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 12_000);
+    try {
+      const response = await fetch(`https://connect.mailerlite.com/api${endpointPath}`, {
+        method: options.method || 'GET',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: options.body ? JSON.stringify(options.body) : undefined,
+        signal: controller.signal,
+      });
+      if (!response.ok) {
+        lastError = `MailerLite returned HTTP ${response.status}.`;
+        if (response.status === 401 || response.status === 403 || response.status === 429 || response.status >= 500) {
+          markKeyCooldown('mailerlite', apiKey, response.status === 429 ? 60_000 : 300_000);
+          if (i < candidates.length - 1) continue;
+        }
+        throw new Error(lastError);
+      }
+      const data = await response.json();
+      return { data, poolSize: keys.length };
+    } catch (err: any) {
+      lastError = err?.message || lastError;
+      if (i < candidates.length - 1) {
+        markKeyCooldown('mailerlite', apiKey, 60_000);
+        continue;
+      }
+      throw new Error(lastError);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  throw new Error(lastError);
+}
+
+app.get('/api/integrations/health', async (req, res) => {
+  const probe = req.query.probe === '1';
+  const mailerLiteKeys = getMailerLiteApiKeys();
+  const twilioKeys = getTwilioApiKeys();
+  const twilioSids = getTwilioAccountSids();
+  const meetingBaasKeys = getMeetingBaasApiKeys();
+  const pwPushUrls = getPwPushUrls();
+
+  let mailerLiteProbe: { ok: boolean; error?: string } | null = null;
+  let meetingBaasProbe: { ok: boolean; error?: string } | null = null;
+  let openRouterProbe: { ok: boolean; error?: string } | null = null;
+  const openRouterKeys = getOpenRouterApiKeys();
+
+  if (probe && openRouterKeys.length > 0) {
+    const candidates = getRotatedCandidates('openrouter', openRouterKeys, openRouterKeyCursor);
+    const baseUrl = getOpenRouterBaseUrls()[0].replace(/\/+$/, '');
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 10_000);
+    try {
+      const orRes = await fetch(`${baseUrl}/auth/key`, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${candidates[0]}`,
+          Accept: 'application/json',
+        },
+        signal: controller.signal,
+      });
+      if (orRes.ok) {
+        openRouterProbe = { ok: true };
+      } else {
+        openRouterProbe = { ok: false, error: `OpenRouter auth check returned HTTP ${orRes.status}.` };
+      }
+    } catch (err: any) {
+      openRouterProbe = { ok: false, error: err?.message || 'OpenRouter probe failed.' };
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  if (probe && mailerLiteKeys.length > 0) {
+    try {
+      await callMailerLiteWithRotation('/groups?limit=1');
+      mailerLiteProbe = { ok: true };
+    } catch (err: any) {
+      mailerLiteProbe = { ok: false, error: err?.message || 'MailerLite probe failed.' };
+    }
+  }
+
+  if (probe && meetingBaasKeys.length > 0) {
+    const candidates = getRotatedCandidates('meetingbaas', meetingBaasKeys, meetingBaasKeyCursor);
+    meetingBaasRotationCount += 1;
+    let mbError = 'MeetingBaas probe failed.';
+    for (let i = 0; i < candidates.length; i += 1) {
+      const apiKey = candidates[i];
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 10_000);
+      try {
+        const mbRes = await fetch('https://api.meetingbaas.com/v2/calendars', {
+          method: 'GET',
+          headers: {
+            'x-meeting-baas-api-key': apiKey,
+            Accept: 'application/json',
+          },
+          signal: controller.signal,
+        });
+        if (mbRes.ok) {
+          meetingBaasProbe = { ok: true };
+          break;
+        }
+        mbError = `MeetingBaas returned HTTP ${mbRes.status}.`;
+        if (mbRes.status === 401 || mbRes.status === 403 || mbRes.status === 429 || mbRes.status >= 500) {
+          markKeyCooldown('meetingbaas', apiKey, mbRes.status === 429 ? 60_000 : 300_000);
+          if (i < candidates.length - 1) continue;
+        }
+        meetingBaasProbe = { ok: false, error: mbError };
+        break;
+      } catch (err: any) {
+        mbError = err?.message || mbError;
+        if (i < candidates.length - 1) {
+          markKeyCooldown('meetingbaas', apiKey, 60_000);
+          continue;
+        }
+        meetingBaasProbe = { ok: false, error: mbError };
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+  }
+
+  if (twilioKeys.length > 0) {
+    getRotatedCandidates('twilio', twilioKeys, twilioKeyCursor);
+    twilioRotationCount += 1;
+  }
+  if (pwPushUrls.length > 0) {
+    getRotatedCandidates('pwpush-url', pwPushUrls, pwPushUrlCursor);
+    pwPushRotationCount += 1;
+  }
+
+  res.json({
+    mailerLite: {
+      configured: mailerLiteKeys.length > 0,
+      poolSize: mailerLiteKeys.length,
+      probe: mailerLiteProbe,
+    },
+    twilio: {
+      configured: twilioKeys.length > 0,
+      poolSize: twilioKeys.length,
+      accountSidConfigured: twilioSids.length > 0,
+      note: twilioKeys.length > 0 && twilioSids.length === 0
+        ? 'API Key loaded; pair with TWILIO_ACCOUNT_SID for live SMS/Voice calls.'
+        : undefined,
+    },
+    meetingBaas: {
+      configured: meetingBaasKeys.length > 0,
+      poolSize: meetingBaasKeys.length,
+      probe: meetingBaasProbe,
+    },
+    pwPush: {
+      configured: pwPushUrls.length > 0,
+      poolSize: pwPushUrls.length,
+      // Intentionally never auto-fetched so view-limited links are preserved
+      autoFetchDisabled: true,
+    },
+    aiProviders: {
+      geminiPoolSize: getGeminiApiKeys().length,
+      openRouterPoolSize: openRouterKeys.length,
+      openRouterProbe,
+      alternativeAiPoolSize: getAlternativeAiApiKeys().length,
+      aiAuthKeyConfigured: getAiGatewayAuthKeys().length > 0,
+    },
     checkedAt: new Date().toISOString(),
   });
+});
+
+// 5b-11. Unified Multi-Provider AI & OpenRouter Endpoints (Alternative/Failover to Gemini)
+app.get('/api/ai/providers', (_req, res) => {
+  res.json({
+    anyConfigured: hasAnyTextAiConfigured(),
+    providers: {
+      gemini: {
+        configured: getGeminiApiKeys().length > 0,
+        poolSize: getGeminiApiKeys().length,
+        defaultModel: 'gemini-4-hydrogen',
+      },
+      openRouter: {
+        configured: getOpenRouterApiKeys().length > 0,
+        poolSize: getOpenRouterApiKeys().length,
+        baseUrlHost: (() => {
+          try {
+            return new URL(getOpenRouterBaseUrls()[0]).hostname;
+          } catch {
+            return 'openrouter.ai';
+          }
+        })(),
+        defaultModel: mapOpenRouterModel(undefined, 'openrouter'),
+      },
+      alternativeAi: {
+        configured: getAlternativeAiApiKeys().length > 0,
+        poolSize: getAlternativeAiApiKeys().length,
+        baseUrlHost: (() => {
+          try {
+            return new URL(getAlternativeAiBaseUrls()[0]).hostname;
+          } catch {
+            return 'api.openai.com';
+          }
+        })(),
+        authKeyConfigured: getAiGatewayAuthKeys().length > 0,
+        defaultModel: mapOpenRouterModel(undefined, 'alternative'),
+      },
+    },
+    checkedAt: new Date().toISOString(),
+  });
+});
+
+app.post('/api/ai/chat', async (req, res) => {
+  try {
+    if (!hasAnyTextAiConfigured()) {
+      return res.status(503).json({
+        error: 'No AI API keys are currently configured in Settings > Secrets.',
+      });
+    }
+    const { provider = 'auto', model, prompt, contents, messages, systemInstruction, config } = req.body || {};
+    const resolvedContents =
+      contents ||
+      (Array.isArray(messages) && messages.length > 0
+        ? messages.map((m: any) => ({
+            role: m?.role === 'assistant' || m?.role === 'model' ? 'model' : 'user',
+            parts: [{ text: String(m?.content ?? m?.text ?? '') }],
+          }))
+        : typeof prompt === 'string' && prompt.trim()
+        ? prompt.trim()
+        : null);
+
+    if (!resolvedContents) {
+      return res.status(400).json({ error: 'Provide prompt, contents, or messages.' });
+    }
+
+    const result = await executeTextAiWithFallback({
+      model,
+      contents: resolvedContents,
+      systemInstruction,
+      config,
+      preferredProvider: provider,
+    });
+
+    res.json({
+      text: result.text,
+      candidates: result.candidates,
+      providerUsed: result.providerUsed,
+      modelUsed: result.modelUsed,
+    });
+  } catch (err: any) {
+    const parsed = parseGeminiError(err);
+    res.status(parsed.status).json({ error: parsed.message, code: parsed.code });
+  }
+});
+
+app.post('/api/integrations/newsletter/subscribe', async (req, res) => {
+  try {
+    const cleanEmail = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase().slice(0, 140) : '';
+    const cleanName = typeof req.body?.name === 'string' ? req.body.name.trim().slice(0, 120) : '';
+    if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      return res.status(400).json({ error: 'A valid email address is required.' });
+    }
+    const result = await callMailerLiteWithRotation('/subscribers', {
+      method: 'POST',
+      body: {
+        email: cleanEmail,
+        ...(cleanName ? { fields: { name: cleanName } } : {}),
+      },
+    });
+    res.json({
+      ok: true,
+      subscribed: true,
+      status: result.data?.data?.status || 'active',
+    });
+  } catch (err: any) {
+    const status = String(err?.message || '').includes('configured') ? 503 : 502;
+    res.status(status).json({ error: err?.message || 'Newsletter subscription failed.' });
+  }
 });
 
 // 5c. Scoped Real-Time Payment Settlement (ONLY Flights, Short Stays, and Car Hire)
